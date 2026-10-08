@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Modal } from '../components/Modal';
-import { CPPTInputTable } from '../components/CPPTInputTable';
 import { FormRawatJalan } from '../components/forms/FormRawatJalan';
 import { FormIgd } from '../components/forms/FormIgd';
 import { FormRawatInap } from '../components/forms/FormRawatInap';
@@ -53,7 +52,7 @@ const ALL_RME_FORMS = [
 
 export const RekamMedisView: React.FC = () => {
   const {
-    patients, registrations, medicalRecords, cppt, coding, user, params,
+    patients, registrations, medicalRecords, cppt, coding, user, params, navigate,
     addMedicalRecord, updateMedicalRecord, addCPPT, addCoding, updateCoding, lockCoding,
     getPatient, getReg, getUser, canEditPage
   } = useApp();
@@ -73,8 +72,8 @@ export const RekamMedisView: React.FC = () => {
     return '';
   });
 
-  const [activeTab, setActiveTab] = useState<'identitas' | 'rawatjalan' | 'igd' | 'rawatinap' | 'soap' | 'cppt' | 'keperawatan' | 'coding' | 'tracer' | 'formulir' | 'riwayat'>(() => {
-    if (params?.initialTab) return params.initialTab as any;
+  const [activeTab, setActiveTab] = useState<'identitas' | 'rawatjalan' | 'igd' | 'rawatinap' | 'soap' | 'keperawatan' | 'coding' | 'tracer' | 'formulir' | 'riwayat'>(() => {
+    if (params?.initialTab && params.initialTab !== 'cppt') return params.initialTab as any;
     return 'identitas';
   });
 
@@ -667,7 +666,7 @@ export const RekamMedisView: React.FC = () => {
                       key={fCode}
                       onClick={() => {
                         if (fCode === 'SOAP') setActiveTab('soap');
-                        else if (fCode === 'CPPT') setActiveTab('cppt');
+                        else if (fCode === 'CPPT') navigate('cppt', { patientId: selectedPatientId });
                         else if (fCode === 'ASKEP') setActiveTab('keperawatan');
                         else if (fCode === 'CODING') setActiveTab('coding');
                         else setActiveTab('formulir');
@@ -781,7 +780,6 @@ export const RekamMedisView: React.FC = () => {
             { id: 'igd', label: 'Asesmen IGD & Triase', icon: ShieldAlert },
             { id: 'rawatinap', label: 'Asesmen Rawat Inap', icon: FileSpreadsheet },
             { id: 'soap', label: 'Pemeriksaan Medis (SOAP)', icon: Stethoscope },
-            { id: 'cppt', label: 'CPPT Terintegrasi', icon: Activity },
             { id: 'keperawatan', label: 'Asuhan Keperawatan', icon: ClipboardList },
             { id: 'coding', label: 'Workspace Koding (ICD-10 & 9)', icon: Barcode },
             { id: 'tracer', label: 'Tracer Berkas RM', icon: ShieldAlert },
@@ -1443,41 +1441,6 @@ export const RekamMedisView: React.FC = () => {
             </div>
           )}
 
-          {/* TAB 3: CPPT TERINTEGRASI */}
-          {activeTab === 'cppt' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                <div>
-                  <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-emerald-600" />
-                    Catatan Perkembangan Pasien Terintegrasi (CPPT)
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Pencatatan perkembangan pasien multi-PPA (Dokter, Perawat, Farmasi, Gizi) terintegrasi
-                  </p>
-                </div>
-              </div>
-
-              {activeMR ? (
-                <CPPTInputTable mr={activeMR} />
-              ) : (
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-8 text-center space-y-3">
-                  <Activity className="w-10 h-10 text-slate-300 mx-auto" />
-                  <div className="font-bold text-slate-700 text-sm">Belum Ada Rekam Medis Aktif</div>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    Silakan isi pemeriksaan SOAP awal dokter terlebih dahulu untuk membuka lembar CPPT.
-                  </p>
-                  <button
-                    onClick={() => setActiveTab('soap')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700"
-                  >
-                    Input SOAP Dokter
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* TAB 4: ASUHAN KEPERAWATAN KOMPREHENSIF (SDKI, SLKI, SIKI) */}
           {activeTab === 'keperawatan' && (
             <div className="space-y-6">
@@ -2083,7 +2046,7 @@ export const RekamMedisView: React.FC = () => {
                         else if (form.code === 'AARI') setActiveTab('rawatinap');
                         else if (form.code === 'AIGD') setActiveTab('igd');
                         else if (form.code === 'SOAP') setActiveTab('soap');
-                        else if (form.code === 'CPPT') setActiveTab('cppt');
+                        else if (form.code === 'CPPT') navigate('cppt', { patientId: selectedPatientId });
                         else if (form.code === 'ASKEP') setActiveTab('keperawatan');
                         else if (form.code === 'CODING') setActiveTab('coding');
                         else if (form.code === 'TRACER') setActiveTab('tracer');

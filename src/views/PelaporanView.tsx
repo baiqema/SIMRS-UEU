@@ -8,6 +8,25 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { INITIAL_ICD10 } from '../data/mockData';
+import {
+  INITIAL_SIRS_63_RL41_DATA,
+  SirsRl41Row,
+  SirsRl42Top10Row,
+  SirsRl43Top10DeathRow,
+  SIRS_63_AGE_GROUPS
+} from '../data/sirsRl4Data';
+import {
+  INITIAL_SIRS_63_RL51_DATA,
+  SirsRl51Row,
+  SirsRl52Top10KasusBaruRow,
+  SirsRl53Top10KunjunganRow
+} from '../data/sirsRl5Data';
+import { SirsRl41Table } from '../components/pelaporan/SirsRl41Table';
+import { SirsRl42Table } from '../components/pelaporan/SirsRl42Table';
+import { SirsRl43Table } from '../components/pelaporan/SirsRl43Table';
+import { SirsRl51Table } from '../components/pelaporan/SirsRl51Table';
+import { SirsRl52Table } from '../components/pelaporan/SirsRl52Table';
+import { SirsRl53Table } from '../components/pelaporan/SirsRl53Table';
 
 type BabKey = 'BAB2' | 'BAB3' | 'BAB4' | 'BAB5' | 'BAB6';
 
@@ -276,8 +295,10 @@ export const PelaporanView: React.FC = () => {
       const isMale = p?.gender === 'M' || p?.gender === 'L';
       const isRalan = reg?.type === 'Rawat Jalan' || reg?.type === 'IGD';
 
-      codes.forEach((cd, idx) => {
-        if (!cd) return;
+      codes.forEach((rawCd, idx) => {
+        if (!rawCd) return;
+        const cd = (typeof rawCd === 'string' ? rawCd : (rawCd && typeof rawCd === 'object' && 'code' in rawCd ? (rawCd as any).code : String(rawCd || ''))).trim();
+        if (!cd || cd === '-' || cd === 'undefined' || cd === 'null') return;
         const icdObj = INITIAL_ICD10.find(i => i.code === cd);
         const name = (Array.isArray(c.icd10Desc) ? c.icd10Desc[idx] : c.icd10Desc) || icdObj?.desc || cd;
         if (!codeCounts[cd]) {
@@ -329,6 +350,258 @@ export const PelaporanView: React.FC = () => {
     }));
   }, [coding, medicalRecords, registrations, patients]);
 
+  // =========================================================================
+  // SIRS 6.3 RL 4 (RAWAT INAP) MORBIDITAS & MORTALITAS ANALYTICS
+  // =========================================================================
+
+  // Dynamic RL 4.1 dataset: combines base standard cases with live rawat inap registrations
+  const sirsRl41Data: SirsRl41Row[] = useMemo(() => {
+    // Start with a clone of initial standard benchmark data
+    const list: SirsRl41Row[] = INITIAL_SIRS_63_RL41_DATA.map(item => ({
+      ...item,
+      ageCounts: Object.entries(item.ageCounts).reduce((acc, [k, v]) => ({ ...acc, [k]: { ...v } }), {}),
+    }));
+
+    // Inject any live Inpatient (Ranap) patients diagnosed in the system
+    registrations
+      .filter(r => r.type === 'Rawat Inap')
+      .forEach(reg => {
+        const p = patients.find(pt => pt.id === reg.patientId);
+        const isMale = p?.gender === 'M' || p?.gender === 'L';
+        const coderItem = coding.find(c => c.regId === reg.id);
+        const icdCodes = coderItem ? (Array.isArray(coderItem.icd10) ? coderItem.icd10 : [coderItem.icd10]) : [];
+
+        icdCodes.forEach(rawCd => {
+          if (!rawCd) return;
+          const cd = (typeof rawCd === 'string' ? rawCd : (rawCd && typeof rawCd === 'object' && 'code' in rawCd ? (rawCd as any).code : String(rawCd || ''))).trim();
+          if (!cd || cd === '-' || cd === 'undefined' || cd === 'null') return;
+          let existing = list.find(l => String(l.code).toLowerCase() === cd.toLowerCase());
+          if (!existing) {
+            const icdObj = INITIAL_ICD10.find(i => i.code.toLowerCase() === cd.toLowerCase());
+            existing = {
+              code: cd,
+              name: icdObj?.desc || cd,
+              ageCounts: SIRS_63_AGE_GROUPS.reduce((acc, ag) => ({ ...acc, [ag.key]: { L: 0, P: 0 } }), {}),
+              hidupMatiL: 0,
+              hidupMatiP: 0,
+              hidupMatiTotal: 0,
+              matiL: 0,
+              matiP: 0,
+              matiTotal: 0
+            };
+            list.push(existing);
+          }
+
+          // Assign into age group based on patient dob if available, default to adult group u_35_39th
+          let targetAgeKey = 'u_35_39th';
+          if (p?.dob) {
+            const birthYear = parseInt(p.dob.split('-')[0] || '1990', 10);
+            const age = Math.max(0, 2026 - birthYear);
+            if (age < 1) targetAgeKey = 'u_6_11bln';
+            else if (age <= 4) targetAgeKey = 'u_1_4th';
+            else if (age <= 9) targetAgeKey = 'u_5_9th';
+            else if (age <= 14) targetAgeKey = 'u_10_14th';
+            else if (age <= 19) targetAgeKey = 'u_15_19th';
+            else if (age <= 24) targetAgeKey = 'u_20_24th';
+            else if (age <= 29) targetAgeKey = 'u_25_29th';
+            else if (age <= 34) targetAgeKey = 'u_30_34th';
+            else if (age <= 39) targetAgeKey = 'u_35_39th';
+            else if (age <= 44) targetAgeKey = 'u_40_44th';
+            else if (age <= 49) targetAgeKey = 'u_45_49th';
+            else if (age <= 54) targetAgeKey = 'u_50_54th';
+            else if (age <= 59) targetAgeKey = 'u_55_59th';
+            else if (age <= 64) targetAgeKey = 'u_60_64th';
+            else if (age <= 69) targetAgeKey = 'u_65_69th';
+            else if (age <= 74) targetAgeKey = 'u_70_74th';
+            else if (age <= 79) targetAgeKey = 'u_75_79th';
+            else if (age <= 84) targetAgeKey = 'u_80_84th';
+            else targetAgeKey = 'u_gte_85th';
+          }
+
+          if (existing.ageCounts[targetAgeKey]) {
+            if (isMale) existing.ageCounts[targetAgeKey].L += 1;
+            else existing.ageCounts[targetAgeKey].P += 1;
+          }
+
+          if (isMale) {
+            existing.hidupMatiL += 1;
+          } else {
+            existing.hidupMatiP += 1;
+          }
+          existing.hidupMatiTotal += 1;
+        });
+      });
+
+    return list.sort((a, b) => {
+      const codeA = String(a?.code || '');
+      const codeB = String(b?.code || '');
+      return codeA.localeCompare(codeB);
+    });
+  }, [registrations, coding, patients]);
+
+  // Dynamic RL 4.2: 10 Besar Penyakit Rawat Inap (Sorted by Total Hidup & Mati)
+  const sirsRl42Data: SirsRl42Top10Row[] = useMemo(() => {
+    return [...sirsRl41Data]
+      .sort((a, b) => b.hidupMatiTotal - a.hidupMatiTotal)
+      .slice(0, 10)
+      .map((item, idx) => ({
+        rank: idx + 1,
+        code: item.code,
+        name: item.name,
+        hidupMatiL: item.hidupMatiL,
+        hidupMatiP: item.hidupMatiP,
+        hidupMatiTotal: item.hidupMatiTotal,
+        matiL: item.matiL,
+        matiP: item.matiP,
+        matiTotal: item.matiTotal
+      }));
+  }, [sirsRl41Data]);
+
+  // Dynamic RL 4.3: 10 Besar Kematian Penyakit Rawat Inap (Sorted by Total Keluar Mati)
+  const sirsRl43Data: SirsRl43Top10DeathRow[] = useMemo(() => {
+    return [...sirsRl41Data]
+      .filter(item => item.matiTotal > 0)
+      .sort((a, b) => b.matiTotal - a.matiTotal)
+      .slice(0, 10)
+      .map((item, idx) => ({
+        rank: idx + 1,
+        code: item.code,
+        name: item.name,
+        hidupMatiL: item.hidupMatiL,
+        hidupMatiP: item.hidupMatiP,
+        hidupMatiTotal: item.hidupMatiTotal,
+        matiL: item.matiL,
+        matiP: item.matiP,
+        matiTotal: item.matiTotal
+      }));
+  }, [sirsRl41Data]);
+
+  // =========================================================================
+  // SIRS 6.3 RL 5 (RAWAT JALAN) MORBIDITAS & KUNJUNGAN ANALYTICS
+  // =========================================================================
+
+  // Dynamic RL 5.1 dataset: combines benchmark outpatient cases with live outpatient registrations
+  const sirsRl51Data: SirsRl51Row[] = useMemo(() => {
+    const list: SirsRl51Row[] = INITIAL_SIRS_63_RL51_DATA.map(item => ({
+      ...item,
+      ageCounts: Object.entries(item.ageCounts).reduce((acc, [k, v]) => ({ ...acc, [k]: { ...v } }), {}),
+    }));
+
+    // Inject live Rawat Jalan (Ralan) patients diagnosed in the system
+    registrations
+      .filter(r => r.type === 'Rawat Jalan')
+      .forEach(reg => {
+        const p = patients.find(pt => pt.id === reg.patientId);
+        const isMale = p?.gender === 'M' || p?.gender === 'L';
+        const coderItem = coding.find(c => c.regId === reg.id);
+        const icdCodes = coderItem ? (Array.isArray(coderItem.icd10) ? coderItem.icd10 : [coderItem.icd10]) : [];
+
+        icdCodes.forEach(rawCd => {
+          if (!rawCd) return;
+          const cd = (typeof rawCd === 'string' ? rawCd : (rawCd && typeof rawCd === 'object' && 'code' in rawCd ? (rawCd as any).code : String(rawCd || ''))).trim();
+          if (!cd || cd === '-' || cd === 'undefined' || cd === 'null') return;
+          let existing = list.find(l => String(l.code).toLowerCase() === cd.toLowerCase());
+          if (!existing) {
+            const icdObj = INITIAL_ICD10.find(i => i.code.toLowerCase() === cd.toLowerCase());
+            existing = {
+              code: cd,
+              name: icdObj?.desc || cd,
+              ageCounts: SIRS_63_AGE_GROUPS.reduce((acc, ag) => ({ ...acc, [ag.key]: { L: 0, P: 0 } }), {}),
+              kasusBaruL: 0,
+              kasusBaruP: 0,
+              kasusBaruTotal: 0,
+              kunjunganL: 0,
+              kunjunganP: 0,
+              kunjunganTotal: 0
+            };
+            list.push(existing);
+          }
+
+          let targetAgeKey = 'u_25_29th';
+          if (p?.dob) {
+            const birthYear = parseInt(p.dob.split('-')[0] || '1995', 10);
+            const age = Math.max(0, 2026 - birthYear);
+            if (age < 1) targetAgeKey = 'u_6_11bln';
+            else if (age <= 4) targetAgeKey = 'u_1_4th';
+            else if (age <= 9) targetAgeKey = 'u_5_9th';
+            else if (age <= 14) targetAgeKey = 'u_10_14th';
+            else if (age <= 19) targetAgeKey = 'u_15_19th';
+            else if (age <= 24) targetAgeKey = 'u_20_24th';
+            else if (age <= 29) targetAgeKey = 'u_25_29th';
+            else if (age <= 34) targetAgeKey = 'u_30_34th';
+            else if (age <= 39) targetAgeKey = 'u_35_39th';
+            else if (age <= 44) targetAgeKey = 'u_40_44th';
+            else if (age <= 49) targetAgeKey = 'u_45_49th';
+            else if (age <= 54) targetAgeKey = 'u_50_54th';
+            else if (age <= 59) targetAgeKey = 'u_55_59th';
+            else if (age <= 64) targetAgeKey = 'u_60_64th';
+            else if (age <= 69) targetAgeKey = 'u_65_69th';
+            else if (age <= 74) targetAgeKey = 'u_70_74th';
+            else if (age <= 79) targetAgeKey = 'u_75_79th';
+            else if (age <= 84) targetAgeKey = 'u_80_84th';
+            else targetAgeKey = 'u_gte_85th';
+          }
+
+          if (existing.ageCounts[targetAgeKey]) {
+            if (isMale) existing.ageCounts[targetAgeKey].L += 1;
+            else existing.ageCounts[targetAgeKey].P += 1;
+          }
+
+          if (isMale) {
+            existing.kasusBaruL += 1;
+            existing.kunjunganL += 1;
+          } else {
+            existing.kasusBaruP += 1;
+            existing.kunjunganP += 1;
+          }
+          existing.kasusBaruTotal += 1;
+          existing.kunjunganTotal += 1;
+        });
+      });
+
+    return list.sort((a, b) => {
+      const codeA = String(a?.code || '');
+      const codeB = String(b?.code || '');
+      return codeA.localeCompare(codeB);
+    });
+  }, [registrations, coding, patients]);
+
+  // Dynamic RL 5.2: 10 Besar Kasus Baru Penyakit Rawat Jalan
+  const sirsRl52Data: SirsRl52Top10KasusBaruRow[] = useMemo(() => {
+    return [...sirsRl51Data]
+      .sort((a, b) => b.kasusBaruTotal - a.kasusBaruTotal)
+      .slice(0, 10)
+      .map((item, idx) => ({
+        rank: idx + 1,
+        code: item.code,
+        name: item.name,
+        kasusBaruL: item.kasusBaruL,
+        kasusBaruP: item.kasusBaruP,
+        kasusBaruTotal: item.kasusBaruTotal,
+        kunjunganL: item.kunjunganL,
+        kunjunganP: item.kunjunganP,
+        kunjunganTotal: item.kunjunganTotal
+      }));
+  }, [sirsRl51Data]);
+
+  // Dynamic RL 5.3: 10 Besar Kunjungan Penyakit Rawat Jalan
+  const sirsRl53Data: SirsRl53Top10KunjunganRow[] = useMemo(() => {
+    return [...sirsRl51Data]
+      .sort((a, b) => b.kunjunganTotal - a.kunjunganTotal)
+      .slice(0, 10)
+      .map((item, idx) => ({
+        rank: idx + 1,
+        code: item.code,
+        name: item.name,
+        kasusBaruL: item.kasusBaruL,
+        kasusBaruP: item.kasusBaruP,
+        kasusBaruTotal: item.kasusBaruTotal,
+        kunjunganL: item.kunjunganL,
+        kunjunganP: item.kunjunganP,
+        kunjunganTotal: item.kunjunganTotal
+      }));
+  }, [sirsRl51Data]);
+
   const handleExportExcel = (formName: string) => {
     try {
       let csvContent = `\uFEFF`; // UTF-8 BOM for Excel
@@ -340,16 +613,7 @@ export const PelaporanView: React.FC = () => {
       csvContent += `"JUMLAH PASIEN SAAT INI:","${patientStats.totalPatients} Pasien (L: ${patientStats.malePatients}, P: ${patientStats.femalePatients})"\n`;
       csvContent += `"TANGGAL EXPORT:","${new Date().toLocaleString('id-ID')}"\n\n`;
 
-      if (formName === 'RL 5.2' || formName === 'RL 5.3') {
-        csvContent += `"No Urut","Kode ICD-10","Deskripsi / Nama Penyakit","Kasus Laki-laki","Kasus Perempuan","Total Kasus","% Terhadap Total"\n`;
-        if (dynamicTop10.length === 0) {
-          csvContent += `"-","Belum ada data","Belum ada diagnosa tercatat","0","0","0","0%"\n`;
-        } else {
-          dynamicTop10.forEach(item => {
-            csvContent += `"${item.rank}","${item.code}","${item.name.replace(/"/g, '""')}","${item.casesL}","${item.casesP}","${item.total}","${item.percentage}%"\n`;
-          });
-        }
-      } else if (formName === 'RL 3.4') {
+      if (formName === 'RL 3.4') {
         csvContent += `"No","Jenis Pengunjung","Laki-Laki","Perempuan","Total Pengunjung"\n`;
         csvContent += `"1","Pengunjung Baru","${patientStats.pengunjungBaruL}","${patientStats.pengunjungBaruP}","${patientStats.totalPengunjungBaru}"\n`;
         csvContent += `"2","Pengunjung Lama","${patientStats.pengunjungLamaL}","${patientStats.pengunjungLamaP}","${patientStats.totalPengunjungLama}"\n`;
@@ -417,15 +681,58 @@ export const PelaporanView: React.FC = () => {
         csvContent += `"4","BTO (Bed Turn Over)","${bto} Kali","40 - 50 Kali / Tahun"\n`;
         csvContent += `"5","NDR (Net Death Rate)","${ndr} per 1.000","< 25 per 1.000 Pasien Keluar"\n`;
         csvContent += `"6","GDR (Gross Death Rate)","${gdr} per 1.000","< 45 per 1.000 Pasien Keluar"\n`;
-      } else if (formName.startsWith('RL 4') || formName === 'RL 5.1') {
-        csvContent += `"No Urut","Golongan Sebab Penyakit (ICD-10)","Kasus Laki-laki","Kasus Perempuan","Total Kasus"\n`;
-        if (dynamicTop10.length === 0) {
-          csvContent += `"-","Belum ada kasus morbiditas pasien","0","0","0"\n`;
-        } else {
-          dynamicTop10.forEach(item => {
-            csvContent += `"${item.rank}","${item.code} - ${item.name.replace(/"/g, '""')}","${item.casesL}","${item.casesP}","${item.total}"\n`;
+      } else if (formName === 'RL 4.2') {
+        csvContent += `"No","Kelompok ICD-10","Kelompok Diagnosis Penyakit","Pasien Hidup & Mati (L)","Pasien Hidup & Mati (P)","Total Pasien Hidup & Mati","Keluar Mati (L)","Keluar Mati (P)","Total Pasien Keluar Mati"\n`;
+        sirsRl42Data.forEach(item => {
+          csvContent += `"${item.rank}","${item.code}","${item.name.replace(/"/g, '""')}","${item.hidupMatiL}","${item.hidupMatiP}","${item.hidupMatiTotal}","${item.matiL}","${item.matiP}","${item.matiTotal}"\n`;
+        });
+      } else if (formName === 'RL 4.3') {
+        csvContent += `"No","Kelompok ICD-10","Kelompok Diagnosis Penyakit","Pasien Hidup & Mati (L)","Pasien Hidup & Mati (P)","Total Pasien Hidup & Mati","Keluar Mati (L)","Keluar Mati (P)","Total Pasien Keluar Mati"\n`;
+        sirsRl43Data.forEach(item => {
+          csvContent += `"${item.rank}","${item.code}","${item.name.replace(/"/g, '""')}","${item.hidupMatiL}","${item.hidupMatiP}","${item.hidupMatiTotal}","${item.matiL}","${item.matiP}","${item.matiTotal}"\n`;
+        });
+      } else if (formName === 'RL 4.1') {
+        let header = `"No","Kelompok ICD-10","Kelompok Diagnosis Penyakit"`;
+        SIRS_63_AGE_GROUPS.forEach(ag => {
+          header += `,"${ag.label} (L)","${ag.label} (P)"`;
+        });
+        header += `,"Total Hidup & Mati (L)","Total Hidup & Mati (P)","Total Pasien Hidup & Mati","Keluar Mati (L)","Keluar Mati (P)","Total Pasien Keluar Mati"\n`;
+        csvContent += header;
+        sirsRl41Data.forEach((row, idx) => {
+          let line = `"${idx + 1}","${row.code}","${row.name.replace(/"/g, '""')}"`;
+          SIRS_63_AGE_GROUPS.forEach(ag => {
+            const counts = row.ageCounts[ag.key] || { L: 0, P: 0 };
+            line += `,"${counts.L}","${counts.P}"`;
           });
-        }
+          line += `,"${row.hidupMatiL}","${row.hidupMatiP}","${row.hidupMatiTotal}","${row.matiL}","${row.matiP}","${row.matiTotal}"\n`;
+          csvContent += line;
+        });
+      } else if (formName === 'RL 5.2') {
+        csvContent += `"No","Kelompok ICD-10","Kelompok Diagnosis Penyakit","Kasus Baru (L)","Kasus Baru (P)","Total Kasus Baru","Jumlah Kunjungan (L)","Jumlah Kunjungan (P)","Total Kunjungan"\n`;
+        sirsRl52Data.forEach(item => {
+          csvContent += `"${item.rank}","${item.code}","${item.name.replace(/"/g, '""')}","${item.kasusBaruL}","${item.kasusBaruP}","${item.kasusBaruTotal}","${item.kunjunganL}","${item.kunjunganP}","${item.kunjunganTotal}"\n`;
+        });
+      } else if (formName === 'RL 5.3') {
+        csvContent += `"No","Kelompok ICD-10","Kelompok Diagnosis Penyakit","Kasus Baru (L)","Kasus Baru (P)","Total Kasus Baru","Jumlah Kunjungan (L)","Jumlah Kunjungan (P)","Total Kunjungan"\n`;
+        sirsRl53Data.forEach(item => {
+          csvContent += `"${item.rank}","${item.code}","${item.name.replace(/"/g, '""')}","${item.kasusBaruL}","${item.kasusBaruP}","${item.kasusBaruTotal}","${item.kunjunganL}","${item.kunjunganP}","${item.kunjunganTotal}"\n`;
+        });
+      } else if (formName === 'RL 5.1') {
+        let header = `"No","Kelompok ICD-10","Kelompok Diagnosis Penyakit"`;
+        SIRS_63_AGE_GROUPS.forEach(ag => {
+          header += `,"Kasus Baru ${ag.label} (L)","Kasus Baru ${ag.label} (P)"`;
+        });
+        header += `,"Total Kasus Baru (L)","Total Kasus Baru (P)","Total Kasus Baru","Jumlah Kunjungan (L)","Jumlah Kunjungan (P)","Total Kunjungan"\n`;
+        csvContent += header;
+        sirsRl51Data.forEach((row, idx) => {
+          let line = `"${idx + 1}","${row.code}","${row.name.replace(/"/g, '""')}"`;
+          SIRS_63_AGE_GROUPS.forEach(ag => {
+            const counts = row.ageCounts[ag.key] || { L: 0, P: 0 };
+            line += `,"${counts.L}","${counts.P}"`;
+          });
+          line += `,"${row.kasusBaruL}","${row.kasusBaruP}","${row.kasusBaruTotal}","${row.kunjunganL}","${row.kunjunganP}","${row.kunjunganTotal}"\n`;
+          csvContent += line;
+        });
       } else {
         csvContent += `"No","Komponen Pelayanan / Indikator ${formName}","Jumlah Laki-laki","Jumlah Perempuan","Total Volume / Realisasi"\n`;
         csvContent += `"1","Pasien Terlayani Sesuai Data Sistem","${patientStats.malePatients}","${patientStats.femalePatients}","${patientStats.totalPatients}"\n`;
@@ -689,9 +996,9 @@ export const PelaporanView: React.FC = () => {
           {activeBab === 'BAB5' && (
             <>
               {[
-                { id: 'RL 4.1', label: 'RL 4.1 Kompilasi Morbiditas Ranap (A-Z)' },
-                { id: 'RL 4.2', label: 'RL 4.2 Rekapitulasi Morbiditas Ranap (A-Z)' },
-                { id: 'RL 4.3', label: 'RL 4.3 Rekapitulasi Kematian Ranap (A-Z)' },
+                { id: 'RL 4.1', label: 'RL 4.1 Kompilasi Penyakit/Morbiditas Pasien Rawat Inap' },
+                { id: 'RL 4.2', label: 'RL 4.2 10 Besar Penyakit Rawat Inap' },
+                { id: 'RL 4.3', label: 'RL 4.3 10 Besar Kematian Penyakit Rawat Inap' },
               ].map(item => (
                 <button
                   key={item.id}
@@ -710,9 +1017,9 @@ export const PelaporanView: React.FC = () => {
           {activeBab === 'BAB6' && (
             <>
               {[
-                { id: 'RL 5.1', label: 'RL 5.1 Kompilasi Morbiditas Ralan' },
-                { id: 'RL 5.2', label: 'RL 5.2 10 Besar Kasus Baru Ralan' },
-                { id: 'RL 5.3', label: 'RL 5.3 10 Besar Kunjungan Ralan' },
+                { id: 'RL 5.1', label: 'RL 5.1 Kompilasi Morbiditas Pasien Rawat Jalan' },
+                { id: 'RL 5.2', label: 'RL 5.2 10 Besar Kasus Baru Penyakit Rawat Jalan' },
+                { id: 'RL 5.3', label: 'RL 5.3 10 Besar Kunjungan Penyakit Rawat Jalan' },
               ].map(item => (
                 <button
                   key={item.id}
@@ -1549,283 +1856,53 @@ export const PelaporanView: React.FC = () => {
       )}
 
       {/* ------------------------------------------------------------------------- */}
-      {/* RL 5.2 & RL 5.3 : 10 BESAR PENYAKIT RAWAT JALAN (DINAMIS DARI DATA CODING) */}
+      {/* SIRS 6.3 RL 4.1: KOMPILASI PENYAKIT/MORBIDITAS PASIEN RAWAT INAP */}
       {/* ------------------------------------------------------------------------- */}
-      {(selectedRL === 'RL 5.2' || selectedRL === 'RL 5.3') && (
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="bg-amber-100 text-amber-900 border border-amber-200 font-extrabold px-2 py-0.5 rounded text-[10px]">
-                  SIRS REVISI 6.3 - POLA PENYAKIT UTAMA
-                </span>
-                <span className="bg-blue-100 text-blue-800 border border-blue-200 font-black px-2 py-0.5 rounded text-[10px]">
-                  KALKULASI DINAMIS DARI CODING ICD-10
-                </span>
-              </div>
-              <h2 className="text-base font-black text-slate-900 flex items-center gap-2 mt-1">
-                <Trophy className="w-5 h-5 text-amber-500" /> Formulir {selectedRL} - {selectedRL === 'RL 5.2' ? '10 Besar Penyakit / Kasus Baru Rawat Jalan' : '10 Besar Kunjungan Pasien Rawat Jalan'}
-              </h2>
-              <p className="text-xs text-slate-500">
-                Peringkat 10 diagnosis terbanyak secara otomatis dikompilasi dari entri Coding ICD-10 & status registrasi pasien.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                Total Coding Tercatat: {coding.length} berkas
-              </span>
-            </div>
-          </div>
-
-          {/* Top 3 Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {dynamicTop10.slice(0, 3).map((item, idx) => (
-              <div
-                key={item.code}
-                className={`p-4 rounded-2xl border flex items-start justify-between relative overflow-hidden ${
-                  idx === 0
-                    ? 'bg-amber-50/80 border-amber-200 text-amber-950'
-                    : idx === 1
-                    ? 'bg-slate-50 border-slate-200 text-slate-900'
-                    : 'bg-orange-50/80 border-orange-200 text-orange-950'
-                }`}
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-5 h-5 rounded-full text-[11px] font-black flex items-center justify-center ${
-                      idx === 0 ? 'bg-amber-500 text-white' : idx === 1 ? 'bg-slate-400 text-white' : 'bg-orange-400 text-white'
-                    }`}>
-                      {idx + 1}
-                    </span>
-                    <span className="font-mono font-black text-xs">{item.code}</span>
-                  </div>
-                  <h4 className="font-bold text-xs line-clamp-2">{item.name}</h4>
-                  <div className="text-[11px] text-slate-500 font-medium">
-                    L: {item.casesL} • P: {item.casesP}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-black">{item.total}</div>
-                  <div className="text-[10px] font-bold opacity-80">{item.percentage}% dari total</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Top 10 Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse border border-slate-200">
-              <thead>
-                <tr className="bg-slate-900 text-white font-bold">
-                  <th className="p-3 border-r border-slate-800 text-center w-16">Peringkat</th>
-                  <th className="p-3 border-r border-slate-800 text-center w-28">Kode ICD-10</th>
-                  <th className="p-3 border-r border-slate-800">Deskripsi Diagnosis Penyakit</th>
-                  <th className="p-3 border-r border-slate-800 text-center w-24">Laki-Laki</th>
-                  <th className="p-3 border-r border-slate-800 text-center w-24">Perempuan</th>
-                  <th className="p-3 border-r border-slate-800 text-center w-28">Total Kasus</th>
-                  <th className="p-3 text-center w-36">Proporsi (%)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {dynamicTop10.map((item) => (
-                  <tr key={item.code} className="hover:bg-slate-50 transition-colors">
-                    <td className="p-3 text-center">
-                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black ${
-                        item.rank === 1
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : item.rank === 2
-                          ? 'bg-slate-200 text-slate-700'
-                          : item.rank === 3
-                          ? 'bg-orange-100 text-orange-800'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {item.rank}
-                      </span>
-                    </td>
-                    <td className="p-3 text-center font-mono font-bold text-blue-700">{item.code}</td>
-                    <td className="p-3 font-semibold text-slate-800">{item.name}</td>
-                    <td className="p-3 text-center font-mono">{item.casesL}</td>
-                    <td className="p-3 text-center font-mono">{item.casesP}</td>
-                    <td className="p-3 text-center font-mono font-black text-slate-900 bg-slate-50">{item.total}</td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                          <div
-                            className="bg-blue-600 h-full rounded-full"
-                            style={{ width: `${Math.min(100, Number(item.percentage) * 3)}%` }}
-                          />
-                        </div>
-                        <span className="text-[11px] font-bold font-mono text-slate-600 w-10 text-right">
-                          {item.percentage}%
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {selectedRL === 'RL 4.1' && (
+        <SirsRl41Table
+          data={sirsRl41Data}
+          selectedPeriodMonth={selectedPeriodMonth}
+          selectedPeriodYear={selectedPeriodYear}
+        />
       )}
 
       {/* ------------------------------------------------------------------------- */}
-      {/* RL 4.1, 4.2, 4.3 & RL 5.1 : MORBIDITAS KODE ICD-10 (A - Z LENGKAP) */}
+      {/* SIRS 6.3 RL 4.2: 10 BESAR PENYAKIT RAWAT INAP */}
       {/* ------------------------------------------------------------------------- */}
-      {(selectedRL === 'RL 4.1' || selectedRL === 'RL 4.2' || selectedRL === 'RL 4.3' || selectedRL === 'RL 5.1') && (
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="bg-indigo-100 text-indigo-900 border border-indigo-200 font-extrabold px-2 py-0.5 rounded text-[10px]">
-                  SIRS REVISI 6.3 - MODUL MORBIDITAS
-                </span>
-                <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 font-black px-2 py-0.5 rounded text-[10px]">
-                  KODE ICD-10 (A - Z LENGKAP)
-                </span>
-              </div>
-              <h2 className="text-base font-black text-slate-900 flex items-center gap-2 mt-1">
-                <Layers className="w-5 h-5 text-indigo-600" /> Formulir {selectedRL} - Data Kompilasi Morbiditas ICD-10 A-Z ({selectedRL.includes('4') ? 'Rawat Inap' : 'Rawat Jalan'})
-              </h2>
-              <p className="text-xs text-slate-500">
-                Laporan Seluruh Kode ICD-10 Urut Abjad A-Z Menurut 25 Kelompok Umur Standar Kemenkes RI & Jenis Kelamin
-              </p>
-            </div>
+      {selectedRL === 'RL 4.2' && (
+        <SirsRl42Table data={sirsRl42Data} />
+      )}
 
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Cari Kode ICD-10 / Nama Penyakit..."
-                  value={searchFilter}
-                  onChange={e => setSearchFilter(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-xs w-64 focus:ring-2 focus:ring-indigo-500"
-                />
-              </div>
-            </div>
-          </div>
+      {/* ------------------------------------------------------------------------- */}
+      {/* SIRS 6.3 RL 4.3: 10 BESAR KEMATIAN PENYAKIT RAWAT INAP */}
+      {/* ------------------------------------------------------------------------- */}
+      {selectedRL === 'RL 4.3' && (
+        <SirsRl43Table data={sirsRl43Data} />
+      )}
 
-          {/* ALPHABET QUICK JUMP BAR A-Z */}
-          <div className="bg-slate-100 p-2 rounded-xl border border-slate-200 flex items-center gap-1 overflow-x-auto scrollbar-none">
-            <span className="text-[10px] font-black text-slate-600 px-2 uppercase shrink-0">Filter Abjad ICD:</span>
-            {['SEMUA', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')].map(letter => (
-              <button
-                key={letter}
-                type="button"
-                onClick={() => setSelectedLetter(letter)}
-                className={`px-2 py-1 rounded-lg text-[11px] font-black shrink-0 transition-all cursor-pointer ${
-                  selectedLetter === letter
-                    ? 'bg-indigo-700 text-white shadow-xs scale-105'
-                    : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200'
-                }`}
-              >
-                {letter}
-              </button>
-            ))}
-          </div>
+      {/* ------------------------------------------------------------------------- */}
+      {/* SIRS 6.3 RL 5.1: KOMPILASI MORBIDITAS PASIEN RAWAT JALAN */}
+      {/* ------------------------------------------------------------------------- */}
+      {selectedRL === 'RL 5.1' && (
+        <SirsRl51Table
+          data={sirsRl51Data}
+          selectedPeriodMonth={selectedPeriodMonth}
+          selectedPeriodYear={selectedPeriodYear}
+        />
+      )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px] border-collapse border border-slate-300">
-              <thead>
-                <tr className="bg-indigo-900 text-white font-bold border-b border-indigo-950">
-                  <th className="p-2 border-r border-indigo-800 text-center" rowSpan={2}>No</th>
-                  <th className="p-2 border-r border-indigo-800 text-center" rowSpan={2}>Kode ICD-10</th>
-                  <th className="p-2 border-r border-indigo-800" rowSpan={2}>Deskripsi Diagnosis Utama (A - Z)</th>
-                  <th className="p-2 border-r border-indigo-800 text-center" colSpan={4}>Kelompok Umur &lt;1 Thn</th>
-                  <th className="p-2 border-r border-indigo-800 text-center" colSpan={4}>Kelompok Umur 1-19 Thn</th>
-                  <th className="p-2 border-r border-indigo-800 text-center" colSpan={4}>Kelompok Umur 20-59 Thn</th>
-                  <th className="p-2 border-r border-indigo-800 text-center" colSpan={2}>&ge;60 Thn</th>
-                  <th className="p-2 text-center" colSpan={3}>Total Kasus / Kunjungan</th>
-                </tr>
-                <tr className="bg-indigo-800 text-white font-bold text-[10px]">
-                  <th className="p-1 border-r border-indigo-700 text-center">&lt;28hr L</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">&lt;28hr P</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">1-11bln L</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">1-11bln P</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">1-4th L</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">1-4th P</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">5-19th L</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">5-19th P</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">20-44th L</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">20-44th P</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">45-59th L</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">45-59th P</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">L</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">P</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">L</th>
-                  <th className="p-1 border-r border-indigo-700 text-center">P</th>
-                  <th className="p-1 text-center font-black">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 font-mono text-[11px]">
-                {[
-                  { code: 'A09.9', name: 'Gastroenteritis and colitis of unspecified origin', l1: 3, p1: 2, l2: 6, p2: 5, l3: 12, p3: 10, l4: 8, p4: 7, l5: 6, p5: 5, l6: 4, p6: 4, l7: 3, p7: 2, totL: 42, totP: 35, tot: 77 },
-                  { code: 'A15.0', name: 'Tuberculosis of lung, confirmed by sputum microscopy', l1: 0, p1: 0, l2: 1, p2: 1, l3: 3, p3: 2, l4: 8, p4: 6, l5: 14, p5: 10, l6: 12, p6: 8, l7: 10, p7: 6, totL: 48, totP: 33, tot: 81 },
-                  { code: 'B20', name: 'Human immunodeficiency virus [HIV] disease', l1: 0, p1: 0, l2: 0, p2: 0, l3: 1, p3: 1, l4: 4, p4: 3, l5: 12, p5: 8, l6: 6, p6: 4, l7: 2, p7: 1, totL: 25, totP: 17, tot: 42 },
-                  { code: 'B26.0', name: 'Mumps orchitis', l1: 0, p1: 0, l2: 0, p2: 0, l3: 2, p3: 0, l4: 5, p4: 0, l5: 3, p5: 0, l6: 1, p6: 0, l7: 0, p7: 0, totL: 11, totP: 0, tot: 11 },
-                  { code: 'C34.9', name: 'Malignant neoplasm of bronchus and lung, unspecified', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 0, p4: 0, l5: 8, p5: 4, l6: 18, p6: 10, l7: 15, p7: 8, totL: 41, totP: 22, tot: 63 },
-                  { code: 'C50.9', name: 'Malignant neoplasm of breast, unspecified', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 0, p4: 1, l5: 0, p5: 22, l6: 0, p6: 28, l7: 0, p7: 12, totL: 0, totP: 63, tot: 63 },
-                  { code: 'D50.9', name: 'Iron deficiency anaemia, unspecified', l1: 1, p1: 1, l2: 3, p2: 4, l3: 5, p3: 6, l4: 4, p4: 8, l5: 8, p5: 18, l6: 10, p6: 15, l7: 6, p7: 12, totL: 37, totP: 64, tot: 101 },
-                  { code: 'E11.9', name: 'Type 2 diabetes mellitus without complications', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 1, p4: 1, l5: 12, p5: 18, l6: 22, p6: 28, l7: 15, p7: 20, totL: 50, totP: 67, tot: 117 },
-                  { code: 'E87.1', name: 'Hypo-osmolality and hyponatremia', l1: 0, p1: 0, l2: 1, p2: 1, l3: 2, p3: 2, l4: 3, p4: 3, l5: 8, p5: 10, l6: 12, p6: 15, l7: 10, p7: 12, totL: 36, totP: 43, tot: 79 },
-                  { code: 'F20.9', name: 'Schizophrenia, unspecified', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 2, p4: 1, l5: 15, p5: 10, l6: 12, p6: 8, l7: 5, p7: 4, totL: 34, totP: 23, tot: 57 },
-                  { code: 'G40.9', name: 'Epilepsy, unspecified', l1: 1, p1: 1, l2: 4, p2: 3, l3: 8, p3: 6, l4: 10, p4: 8, l5: 6, p5: 5, l6: 4, p6: 3, l7: 2, p7: 2, totL: 35, totP: 28, tot: 63 },
-                  { code: 'H10.9', name: 'Conjunctivitis, unspecified', l1: 2, p1: 2, l2: 5, p2: 5, l3: 10, p3: 12, l4: 8, p4: 8, l5: 6, p5: 6, l6: 4, p6: 4, l7: 2, p7: 2, totL: 37, totP: 39, tot: 76 },
-                  { code: 'H66.9', name: 'Otitis media, unspecified', l1: 1, p1: 1, l2: 4, p2: 4, l3: 8, p3: 8, l4: 6, p4: 6, l5: 5, p5: 4, l6: 3, p6: 3, l7: 2, p7: 1, totL: 29, totP: 27, tot: 56 },
-                  { code: 'I10', name: 'Essential (primary) hypertension', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 2, p4: 3, l5: 15, p5: 22, l6: 28, p6: 35, l7: 20, p7: 25, totL: 65, totP: 85, tot: 150 },
-                  { code: 'I21.9', name: 'Acute myocardial infarction, unspecified (STEMI)', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 0, p4: 0, l5: 14, p5: 6, l6: 20, p6: 10, l7: 18, p7: 8, totL: 52, totP: 24, tot: 76 },
-                  { code: 'I63.9', name: 'Cerebral infarction, unspecified (Stroke Iskemik)', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 0, p4: 0, l5: 10, p5: 8, l6: 22, p6: 18, l7: 25, p7: 20, totL: 57, totP: 46, tot: 103 },
-                  { code: 'J18.9', name: 'Pneumonia, unspecified', l1: 2, p1: 1, l2: 5, p2: 4, l3: 8, p3: 6, l4: 10, p4: 8, l5: 8, p5: 7, l6: 12, p6: 10, l7: 15, p7: 12, totL: 60, totP: 48, tot: 108 },
-                  { code: 'J44.9', name: 'Chronic obstructive pulmonary disease, unspecified (PPOK)', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 0, p4: 0, l5: 6, p5: 2, l6: 15, p6: 8, l7: 20, p7: 10, totL: 41, totP: 20, tot: 61 },
-                  { code: 'J45.9', name: 'Asthma, unspecified', l1: 1, p1: 1, l2: 4, p2: 4, l3: 10, p3: 10, l4: 12, p4: 12, l5: 8, p5: 10, l6: 6, p6: 8, l7: 4, p7: 5, totL: 45, totP: 50, tot: 95 },
-                  { code: 'K29.7', name: 'Gastritis, unspecified', l1: 0, p1: 0, l2: 0, p2: 0, l3: 1, p3: 2, l4: 5, p4: 8, l5: 18, p5: 25, l6: 15, p6: 20, l7: 8, p7: 10, totL: 47, totP: 65, tot: 92 },
-                  { code: 'L03.9', name: 'Cellulitis, unspecified', l1: 0, p1: 0, l2: 1, p2: 1, l3: 3, p3: 2, l4: 6, p4: 5, l5: 10, p5: 8, l6: 8, p6: 6, l7: 5, p7: 4, totL: 33, totP: 26, tot: 59 },
-                  { code: 'M80.9', name: 'Osteoporosis with pathological fracture, unspecified', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 0, p4: 0, l5: 2, p5: 4, l6: 8, p6: 15, l7: 10, p7: 22, totL: 20, totP: 41, tot: 61 },
-                  { code: 'N39.0', name: 'Urinary tract infection, site unspecified (ISK)', l1: 1, p1: 1, l2: 2, p2: 3, l3: 4, p3: 6, l4: 5, p4: 8, l5: 10, p5: 18, l6: 12, p6: 20, l7: 10, p7: 15, totL: 44, totP: 71, tot: 115 },
-                  { code: 'O80', name: 'Single spontaneous delivery (Persalinan Normal)', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 0, p4: 2, l5: 0, p5: 45, l6: 0, p6: 5, l7: 0, p7: 0, totL: 0, totP: 52, tot: 52 },
-                  { code: 'O82', name: 'Single delivery by caesarean section (Sectio Caesarea)', l1: 0, p1: 0, l2: 0, p2: 0, l3: 0, p3: 0, l4: 0, p4: 1, l5: 0, p5: 38, l6: 0, p6: 3, l7: 0, p7: 0, totL: 0, totP: 42, tot: 42 },
-                  { code: 'P07.3', name: 'Other preterm infants (BBLR / Prematur)', l1: 12, p1: 10, l2: 5, p2: 4, l3: 0, p3: 0, l4: 0, p4: 0, l5: 0, p5: 0, l6: 0, p6: 0, l7: 0, p7: 0, totL: 17, totP: 14, tot: 31 },
-                  { code: 'Q05.9', name: 'Spina bifida, unspecified', l1: 1, p1: 1, l2: 2, p2: 1, l3: 1, p3: 1, l4: 0, p4: 0, l5: 0, p5: 0, l6: 0, p6: 0, l7: 0, p7: 0, totL: 4, totP: 3, tot: 7 },
-                  { code: 'R50.9', name: 'Fever, unspecified (Demam Unspecified)', l1: 5, p1: 4, l2: 12, p2: 10, l3: 18, p3: 15, l4: 10, p4: 8, l5: 6, p5: 6, l6: 4, p6: 4, l7: 2, p7: 2, totL: 57, totP: 49, tot: 106 },
-                  { code: 'S06.9', name: 'Intracranial injury, unspecified (Cedera Kepala)', l1: 1, p1: 0, l2: 2, p2: 1, l3: 6, p3: 3, l4: 15, p4: 8, l5: 18, p5: 10, l6: 12, p6: 6, l7: 8, p7: 4, totL: 62, totP: 32, tot: 94 },
-                  { code: 'T14.9', name: 'Injury, unspecified', l1: 0, p1: 0, l2: 1, p2: 1, l3: 4, p3: 3, l4: 10, p4: 6, l5: 12, p5: 8, l6: 6, p6: 4, l7: 3, p7: 2, totL: 36, totP: 24, tot: 60 },
-                  { code: 'U07.1', name: 'COVID-19, virus identified', l1: 1, p1: 1, l2: 2, p2: 2, l3: 3, p3: 3, l4: 5, p4: 5, l5: 10, p5: 10, l6: 12, p6: 12, l7: 8, p7: 8, totL: 41, totP: 41, tot: 82 },
-                  { code: 'Z00.0', name: 'General medical examination', l1: 2, p1: 2, l2: 5, p2: 5, l3: 10, p3: 10, l4: 15, p4: 15, l5: 20, p5: 20, l6: 15, p6: 15, l7: 10, p7: 10, totL: 77, totP: 77, tot: 154 },
-                ]
-                  .filter(item => {
-                    const matchLetter = selectedLetter === 'SEMUA' || item.code.toUpperCase().startsWith(selectedLetter);
-                    const matchSearch = item.code.toLowerCase().includes(searchFilter.toLowerCase()) || item.name.toLowerCase().includes(searchFilter.toLowerCase());
-                    return matchLetter && matchSearch;
-                  })
-                  .map((item, idx) => (
-                    <tr key={item.code} className="hover:bg-slate-50">
-                      <td className="p-2 text-center font-sans font-bold text-slate-400">{idx + 1}</td>
-                      <td className="p-2 text-center font-bold text-blue-700 font-mono">{item.code}</td>
-                      <td className="p-2 font-sans font-semibold text-slate-800">{item.name}</td>
-                      <td className="p-1 text-center">{item.l1}</td>
-                      <td className="p-1 text-center">{item.p1}</td>
-                      <td className="p-1 text-center">{item.l2}</td>
-                      <td className="p-1 text-center">{item.p2}</td>
-                      <td className="p-1 text-center">{item.l3}</td>
-                      <td className="p-1 text-center">{item.p3}</td>
-                      <td className="p-1 text-center">{item.l4}</td>
-                      <td className="p-1 text-center">{item.p4}</td>
-                      <td className="p-1 text-center">{item.l5}</td>
-                      <td className="p-1 text-center">{item.p5}</td>
-                      <td className="p-1 text-center">{item.l6}</td>
-                      <td className="p-1 text-center">{item.p6}</td>
-                      <td className="p-1 text-center">{item.l7}</td>
-                      <td className="p-1 text-center">{item.p7}</td>
-                      <td className="p-1 text-center font-bold text-slate-900">{item.totL}</td>
-                      <td className="p-1 text-center font-bold text-slate-900">{item.totP}</td>
-                      <td className="p-2 text-center font-black text-indigo-900 bg-indigo-50">{item.tot}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* ------------------------------------------------------------------------- */}
+      {/* SIRS 6.3 RL 5.2: 10 BESAR KASUS BARU PENYAKIT RAWAT JALAN */}
+      {/* ------------------------------------------------------------------------- */}
+      {selectedRL === 'RL 5.2' && (
+        <SirsRl52Table data={sirsRl52Data} />
+      )}
+
+      {/* ------------------------------------------------------------------------- */}
+      {/* SIRS 6.3 RL 5.3: 10 BESAR KUNJUNGAN PENYAKIT RAWAT JALAN */}
+      {/* ------------------------------------------------------------------------- */}
+      {selectedRL === 'RL 5.3' && (
+        <SirsRl53Table data={sirsRl53Data} />
       )}
 
       {/* FOOTER INFORMASI STANDAR KEMENKES */}

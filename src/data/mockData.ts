@@ -1,7 +1,8 @@
 import {
   User, Role, Patient, Registration, GeneralConsent, MedicalRecord,
   CPPT, InformedConsent, Coding, Claim, Billing, PharmacyRecord, LabRecord,
-  RadiologyRecord, ICD10, ICD9CM, Bed, AuditEntry, PraktikumModule, DokumenBerkas, AsuhanKeperawatan
+  RadiologyRecord, ICD10, ICD9CM, Bed, AuditEntry, PraktikumModule, DokumenBerkas, AsuhanKeperawatan,
+  ResumeMedis
 } from '../types';
 
 export const INITIAL_USERS: User[] = [
@@ -651,3 +652,251 @@ export const INITIAL_AUDIT_TRAIL: AuditEntry[] = [
     module: 'dashboard'
   }
 ];
+
+export const INITIAL_RESUME_MEDIS: ResumeMedis[] = [
+  {
+    id: 'RMED-001',
+    regId: 'REG002',
+    noRM: '000002',
+    patientId: 'P002',
+    doctorId: 'U002',
+    doctorName: 'dr. Sari Dewi, Sp.PD',
+    admissionDate: '2026-08-29',
+    dischargeDate: '2026-09-02',
+    lengthOfStay: 5,
+    admissionPoliRoom: 'Penyakit Dalam (Rawat Inap)',
+    dischargeRoom: 'Ruang VVIP-201 (Bed A)',
+    dischargeType: 'Persetujuan Dokter',
+    dischargeCondition: 'Membaik',
+    chiefComplaint: 'Nyeri dada kiri menjalar ke bahu kiri sejak 3 jam SMRS seperti tertindih beban berat, keringat dingin (+), sesak nafas (+).',
+    historyOfPresentIllness: 'Pasien datang via IGD dengan sindrom koroner akut, dirawat di VVIP-201 selama 5 hari. Dilakukan pemantauan hemodinamik ketat, pemberian terapi trombolitik & antikoagulan, serta kateterisasi diagnostik. Keluhan nyeri dada telah teratasi, toleransi aktivitas membaik.',
+    pastMedicalHistory: 'Riwayat hipertensi tidak terkontrol sejak 3 tahun lalu, riwayat dislipidemia.',
+    vitalSignsAdmission: {
+      td: '140/90 mmHg',
+      nadi: '96 x/m',
+      rr: '24 x/m',
+      suhu: '37.0 C',
+      spo2: '96%',
+      kesadaran: 'Compos Mentis (GCS E4V5M6)'
+    },
+    vitalSignsDischarge: {
+      td: '120/80 mmHg',
+      nadi: '76 x/m',
+      rr: '18 x/m',
+      suhu: '36.5 C',
+      spo2: '99%',
+      kesadaran: 'Compos Mentis (GCS 15)'
+    },
+    physicalExamSummary: 'KU: Baik, Kesadaran: CM. Jantung: S1-S2 normal murni, murmur (-), gallop (-). Paru: Suara nafas vesikuler simetris, ronkhi (-), wheezing (-). Abdomen: Supel, bising usus normal. Ekstremitas: Akral hangat, CRT < 2 detik, edema tungkai (-).',
+    labResultsSummary: 'Troponin T: 0.85 ng/mL (High / Positif NSTEMI), CK-MB: 45 U/L (Elevated), Profil Lipid: Kolesterol Total 265 mg/dL, LDL 168 mg/dL, HDL 38 mg/dL, TG 180 mg/dL. Hb: 13.8 g/dL, Leuko: 8.400, Trombosit: 245.000.',
+    radiologySummary: 'EKG 12-Lead (RAD001): ST deviasi / depresi di lead V3-V5, inverted T wave lead I, aVL. Kesan: Ischemia anterolateral. Foto Thorax PA: CTR 52%, sinus kostofrenikus tajam, cor dan pulmo stabil.',
+    admissionDiagnosis: 'Acute Coronary Syndrome (Suspect NSTEMI) & Hipertensi Grade 1',
+    primaryDiagnosisForm: 'I25.1 - Penyakit Jantung Iskemik (CAD Post NSTEMI)',
+    primaryDiagnosisVerified: 'I25.1 - Penyakit Jantung Iskemik',
+    isDiagnosisMatched: true,
+    diagnosisDiscrepancyNotes: 'Diagnosis formulir DPJP telah diverifikasi dan sepenuhnya sesuai dengan Dokumen Verifikasi Koding ICD-10 (I25.1).',
+    secondaryDiagnoses: ['I10 - Hipertensi Esensial (Primer)', 'E78.5 - Hiperlipidemia, Tidak Ditetapkan'],
+    secondaryDiagnosesVerified: ['I10 - Hipertensi Esensial (Primer)', 'E78.5 - Hiperlipidemia, Tidak Ditetapkan'],
+    procedures: [
+      { code: '88.56', name: 'Arteriografi Koroner / Kateterisasi Jantung Diagnostik', date: '2026-08-30' },
+      { code: '89.13', name: 'Elektrokardiogram (EKG 12-Lead Serial)', date: '2026-08-29' }
+    ],
+    therapyDuringHospitalization: [
+      'Infus NaCl 0.9% 500ml/24 jam',
+      'Injeksi Enoxaparin 60mg SC / 12 jam (selama 3 hari)',
+      'ISDN 5mg SL bila nyeri dada timbul',
+      'Clopidogrel 300mg loading lanjut 75mg PO 1x1',
+      'Atorvastatin 40mg PO 1x1 malam'
+    ],
+    homeMedications: [
+      { drugName: 'Clopidogrel 75mg', dose: '75 mg', frequency: '1 x 1 tablet', route: 'Oral (PO)', instructions: 'Diminum pagi hari setelah sarapan, rutin jangan terputus' },
+      { drugName: 'Bisoprolol 2.5mg', dose: '2.5 mg', frequency: '1 x 1 tablet', route: 'Oral (PO)', instructions: 'Diminum pagi hari' },
+      { drugName: 'Atorvastatin 20mg', dose: '20 mg', frequency: '1 x 1 tablet', route: 'Oral (PO)', instructions: 'Diminum malam hari sebelum tidur' },
+      { drugName: 'Nitrogliserin (NTG) Sublingual 0.5mg', dose: '0.5 mg', frequency: 'PRN (Bila Nyeri Dada)', route: 'Sublingual (bawah lidah)', instructions: 'Dihisap bawah lidah bila terasa nyeri dada akut' }
+    ],
+    dischargeInstructions: '1. Batasi aktivitas fisik berat, hindari stres berlebih. 2. Konsumsi diet rendah garam (<1 sdt/hari) dan rendah lemak jenuh. 3. Hindari rokok dan alkohol. 4. Kontrol teratur ke Poli Jantung sesuai jadwal.',
+    followUpPlan: {
+      controlDate: '2026-09-09',
+      controlPoli: 'Poli Jantung & Pembuluh Darah RS Universitas Esa Unggul',
+      controlDoctor: 'dr. Sari Dewi, Sp.PD',
+      emergencyWarningSigns: 'Segera ke IGD jika timbul: Nyeri dada hebat menembus punggung >15 menit, sesak nafas mendadak, pingsan, atau keringat dingin berulang.'
+    },
+    dietRecommendation: 'Diet Jantung II Rendah Garam & Rendah Kolesterol',
+    activityRecommendation: 'Jalan santai bertahap 15-20 menit/hari, hindari angkat beban >5 kg',
+    status: 'Siap Difinalisasi',
+    missingFields: [],
+    serviceType: 'Rawat Inap',
+    resolutionTargetHours: 48,
+    deadlineTimestamp: '2026-09-04 12:00',
+    inaCbgPedomanNotes: [
+      '[VI. Penyakit-Penyakit Sistem Sirkulasi - I25.1]: Penyakit Jantung Iskemik terverifikasi valid sesuai kaidah morbiditas ICD-10.',
+      '[V. Operasi pada Sistem Kardiovaskular - 88.56]: Arteriografi koroner / kateterisasi diagnostik standby PCI sesuai rekomendasi PERKI.'
+    ],
+    doctorSignature: 'dr. Sari Dewi, Sp.PD',
+    doctorSignatureDate: '2026-09-02',
+    reminderDeadline: '2026-09-04 12:00 (Maksimal 2x24 Jam - Rawat Inap)',
+    createdAt: '2026-09-02 09:30',
+    updatedAt: '2026-09-02 11:00'
+  },
+  {
+    id: 'RMED-002',
+    regId: 'REG001',
+    noRM: '000001',
+    patientId: 'P001',
+    doctorId: 'U002',
+    doctorName: 'dr. Sari Dewi, Sp.PD',
+    admissionDate: '2026-08-28',
+    dischargeDate: '2026-08-31',
+    lengthOfStay: 4,
+    admissionPoliRoom: 'IGD / Rawat Inap Ruang Melati',
+    dischargeRoom: 'Ruang Melati-102',
+    dischargeType: 'Persetujuan Dokter',
+    dischargeCondition: 'Membaik',
+    chiefComplaint: 'Pusing berputar, tengkuk berat sejak 2 hari, mual (+).',
+    historyOfPresentIllness: 'Pasien masuk IGD dengan krisis hipertensi TD 160/100 mmHg. Mendapat terapi antihipertensi parenteral dan oral di bangsal selama 4 hari.',
+    pastMedicalHistory: 'Riwayat hipertensi esensial 5 tahun, tidak rutin minum obat.',
+    vitalSignsAdmission: {
+      td: '160/100 mmHg',
+      nadi: '88 x/m',
+      rr: '20 x/m',
+      suhu: '36.8 C',
+      spo2: '98%',
+      kesadaran: 'Compos Mentis'
+    },
+    vitalSignsDischarge: {
+      td: '135/85 mmHg',
+      nadi: '80 x/m',
+      rr: '18 x/m',
+      suhu: '36.6 C',
+      spo2: '99%',
+      kesadaran: 'Compos Mentis'
+    },
+    physicalExamSummary: 'KU: Baik, CM. Mata: Konjungtiva anemis (-), sklera ikterik (-). Thorax: Cor/Pulmo DBN. Abdomen: Supel, nyeri tekan (-).',
+    labResultsSummary: 'Darah Lengkap: Hb 13.2 g/dL, Leuko 7.800, Trombosit 250.000. GDS: 142 mg/dL. Fungsi Ginjal: Ureum 28, Kreatinin 0.9 mg/dL.',
+    radiologySummary: 'Foto Thorax: Cor dan pulmo dalam batas normal.',
+    admissionDiagnosis: 'Hipertensi Urgensi / Grade 2',
+    primaryDiagnosisForm: 'Hipertensi Akut Berat Tidak Terkontrol',
+    primaryDiagnosisVerified: 'I10 - Hipertensi Esensial (Primer)',
+    isDiagnosisMatched: false,
+    diagnosisDiscrepancyNotes: '⚠️ PERINGATAN KETIDAKSESUAIAN DIAGNOSIS: Diagnosis pada formulir DPJP ("Hipertensi Akut Berat") berbeda redaksi & kode dengan Dokumen Verifikasi Koding ("I10 - Hipertensi Esensial"). Diperlukan konfirmasi DPJP/Koder sebelum finalisasi.',
+    secondaryDiagnoses: ['E78.5 - Hiperlipidemia'],
+    secondaryDiagnosesVerified: ['E78.5 - Dislipidemia Campuran'],
+    procedures: [
+      { code: '89.13', name: 'Elektrokardiogram (EKG 12-Lead)', date: '2026-08-28' },
+      { code: '99.21', name: 'Injeksi Intramuskular / Intravena Terapi', date: '2026-08-28' }
+    ],
+    therapyDuringHospitalization: [
+      'Amlodipine 10mg PO 1x1',
+      'Captopril 12.5mg PO 2x1 PRN tensi > 150/90'
+    ],
+    homeMedications: [
+      { drugName: 'Amlodipine 10mg', dose: '10 mg', frequency: '1 x 1 tablet', route: 'Oral', instructions: 'Pagi hari' }
+    ],
+    dischargeInstructions: '', // Masih kosong -> Belum Lengkap!
+    followUpPlan: {
+      controlDate: '',
+      controlPoli: '',
+      controlDoctor: 'dr. Sari Dewi, Sp.PD',
+      emergencyWarningSigns: 'Sakit kepala hebat, pandangan kabur, mimisan, muntah proyektil.'
+    },
+    dietRecommendation: 'Diet Rendah Garam I (<2 gram garam dapur/hari)',
+    activityRecommendation: 'Istirahat cukup 7-8 jam per hari, hindari begadang',
+    status: 'Belum Lengkap',
+    missingFields: [
+      'Diagnosis Terverifikasi (Kesesuaian Diagnosis)',
+      'Instruksi & Edukasi Pulang',
+      'Jadwal Kontrol Poliklinik'
+    ],
+    serviceType: 'IGD',
+    resolutionTargetHours: 24, // 1x24 jam untuk IGD
+    deadlineTimestamp: '2026-08-29 12:00',
+    inaCbgPedomanNotes: [
+      '[VI. Penyakit-Penyakit Sistem Sirkulasi - I10 Hipertensi]: Gunakan kode primer I10. Jika disertai gagal ginjal/jantung perhatikan kode kombinasi I11, I12, I13.'
+    ],
+    doctorSignature: '',
+    reminderDeadline: '2026-08-29 12:00 (Maksimal 1x24 Jam - IGD - Terlambat)',
+    createdAt: '2026-08-31 10:00',
+    updatedAt: '2026-08-31 10:00'
+  },
+  {
+    id: 'RMED-003',
+    regId: 'REG007',
+    noRM: '000002',
+    patientId: 'P002',
+    doctorId: 'U002',
+    doctorName: 'dr. Sari Dewi, Sp.PD',
+    admissionDate: '2026-09-11',
+    dischargeDate: '2026-09-11',
+    lengthOfStay: 1,
+    admissionPoliRoom: 'Poli Jantung & Pembuluh Darah',
+    dischargeRoom: 'Poli Rawat Jalan',
+    dischargeType: 'Persetujuan Dokter',
+    dischargeCondition: 'Sembuh',
+    chiefComplaint: 'Kontrol berkala pasca perawatan NSTEMI 2 minggu lalu.',
+    historyOfPresentIllness: 'Pasien kontrol berkala dalam kondisi stabil. Tidak ada keluhan nyeri dada saat istirahat maupun aktivitas biasa. Kepatuhan minum obat sangat baik.',
+    pastMedicalHistory: 'Post NSTEMI dirawat Agustus 2026, Hipertensi terkontrol.',
+    vitalSignsAdmission: {
+      td: '125/80 mmHg',
+      nadi: '76 x/m',
+      rr: '18 x/m',
+      suhu: '36.5 C',
+      spo2: '99%',
+      kesadaran: 'Compos Mentis (15)'
+    },
+    vitalSignsDischarge: {
+      td: '125/80 mmHg',
+      nadi: '76 x/m',
+      rr: '18 x/m',
+      suhu: '36.5 C',
+      spo2: '99%',
+      kesadaran: 'Compos Mentis (15)'
+    },
+    physicalExamSummary: 'KU: Baik, CM. Cor S1-S2 normal murni, murmur (-). Pulmo vesikuler simetris.',
+    labResultsSummary: 'Evaluasi Profil Lipid dalam target pengobatan.',
+    radiologySummary: 'EKG Rekam Kontrol: Sinus rhythm 75x/m, elevasi ST tidak dijumpai, gelombang T isoelektrik di precordial.',
+    admissionDiagnosis: 'Penyakit Jantung Iskemik Kronik (CAD Post NSTEMI) & Hipertensi',
+    primaryDiagnosisForm: 'I25.1 - Penyakit Jantung Iskemik',
+    primaryDiagnosisVerified: 'I25.1 - Penyakit Jantung Iskemik',
+    isDiagnosisMatched: true,
+    diagnosisDiscrepancyNotes: 'Terverifikasi dan valid sesuai ICD-10.',
+    secondaryDiagnoses: ['I10 - Hipertensi Esensial (Primer)'],
+    secondaryDiagnosesVerified: ['I10 - Hipertensi Esensial (Primer)'],
+    procedures: [
+      { code: '89.13', name: 'Elektrokardiogram (EKG 12-Lead Evaluasi)', date: '2026-09-11' }
+    ],
+    therapyDuringHospitalization: [
+      'Clopidogrel 75mg PO 1x1',
+      'Bisoprolol 2.5mg PO 1x1'
+    ],
+    homeMedications: [
+      { drugName: 'Clopidogrel 75mg', dose: '75 mg', frequency: '1 x 1 tablet', route: 'Oral', instructions: 'Pagi setelah sarapan' },
+      { drugName: 'Bisoprolol 2.5mg', dose: '2.5 mg', frequency: '1 x 1 tablet', route: 'Oral', instructions: 'Pagi' },
+      { drugName: 'Atorvastatin 20mg', dose: '20 mg', frequency: '1 x 1 tablet', route: 'Oral', instructions: 'Malam' }
+    ],
+    dischargeInstructions: 'Lanjutkan pengobatan rutin, pertahankan gaya hidup sehat, batasi konsumsi garam dan kolesterol.',
+    followUpPlan: {
+      controlDate: '2026-10-11',
+      controlPoli: 'Poli Jantung RS Universitas Esa Unggul',
+      controlDoctor: 'dr. Sari Dewi, Sp.PD',
+      emergencyWarningSigns: 'Segera kembali jika ada nyeri dada atau sesak nafas.'
+    },
+    dietRecommendation: 'Diet Sehat Jantung Rendah Garam Rendah Lemak',
+    activityRecommendation: 'Aktivitas fisik ringan-sedang rutin 30 menit 5x/minggu',
+    status: 'Final',
+    missingFields: [],
+    serviceType: 'Rawat Jalan',
+    resolutionTargetHours: 24, // 1x24 jam untuk Rawat Jalan
+    deadlineTimestamp: '2026-09-12 12:00',
+    inaCbgPedomanNotes: [
+      '[VI. Penyakit-Penyakit Sistem Sirkulasi - I25.1]: Penyakit Jantung Iskemik kronik pasca NSTEMI pada kontrol rawat jalan.'
+    ],
+    doctorSignature: 'dr. Sari Dewi, Sp.PD',
+    doctorSignatureDate: '2026-09-11',
+    finalizedAt: '2026-09-11 11:45',
+    finalizedBy: 'dr. Sari Dewi, Sp.PD (DPJP)',
+    reminderDeadline: '2026-09-12 12:00 (Maksimal 1x24 Jam - Rawat Jalan)',
+    createdAt: '2026-09-11 10:30',
+    updatedAt: '2026-09-11 11:45'
+  }
+];
+

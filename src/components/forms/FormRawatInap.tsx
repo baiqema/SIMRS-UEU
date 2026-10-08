@@ -491,7 +491,7 @@ export const FormRawatInap: React.FC<FormRawatInapProps> = ({
       </div>
 
       {/* BOTTOM ACTION BAR */}
-      <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 print:hidden">
         <div className="text-xs text-slate-500 font-medium">
           DPJP Rawat Inap: <strong className="text-slate-800">{user?.name || 'dr. Sari Dewi, Sp.PD'}</strong>
         </div>

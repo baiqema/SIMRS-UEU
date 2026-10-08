@@ -22,6 +22,7 @@ export const Header: React.FC = () => {
       dashboard: 'Dashboard Eksekutif',
       pendaftaran: 'Pelayanan / Pendaftaran Pasien',
       generalconsent: 'Pelayanan / General Consent',
+      pemeriksaan: 'Pelayanan / Pemeriksaan Pasien',
       rekammedis: 'Rekam Medis / Rekam Medis Elektronik',
       cppt: 'Rekam Medis / CPPT',
       informedconsent: 'Rekam Medis / Informed Consent',
@@ -90,7 +91,7 @@ export const Header: React.FC = () => {
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-[#0B5ED7] border-b border-[#0852bc] h-17 sm:h-18 flex items-center justify-between px-3 sm:px-6 shadow-md gap-2 select-none">
+      <header className="sticky top-0 z-50 bg-[#0B5ED7] border-b border-[#0852bc] h-17 sm:h-18 flex items-center justify-between px-3 sm:px-6 shadow-md gap-2 select-none">
         {/* LEFT: Toggle Sidebar & Breadcrumbs */}
         <div className="flex items-center gap-3">
           <button

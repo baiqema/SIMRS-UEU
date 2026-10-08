@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { FileSignature, CheckCircle2, Printer, Search, Eye } from 'lucide-react';
+import { FileSignature, CheckCircle2, Printer, Search, Eye, Edit3, Sparkles } from 'lucide-react';
 import { CetakGeneralConsentModal } from '../components/CetakGeneralConsentModal';
+import { EditGeneralConsentModal } from '../components/EditGeneralConsentModal';
 import { GeneralConsent } from '../types';
 
 export const GeneralConsentView: React.FC = () => {
@@ -12,9 +13,18 @@ export const GeneralConsentView: React.FC = () => {
   const [selectedConsentForPrint, setSelectedConsentForPrint] = useState<GeneralConsent | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
+  // State untuk Modal Edit & Tanda Tangan Elektronik
+  const [selectedConsentForEdit, setSelectedConsentForEdit] = useState<GeneralConsent | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
   const handleOpenPrint = (gc: GeneralConsent) => {
     setSelectedConsentForPrint(gc);
     setIsPrintModalOpen(true);
+  };
+
+  const handleOpenEdit = (gc: GeneralConsent) => {
+    setSelectedConsentForEdit(gc);
+    setIsEditModalOpen(true);
   };
 
   const filteredConsents = generalConsents.filter(gc => {
@@ -45,6 +55,10 @@ export const GeneralConsentView: React.FC = () => {
   const selectedReg = selectedConsentForPrint ? getReg(selectedConsentForPrint.regId) : null;
   const selectedPatient = selectedReg ? getPatient(selectedReg.patientId) : null;
   const selectedDoctor = selectedReg ? getUser(selectedReg.dpjp) : null;
+
+  const selectedRegForEdit = selectedConsentForEdit ? getReg(selectedConsentForEdit.regId) : null;
+  const selectedPatientForEdit = selectedRegForEdit ? getPatient(selectedRegForEdit.patientId) : null;
+  const selectedDoctorForEdit = selectedRegForEdit ? getUser(selectedRegForEdit.dpjp) : null;
 
   return (
     <div className="space-y-6">
@@ -126,7 +140,7 @@ export const GeneralConsentView: React.FC = () => {
                 <th className="p-3.5">Tanda Tangan Pasien / Wali</th>
                 <th className="p-3.5">Petugas / Saksi RS</th>
                 <th className="p-3.5 text-center">Status</th>
-                <th className="p-3.5 text-center">Cetak Formulir</th>
+                <th className="p-3.5 text-center">Aksi & Tanda Tangan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
@@ -140,6 +154,8 @@ export const GeneralConsentView: React.FC = () => {
                 filteredConsents.map(gc => {
                   const r = getReg(gc.regId);
                   const p = r ? getPatient(r.patientId) : null;
+                  const hasDigitalSignature = Boolean(gc.patientSignatureImage);
+
                   return (
                     <tr key={gc.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-3.5 font-bold text-blue-600">{gc.id}</td>
@@ -149,22 +165,42 @@ export const GeneralConsentView: React.FC = () => {
                         {p?.noRM && <div className="text-[10px] text-slate-400 font-mono">No. RM: {p.noRM}</div>}
                       </td>
                       <td className="p-3.5 text-slate-500">{gc.date}</td>
-                      <td className="p-3.5 font-semibold text-slate-800">{gc.patientSign}</td>
-                      <td className="p-3.5 text-slate-600">{gc.witnessSign}</td>
+                      <td className="p-3.5">
+                        <div className="font-semibold text-slate-800">{gc.signerName || gc.patientSign}</div>
+                        {hasDigitalSignature ? (
+                          <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 mt-0.5">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> TTD Digital Tersimpan
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">Belum TTD Digital</span>
+                        )}
+                      </td>
+                      <td className="p-3.5 text-slate-600">{gc.witnessName || gc.witnessSign}</td>
                       <td className="p-3.5 text-center">
                         <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3 text-emerald-600" /> {gc.status}
                         </span>
                       </td>
                       <td className="p-3.5 text-center">
-                        <button
-                          onClick={() => handleOpenPrint(gc)}
-                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 hover:border-blue-600 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                          title="Cetak Dokumen General Consent Resmi (PDF / Print)"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>Cetak</span>
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEdit(gc)}
+                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 hover:border-amber-500 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                            title="Edit Data & Goreskan Tanda Tangan Elektronik"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Edit / TTD</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleOpenPrint(gc)}
+                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 hover:border-blue-600 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                            title="Cetak Dokumen General Consent Resmi (PDF / Print)"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Cetak</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -183,6 +219,18 @@ export const GeneralConsentView: React.FC = () => {
         patient={selectedPatient}
         registration={selectedReg}
         doctor={selectedDoctor}
+        onOpenEdit={handleOpenEdit}
+      />
+
+      {/* Modal Edit & Tanda Tangan Elektronik General Consent */}
+      <EditGeneralConsentModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        consent={selectedConsentForEdit}
+        patient={selectedPatientForEdit}
+        registration={selectedRegForEdit}
+        doctor={selectedDoctorForEdit}
+        onOpenPrint={handleOpenPrint}
       />
     </div>
   );

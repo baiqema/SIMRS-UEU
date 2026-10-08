@@ -3,11 +3,13 @@ import { useApp } from '../context/AppContext';
 import { ExamScenario } from '../types';
 import { ExamScenarioManagerModal } from '../components/exam/ExamScenarioManagerModal';
 import { ExamDualPaneWorkspace } from '../components/exam/ExamDualPaneWorkspace';
+import { MateriPraktikumView } from '../components/praktikum/MateriPraktikumView';
+import { QuizEvaluasiView } from '../components/praktikum/QuizEvaluasiView';
 import {
   GraduationCap, Plus, Clock, FileText, CheckCircle2,
   AlertTriangle, BookOpen, UserCheck, ShieldCheck,
   Edit, Trash2, Play, Award, BarChart3, Users, ExternalLink,
-  Sparkles, Lock, RotateCcw, Search, Eye
+  Sparkles, Lock, RotateCcw, Search, Eye, HelpCircle, Layers
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -32,7 +34,7 @@ export const PraktikumView: React.FC = () => {
   const isDosen = roleModeOverride === 'AUTO' ? isDosenRole : roleModeOverride === 'DOSEN';
 
   // Active view states
-  const [activeTab, setActiveTab] = useState<'exams' | 'bank' | 'grades' | 'guides'>('exams');
+  const [activeTab, setActiveTab] = useState<'materi' | 'quiz' | 'exams' | 'bank' | 'grades' | 'guides'>('materi');
   const [activeScenarioForExam, setActiveScenarioForExam] = useState<ExamScenario | null>(null);
   const [selectedScenarioForEdit, setSelectedScenarioForEdit] = useState<ExamScenario | null>(null);
   const [isManagerModalOpen, setIsManagerModalOpen] = useState(false);
@@ -190,49 +192,71 @@ export const PraktikumView: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 pt-3 rounded-t-2xl">
         <div className="flex items-center gap-2 overflow-x-auto">
           <button
+            onClick={() => setActiveTab('materi')}
+            className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'materi'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 text-blue-600" /> Materi Pembelajaran Praktikum
+          </button>
+
+          <button
+            onClick={() => setActiveTab('quiz')}
+            className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'quiz'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-500" /> Quiz Evaluasi (20 Soal)
+          </button>
+
+          <button
             onClick={() => setActiveTab('exams')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'exams'
                 ? 'border-blue-600 text-blue-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Play className="w-4 h-4" /> Daftar Ujian Praktik ({filteredScenarios.length})
+            <Play className="w-4 h-4 text-emerald-600" /> Simulasi Kasus Ujian ({filteredScenarios.length})
           </button>
 
           {isDosen && (
             <button
               onClick={() => setActiveTab('bank')}
-              className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+              className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'bank'
                   ? 'border-blue-600 text-blue-700'
                   : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
-              <FileText className="w-4 h-4" /> Bank Soal & Pengelolaan Dosen
+              <FileText className="w-4 h-4 text-indigo-600" /> Bank Soal Dosen
             </button>
           )}
 
           <button
             onClick={() => setActiveTab('grades')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'grades'
                 ? 'border-blue-600 text-blue-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Award className="w-4 h-4" /> Rekap Nilai & Hasil Ujian ({examSubmissions.length})
+            <Award className="w-4 h-4 text-purple-600" /> Rekap Nilai Kasus ({examSubmissions.length})
           </button>
 
           <button
             onClick={() => setActiveTab('guides')}
-            className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+            className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'guides'
                 ? 'border-blue-600 text-blue-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <BookOpen className="w-4 h-4" /> Panduan Praktikum Modul SIMRS
+            <Layers className="w-4 h-4 text-slate-600" /> Pintasan Modul SIMRS
           </button>
         </div>
 
@@ -273,6 +297,24 @@ export const PraktikumView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* TAB 0: MATERI PEMBELAJARAN PRAKTIKUM (TUJUAN, TEORI, ALAT BAHAN, LANGKAH) */}
+      {/* ========================================================================= */}
+      {activeTab === 'materi' && (
+        <MateriPraktikumView onStartQuiz={() => setActiveTab('quiz')} />
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 0B: QUIZ EVALUASI PEMAHAMAN (20 SOAL PILIHAN GANDA OTOMATIS) */}
+      {/* ========================================================================= */}
+      {activeTab === 'quiz' && (
+        <QuizEvaluasiView
+          onBackToMateri={() => setActiveTab('materi')}
+          studentName={user?.name}
+          studentId={user?.id}
+        />
+      )}
 
       {/* ========================================================================= */}
       {/* TAB 1: DAFTAR UJIAN PRAKTIK & SIMULASI (CARDS VIEW) */}

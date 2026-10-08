@@ -5,6 +5,7 @@ import { Sidebar } from './components/Sidebar';
 import { LoginView } from './views/LoginView';
 import { DashboardView } from './views/DashboardView';
 import { PendaftaranView } from './views/PendaftaranView';
+import { BedManagementView } from './views/BedManagementView';
 import { GeneralConsentView } from './views/GeneralConsentView';
 import { RekamMedisView } from './views/RekamMedisView';
 import { CPPTView } from './views/CPPTView';
@@ -23,6 +24,7 @@ import { AuditTrailView } from './views/AuditTrailView';
 import { LogAktivitasView } from './views/LogAktivitasView';
 import { PelaporanView } from './views/PelaporanView';
 import { MetadataRmeView } from './views/MetadataRmeView';
+import { PemeriksaanView } from './views/PemeriksaanView';
 import { ShieldAlert } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -37,6 +39,7 @@ const AppContent: React.FC = () => {
 
   const hasPageAccess = (pageId: string) => {
     if (pageId === 'kunjungan') return access.includes('all') || access.includes('pendaftaran') || access.includes('kunjungan');
+    if (pageId === 'bedmanagement') return access.includes('all') || access.includes('pendaftaran') || access.includes('bedmanagement');
     if (pageId === 'audit') return user.roleId === 'R01';
     return access.includes('all') || access.includes(pageId);
   };
@@ -63,12 +66,15 @@ const AppContent: React.FC = () => {
         return <DashboardView />;
       case 'pendaftaran':
       case 'kunjungan':
-      case 'bedmanagement':
         return <PendaftaranView />;
+      case 'bedmanagement':
+        return <BedManagementView />;
       case 'generalconsent':
         return <GeneralConsentView />;
       case 'rekammedis':
         return <RekamMedisView />;
+      case 'pemeriksaan':
+        return <PemeriksaanView />;
       case 'cppt':
         return <CPPTView />;
       case 'informedconsent':

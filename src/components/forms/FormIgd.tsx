@@ -495,7 +495,7 @@ export const FormIgd: React.FC<FormIgdProps> = ({
         </div>
 
         {/* BOTTOM ACTION BAR */}
-        <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 print:hidden">
           <div className="text-xs text-slate-500 font-medium">
             Dokter DPJP / Jaga IGD: <strong className="text-slate-800">{user?.name || 'dr. Hendra Setiawan, Sp.JP'}</strong>
           </div>

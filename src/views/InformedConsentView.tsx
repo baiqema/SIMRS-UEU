@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Modal } from '../components/Modal';
 import { CetakInformedConsentModal } from '../components/CetakInformedConsentModal';
+import { EditInformedConsentModal } from '../components/EditInformedConsentModal';
 import Swal from 'sweetalert2';
 import {
-  Handshake, Plus, CheckCircle2, ShieldAlert, Printer, Search, FileText, Eye
+  Handshake, Plus, CheckCircle2, ShieldAlert, Printer, Search, FileText, Eye, Edit3
 } from 'lucide-react';
 import { InformedConsent } from '../types';
 
@@ -23,9 +24,18 @@ export const InformedConsentView: React.FC = () => {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // State untuk Edit & Tanda Tangan Elektronik
+  const [selectedConsentForEdit, setSelectedConsentForEdit] = useState<InformedConsent | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
   const handleOpenPrint = (ic: InformedConsent) => {
     setSelectedConsentForPrint(ic);
     setIsPrintModalOpen(true);
+  };
+
+  const handleOpenEdit = (ic: InformedConsent) => {
+    setSelectedConsentForEdit(ic);
+    setIsEditModalOpen(true);
   };
 
   const handleSaveIC = (e: React.FormEvent) => {
@@ -122,6 +132,13 @@ export const InformedConsentView: React.FC = () => {
   const selectedPatient = selectedReg ? getPatient(selectedReg.patientId) : null;
   const selectedDoctor = selectedConsentForPrint ? getUser(selectedConsentForPrint.doctorId) : null;
 
+  // Data pasien & kunjungan terkait untuk modal edit
+  const selectedCPPTForEdit = selectedConsentForEdit ? cppt.find(item => item.id === selectedConsentForEdit.cpptId) : null;
+  const selectedMRForEdit = selectedCPPTForEdit ? getMR(selectedCPPTForEdit.mrId) : null;
+  const selectedRegForEdit = selectedMRForEdit ? getReg(selectedMRForEdit.regId) : null;
+  const selectedPatientForEdit = selectedRegForEdit ? getPatient(selectedRegForEdit.patientId) : null;
+  const selectedDoctorForEdit = selectedConsentForEdit ? getUser(selectedConsentForEdit.doctorId) : null;
+
   return (
     <div className="space-y-6">
       {/* Read-Only Mode Banner */}
@@ -216,7 +233,7 @@ export const InformedConsentView: React.FC = () => {
                 <th className="p-3.5">Komplikasi</th>
                 <th className="p-3.5">Dokter Penanggung Jawab</th>
                 <th className="p-3.5 text-center">Status</th>
-                <th className="p-3.5 text-center">Cetak Formulir</th>
+                <th className="p-3.5 text-center">Aksi & Tanda Tangan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
@@ -233,6 +250,8 @@ export const InformedConsentView: React.FC = () => {
                   const r = mr ? getReg(mr.regId) : null;
                   const p = r ? getPatient(r.patientId) : null;
                   const doc = getUser(ic.doctorId);
+                  const hasDigitalSignature = Boolean(ic.patientSignatureImage);
+
                   return (
                     <tr key={ic.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-3.5 font-bold text-blue-600">{ic.id}</td>
@@ -249,16 +268,32 @@ export const InformedConsentView: React.FC = () => {
                         <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 inline-flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3 text-emerald-600" /> {ic.status}
                         </span>
+                        {hasDigitalSignature && (
+                          <span className="block text-[9px] text-emerald-700 font-bold mt-0.5">
+                            ✓ TTD Tersimpan
+                          </span>
+                        )}
                       </td>
                       <td className="p-3.5 text-center">
-                        <button
-                          onClick={() => handleOpenPrint(ic)}
-                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 hover:border-blue-600 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                          title="Cetak Formulir Informed Consent Resmi (PDF / Print)"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>Cetak</span>
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEdit(ic)}
+                            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 hover:border-amber-500 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                            title="Edit Data & Goreskan Tanda Tangan Elektronik"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>Edit / TTD</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleOpenPrint(ic)}
+                            className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 hover:border-blue-600 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                            title="Cetak Formulir Informed Consent Resmi (PDF / Print)"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Cetak</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -279,6 +314,19 @@ export const InformedConsentView: React.FC = () => {
         cpptItem={selectedCPPT}
         mrItem={selectedMR}
         doctor={selectedDoctor}
+        onOpenEdit={handleOpenEdit}
+      />
+
+      {/* Modal Edit & Tanda Tangan Elektronik Informed Consent */}
+      <EditInformedConsentModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        consent={selectedConsentForEdit}
+        patient={selectedPatientForEdit}
+        registration={selectedRegForEdit}
+        cpptItem={selectedCPPTForEdit}
+        doctor={selectedDoctorForEdit}
+        onOpenPrint={handleOpenPrint}
       />
 
       {/* Modal Form Buat Informed Consent */}

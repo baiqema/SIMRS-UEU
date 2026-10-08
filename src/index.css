@@ -22,54 +22,97 @@ input, select, textarea, table, button, td, th, .font-mono {
   font-variant-numeric: tabular-nums;
 }
 
-/* Tone down heavy bold styling to create clean, light, uncrowded UI */
-.font-black, .font-extrabold {
-  font-weight: 600;
+/* Typography: clean, neutral Open Sans without heavy bold text as requested */
+* {
+  font-weight: 400;
 }
-.font-bold {
-  font-weight: 600;
+
+b, strong, .font-semibold, .font-bold, .font-extrabold, .font-black {
+  font-weight: 500 !important;
 }
-b, strong {
-  font-weight: 600;
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600 !important;
+}
+
+input, select, textarea, button, table, td, th {
+  font-weight: 400 !important;
 }
 
 @media print {
-  /* Hide non-printable elements */
+  /* Hide non-printable UI elements */
   aside,
   nav,
+  header.print\:hidden,
   .print\:hidden,
-  button {
+  button,
+  .no-print {
     display: none !important;
   }
 
   /* Reset layout for paper output */
-  body {
+  html, body {
     background: #ffffff !important;
     color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
   }
 
-  /* Unconstrain modals on print */
-  .fixed.inset-0 {
+  /* Unconstrain modals on print so full documents print without cutoff */
+  .fixed.inset-0,
+  div[class*="fixed inset-0"] {
     position: static !important;
     background: transparent !important;
     padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
     overflow: visible !important;
     z-index: auto !important;
   }
 
+  .w-screen, .h-screen, .h-full, .w-full {
+    height: auto !important;
+    width: 100% !important;
+  }
+
+  .overflow-hidden,
+  .overflow-y-auto,
+  .overflow-x-auto,
   .max-h-\[90vh\],
-  .max-h-\[85vh\],
-  .overflow-y-auto {
-    max-height: none !important;
+  .max-h-\[85vh\] {
     overflow: visible !important;
-    border: none !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Remove modal borders and shadows */
+  .border-b.border-slate-100 {
+    display: none !important;
+  }
+
+  /* Form controls in print: display text cleanly */
+  input, textarea, select {
+    border-color: #cbd5e1 !important;
+    background: transparent !important;
+    color: #0f172a !important;
     box-shadow: none !important;
   }
 
-  /* Remove modal header when printing */
-  .border-b.border-slate-100 {
-    display: none !important;
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  .print-resume-document {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 }

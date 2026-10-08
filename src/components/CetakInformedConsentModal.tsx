@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Modal } from './Modal';
 import { InformedConsent, Patient, Registration, CPPT, MedicalRecord, User } from '../types';
-import { Printer, CheckCircle2, ShieldCheck, QrCode, FileText, UserCheck } from 'lucide-react';
+import { Printer, CheckCircle2, ShieldCheck, QrCode, FileText, UserCheck, Edit3 } from 'lucide-react';
 import esaUnggulEmblem from '../assets/logo-esa-unggul-emblem.png';
 import { RmikLogo } from './Logos';
 
@@ -14,6 +14,7 @@ interface CetakInformedConsentModalProps {
   cpptItem?: CPPT | null;
   mrItem?: MedicalRecord | null;
   doctor?: User | null;
+  onOpenEdit?: (ic: InformedConsent) => void;
 }
 
 export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps> = ({
@@ -24,7 +25,8 @@ export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps>
   registration,
   cpptItem,
   mrItem,
-  doctor
+  doctor,
+  onOpenEdit
 }) => {
   const printContentRef = useRef<HTMLDivElement>(null);
 
@@ -260,11 +262,21 @@ export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps>
                 <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                   Dokter Penanggung Jawab (DPJP)
                 </span>
-                <div className="my-2 flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
-                    <QrCode className="w-9 h-9" />
-                  </div>
-                  <span className="text-[9px] font-mono text-emerald-700 font-bold mt-1">✓ Terverifikasi RME</span>
+                <div className="my-2 flex flex-col items-center justify-center min-h-[50px]">
+                  {consent.doctorSignatureImage ? (
+                    <img
+                      src={consent.doctorSignatureImage}
+                      alt="Tanda Tangan Dokter"
+                      className="h-12 max-w-[130px] object-contain drop-shadow-xs"
+                    />
+                  ) : (
+                    <>
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
+                        <QrCode className="w-7 h-7" />
+                      </div>
+                      <span className="text-[9px] font-mono text-emerald-700 font-bold mt-1">✓ Terverifikasi RME</span>
+                    </>
+                  )}
                 </div>
                 <div className="border-t border-slate-300 pt-1">
                   <strong className="text-[11px] text-slate-900 block font-bold">{doctorName}</strong>
@@ -277,12 +289,20 @@ export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps>
                 <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                   Pasien / Keluarga Pemberi Persetujuan
                 </span>
-                <div className="my-2 flex flex-col items-center justify-center h-12">
-                  <span className="text-xs italic text-slate-400 font-serif">[ Tanda Tangan Sah ]</span>
+                <div className="my-2 flex flex-col items-center justify-center min-h-[50px]">
+                  {consent.patientSignatureImage ? (
+                    <img
+                      src={consent.patientSignatureImage}
+                      alt="Tanda Tangan Pasien"
+                      className="h-12 max-w-[130px] object-contain drop-shadow-xs"
+                    />
+                  ) : (
+                    <span className="text-xs italic text-slate-400 font-serif">[ Tanda Tangan Sah ]</span>
+                  )}
                 </div>
                 <div className="border-t border-slate-300 pt-1">
-                  <strong className="text-[11px] text-slate-900 block font-bold">{patient.name}</strong>
-                  <span className="text-[9.5px] text-slate-500 block">( Pasien Sendiri / Wali Sah )</span>
+                  <strong className="text-[11px] text-slate-900 block font-bold">{consent.patientSignName || patient.name}</strong>
+                  <span className="text-[9.5px] text-slate-500 block">({consent.patientRelation || 'Pasien / Wali Sah'})</span>
                 </div>
               </div>
 
@@ -291,11 +311,19 @@ export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps>
                 <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                   Saksi I (Tenaga Medis / Perawat)
                 </span>
-                <div className="my-2 flex flex-col items-center justify-center h-12">
-                  <span className="text-xs italic text-slate-400 font-serif">[ Tanda Tangan ]</span>
+                <div className="my-2 flex flex-col items-center justify-center min-h-[50px]">
+                  {consent.witnessSignatureImage ? (
+                    <img
+                      src={consent.witnessSignatureImage}
+                      alt="Tanda Tangan Saksi"
+                      className="h-12 max-w-[130px] object-contain drop-shadow-xs"
+                    />
+                  ) : (
+                    <span className="text-xs italic text-slate-400 font-serif">[ Tanda Tangan ]</span>
+                  )}
                 </div>
                 <div className="border-t border-slate-300 pt-1">
-                  <strong className="text-[11px] text-slate-900 block font-bold">Ns. Ratna Dewi, S.Kep</strong>
+                  <strong className="text-[11px] text-slate-900 block font-bold">{consent.witnessName || 'Ns. Ratna Dewi, S.Kep'}</strong>
                   <span className="text-[9.5px] text-slate-500 block">NIP. 19890412201503</span>
                 </div>
               </div>
@@ -305,7 +333,7 @@ export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps>
                 <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                   Saksi II (Keluarga Pasien)
                 </span>
-                <div className="my-2 flex flex-col items-center justify-center h-12">
+                <div className="my-2 flex flex-col items-center justify-center min-h-[50px]">
                   <span className="text-xs italic text-slate-400 font-serif">[ Tanda Tangan ]</span>
                 </div>
                 <div className="border-t border-slate-300 pt-1">
@@ -324,7 +352,7 @@ export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps>
         </div>
 
         {/* Action Buttons Toolbar */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100 print:hidden">
           <button
             type="button"
             onClick={onClose}
@@ -334,6 +362,21 @@ export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps>
           </button>
 
           <div className="flex items-center gap-2">
+            {onOpenEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenEdit(consent);
+                }}
+                className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Buka Formulir untuk Melakukan Tanda Tangan Digital"
+              >
+                <Edit3 className="w-4 h-4 text-amber-700" />
+                <span>Edit / TTD Digital</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handlePrint}

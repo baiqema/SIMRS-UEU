@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ClipboardList, FileSignature, FileText,
   FilePenLine, Handshake, Barcode, ShieldAlert, Receipt,
   Banknote, Pill, FlaskConical, Radio, Users, GraduationCap,
-  ShieldCheck, History, BarChart3, BookOpen, Bed
+  ShieldCheck, History, BarChart3, BookOpen, Bed, Stethoscope
 } from 'lucide-react';
 import esaUnggulEmblem from '../assets/logo-esa-unggul-emblem.png';
 import { RmikLogo } from './Logos';
@@ -36,6 +36,7 @@ export const Sidebar: React.FC = () => {
     {
       group: 'PEMERIKSAAN & CLINICAL',
       items: [
+        { id: 'pemeriksaan', label: 'Pemeriksaan Pasien', icon: Stethoscope },
         { id: 'cppt', label: 'CPPT / Asesmen SOAP', icon: FilePenLine },
         { id: 'rekammedis', label: 'Pemeriksaan Rawat Jalan', icon: FileText },
         { id: 'informedconsent', label: 'Informed Consent', icon: Handshake },
@@ -85,7 +86,7 @@ export const Sidebar: React.FC = () => {
     if (itemId === 'kunjungan') {
       navigate('pendaftaran', { tab: 'kunjungan' });
     } else if (itemId === 'bedmanagement') {
-      navigate('pendaftaran', { viewMode: 'bedmanagement' });
+      navigate('bedmanagement');
     } else {
       navigate(itemId);
     }
@@ -164,8 +165,9 @@ export const Sidebar: React.FC = () => {
               {visibleItems.map(item => {
                 const Icon = item.icon;
                 const isKunjunganActive = item.id === 'kunjungan' && activePage === 'pendaftaran' && params?.tab === 'kunjungan';
-                const isPendaftaranActive = item.id === 'pendaftaran' && activePage === 'pendaftaran' && params?.tab !== 'kunjungan';
-                const isActive = item.id === 'kunjungan' ? isKunjunganActive : item.id === 'pendaftaran' ? isPendaftaranActive : activePage === item.id;
+                const isBedManagementActive = item.id === 'bedmanagement' && (activePage === 'bedmanagement' || (activePage === 'pendaftaran' && params?.viewMode === 'bedmanagement'));
+                const isPendaftaranActive = item.id === 'pendaftaran' && activePage === 'pendaftaran' && params?.tab !== 'kunjungan' && params?.viewMode !== 'bedmanagement';
+                const isActive = item.id === 'kunjungan' ? isKunjunganActive : item.id === 'bedmanagement' ? isBedManagementActive : item.id === 'pendaftaran' ? isPendaftaranActive : activePage === item.id;
                 const isEditable = canEditPage(item.id === 'kunjungan' ? 'pendaftaran' : item.id);
 
                 return (

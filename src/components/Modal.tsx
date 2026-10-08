@@ -26,7 +26,7 @@ export const Modal: React.FC<ModalProps> = ({
       }}
     >
       <div
-        className={`bg-white rounded-2xl ${maxWidth} w-full shadow-2xl overflow-hidden border border-slate-100 transform transition-all duration-200 scale-100 max-h-[90vh] flex flex-col my-auto`}
+        className={`bg-white rounded-2xl ${maxWidth} w-full shadow-2xl overflow-hidden border border-slate-100 transform transition-all duration-200 scale-100 max-h-[90vh] flex flex-col my-auto print:max-h-none print:overflow-visible print:border-none print:shadow-none print:w-full print:max-w-none print:rounded-none`}
       >
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 print:hidden">
@@ -35,14 +35,14 @@ export const Modal: React.FC<ModalProps> = ({
           </h3>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-slate-200/60 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+            className="w-8 h-8 rounded-lg hover:bg-slate-200/60 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto flex-1">{children}</div>
+        <div className="p-6 overflow-y-auto flex-1 print:p-0 print:overflow-visible">{children}</div>
       </div>
     </div>
   );

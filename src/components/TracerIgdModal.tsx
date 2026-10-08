@@ -231,7 +231,7 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between pt-2 print:hidden">
           <button
             type="button"
             onClick={onClose}

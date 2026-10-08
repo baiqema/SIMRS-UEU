@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Patient, Registration, User } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Patient, Registration, User, AsuhanKeperawatan } from '../types';
 import {
   CheckCircle2, AlertTriangle, Activity, HeartPulse, FileText, Stethoscope,
   Clock, Save, Sparkles, Printer, UserCheck, ShieldCheck, Scale, Thermometer,
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { DigitalSignaturePad } from './DigitalSignaturePad';
+import esaUnggulEmblem from '../assets/logo-esa-unggul-emblem.png';
 
 interface AsuhanKeperawatanIgdModalProps {
   isOpen: boolean;
@@ -254,6 +255,42 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
   };
 
   const handleSaveAll = () => {
+    try {
+      const askepRecord: AsuhanKeperawatan = {
+        id: `ASKEP_${registration.id}`,
+        regId: registration.id,
+        patientId: patient.id,
+        nurseId: nurse?.id || 'U007_PERAWAT',
+        nurseName: nurseSignName,
+        date: tglPengkajian,
+        time: jamPengkajian,
+        status: 'Final',
+        keluhanUtama: keluhanSaatIni || alasanMasukRS,
+        riwayatPenyakit: riwayatPenyakit,
+        alergi: alergi,
+        tekananDarah: td,
+        nadi: nadi,
+        suhu: suhu,
+        pernapasan: rr,
+        spo2: spo2,
+        diagnosaSDKI: [diagKeperawatan],
+        intervensiSIKI: [diagIntervensi],
+        luaranSLKI: diagTujuan,
+        implementasi: diagIntervensi,
+        evaluasiSOAP: {
+          s: 'Pasien menyampaikan keluhan berangsur membaik.',
+          o: `TD ${td} mmHg, Nadi ${nadi} x/m, Suhu ${suhu} °C, SpO2 ${spo2}%.`,
+          a: 'Masalah keperawatan teratasi sebagian.',
+          p: 'Lanjutkan rencana intervensi keperawatan SIKI.'
+        }
+      };
+      const existing = JSON.parse(localStorage.getItem('simrs_asuhanKeperawatan') || '[]');
+      const filtered = existing.filter((item: any) => item.regId !== registration.id);
+      localStorage.setItem('simrs_asuhanKeperawatan', JSON.stringify([askepRecord, ...filtered]));
+    } catch (err) {
+      console.error('Error saving askep:', err);
+    }
+
     setFormMode('view');
     Swal.fire({
       icon: 'success',
@@ -262,6 +299,33 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
       confirmButtonColor: '#0284c7'
     });
   };
+
+  // Load saved record from localStorage if already saved previously
+  useEffect(() => {
+    if (!registration) return;
+    try {
+      const savedList = JSON.parse(localStorage.getItem('simrs_asuhanKeperawatan') || '[]');
+      const found = savedList.find((item: any) => item.regId === registration.id);
+      if (found) {
+        if (found.nurseName) setNurseSignName(found.nurseName);
+        if (found.date) setTglPengkajian(found.date);
+        if (found.time) setJamPengkajian(found.time);
+        if (found.keluhanUtama) setKeluhanSaatIni(found.keluhanUtama);
+        if (found.riwayatPenyakit) setRiwayatPenyakit(found.riwayatPenyakit);
+        if (found.alergi) setAlergi(found.alergi);
+        if (found.tekananDarah) setTd(found.tekananDarah);
+        if (found.nadi) setNadi(found.nadi);
+        if (found.suhu) setSuhu(found.suhu);
+        if (found.pernapasan) setRr(found.pernapasan);
+        if (found.spo2) setSpo2(found.spo2);
+        if (found.diagnosaSDKI && found.diagnosaSDKI.length > 0) setDiagKeperawatan(found.diagnosaSDKI[0]);
+        if (found.intervensiSIKI && found.intervensiSIKI.length > 0) setDiagIntervensi(found.intervensiSIKI[0]);
+        if (found.luaranSLKI) setDiagTujuan(found.luaranSLKI);
+      }
+    } catch (e) {
+      console.error('Error loading saved askep:', e);
+    }
+  }, [registration]);
 
   const handlePrint = () => {
     window.print();
@@ -274,10 +338,10 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
       <div className="flex flex-col w-full h-full bg-slate-100 overflow-hidden">
         
         {/* TOP APPLICATION HEADER (FULL PAGE) */}
-        <header className="bg-white border-b border-slate-200 px-4 py-2.5 shrink-0 flex items-center justify-between gap-4 shadow-xs">
+        <header className="bg-white border-b border-slate-200 px-4 py-2.5 shrink-0 flex items-center justify-between gap-4 shadow-xs print:hidden">
           <div className="flex items-center gap-3">
             <img
-              src="/logo-esaunggul.png"
+              src={esaUnggulEmblem}
               alt="Logo Universitas Esa Unggul"
               className="h-9 w-auto object-contain bg-white rounded-lg p-0.5 border border-slate-200 shadow-2xs"
             />
@@ -387,11 +451,59 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
         </header>
 
         {/* SCROLLABLE FULL PAGE BODY */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 print:p-2 print:overflow-visible">
           
+          {/* PRINT-ONLY OFFICIAL KOP RUMAH SAKIT & LEMBAR PENGKAJIAN */}
+          <div className="hidden print:block border-b-2 border-slate-900 pb-3 mb-4">
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <div className="flex items-center gap-3">
+                <img
+                  src={esaUnggulEmblem}
+                  alt="Logo Universitas Esa Unggul"
+                  className="w-14 h-14 object-contain"
+                />
+                <div>
+                  <h1 className="text-base font-bold text-slate-900 tracking-tight leading-tight uppercase">
+                    RS UNIVERSITAS ESA UNGGUL JAKARTA
+                  </h1>
+                  <p className="text-[11px] text-slate-700 leading-tight">
+                    Instalasi Gawat Darurat & Rawat Inap &bull; Pelayanan Asuhan Keperawatan Terpadu
+                  </p>
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    Jl. Arjuna Utara No.9, Kebon Jeruk, Jakarta Barat 11510 &bull; Telp: (021) 567-4223
+                  </p>
+                </div>
+              </div>
+              <div className="text-right border border-slate-400 p-2 rounded text-[10px] space-y-0.5 min-w-[210px]">
+                <div className="font-bold text-slate-900 text-xs">RM.ASKEP-01</div>
+                <div>Standar KMK HK.01.07/MENKES/1423/2022</div>
+                <div>Standar PPNI (SDKI - SLKI - SIKI)</div>
+              </div>
+            </div>
+            <div className="text-center py-1 bg-slate-100 border border-slate-300 rounded font-bold text-xs uppercase tracking-wide">
+              FORMULIR PENGKAJIAN & ASUHAN KEPERAWATAN INDIVIDU (RME)
+            </div>
+            
+            {/* Tabel Identitas Pasien Cetak */}
+            <div className="grid grid-cols-2 gap-2 mt-2 p-2 border border-slate-300 rounded text-[11px]">
+              <div>
+                <div><strong>No. Rekam Medis:</strong> {patient.noRM}</div>
+                <div><strong>Nama Pasien:</strong> {patient.name} ({patient.gender === 'M' ? 'Laki-laki' : 'Perempuan'})</div>
+                <div><strong>Tanggal Lahir / Usia:</strong> {patient.dob}</div>
+                <div><strong>Penjamin / Asuransi:</strong> {patient.insuranceType || 'BPJS'} ({pembiayaan})</div>
+              </div>
+              <div>
+                <div><strong>No. Registrasi:</strong> {registration.id}</div>
+                <div><strong>Ruangan / Bangsal:</strong> {ruangan}</div>
+                <div><strong>Tgl / Jam Masuk:</strong> {tglMasuk} {jamMasuk}</div>
+                <div><strong>Tgl / Jam Pengkajian:</strong> {tglPengkajian} {jamPengkajian}</div>
+              </div>
+            </div>
+          </div>
+
           {/* BANNER NOTIFIKASI MODE */}
           {formMode === 'view' && (
-            <div className="bg-amber-50 border border-amber-300 text-amber-900 px-4 py-2.5 rounded-xl flex items-center justify-between shadow-2xs">
+            <div className="bg-amber-50 border border-amber-300 text-amber-900 px-4 py-2.5 rounded-xl flex items-center justify-between shadow-2xs print:hidden">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <div>
@@ -412,7 +524,7 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
           )}
 
           {formMode === 'edit' && (
-            <div className="bg-blue-50 border border-blue-200 text-blue-950 px-4 py-2.5 rounded-xl flex items-center justify-between shadow-2xs">
+            <div className="bg-blue-50 border border-blue-200 text-blue-950 px-4 py-2.5 rounded-xl flex items-center justify-between shadow-2xs print:hidden">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
                 <div>
@@ -433,7 +545,7 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
           )}
 
           {formMode === 'create' && (
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 px-4 py-2.5 rounded-xl flex items-center justify-between shadow-2xs">
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 px-4 py-2.5 rounded-xl flex items-center justify-between shadow-2xs print:hidden">
               <div className="flex items-center gap-2">
                 <Plus className="w-4 h-4 text-emerald-600 shrink-0" />
                 <div>
@@ -454,7 +566,7 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
           )}
 
           {/* HEADER BAR PASIEN */}
-          <div className="bg-gradient-to-r from-sky-700 via-blue-800 to-indigo-900 text-white p-4 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-gradient-to-r from-sky-700 via-blue-800 to-indigo-900 text-white p-4 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-3 print:hidden">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl bg-white/20 border border-white/30 text-white flex items-center justify-center font-black text-lg shrink-0 shadow-inner">
                 RME
@@ -494,7 +606,7 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
           </div>
 
         {/* QUICK JUMPER BAR (SINGLE VIEW - EVERYTHING DISPLAYED ON ONE PAGE) */}
-        <div className="bg-slate-100 p-2 rounded-2xl border border-slate-200 shadow-2xs space-y-1">
+        <div className="bg-slate-100 p-2 rounded-2xl border border-slate-200 shadow-2xs space-y-1 print:hidden">
           <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-700 px-2">
             <span className="flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-sky-600" /> NAVIGASI CEPAT (PENGKAJIAN TAMPIL FULL SATU HALAMAN):
@@ -1154,7 +1266,7 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
             </div>
 
             {/* VERIFICATION & BOTTOM SAVE BAR */}
-            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-950">
+            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs text-emerald-950 print:hidden">
               <div className="flex items-center gap-2 font-bold">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
                 <span>Status Verifikasi: <strong className="text-slate-900 font-extrabold">{nurseSignName} &bull; {doctorSignName}</strong></span>
@@ -1164,7 +1276,7 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
               </span>
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200 print:hidden">
               <button
                 type="button"
                 onClick={onClose}

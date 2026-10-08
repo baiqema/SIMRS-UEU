@@ -572,7 +572,7 @@ export const ProfilPasienKomprehensifModal: React.FC<ProfilPasienKomprehensifMod
         )}
 
         {/* FOOTER ACTIONS */}
-        <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-3">
+        <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-3 print:hidden">
           <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
             <span>Rekam Medis Terintegrasi sesuai KMK No. HK.01.07/MENKES/1423/2022</span>

@@ -1009,14 +1009,10 @@ export const PendaftaranView: React.FC = () => {
             <FileText className="w-4 h-4 text-emerald-300" /> Kunjungan Pasien
           </button>
           <button
-            onClick={() => setViewMode('bedmanagement')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              viewMode === 'bedmanagement'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            onClick={() => navigate('bedmanagement')}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
           >
-            <Bed className="w-4 h-4 text-amber-300" /> Bed Management (Ranap)
+            <Bed className="w-4 h-4 text-amber-500" /> Bed Management (Ranap)
           </button>
           <button
             onClick={() => setViewMode('list')}
@@ -2675,7 +2671,16 @@ export const PendaftaranView: React.FC = () => {
                               </button>
                             )}
 
-                            {/* 5. Buka RME */}
+                            {/* 5. Periksa Pasien */}
+                            <button
+                              onClick={() => navigate('pemeriksaan', { regId: r.id, tab: r.type, patientId: r.patientId })}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors shadow-2xs ml-0.5"
+                              title="Buka Formulir Pemeriksaan Pasien"
+                            >
+                              Periksa
+                            </button>
+
+                            {/* 6. Buka RME */}
                             <button
                               onClick={() => navigate('rekammedis', { patientId: r.patientId, regId: r.id })}
                               className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors shadow-2xs ml-0.5"

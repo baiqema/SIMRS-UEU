@@ -850,7 +850,40 @@ export const CodingView: React.FC = () => {
                 {/* SOAP Detail Box */}
                 {currentCPPT ? (
                   <div className="space-y-3">
-                    {/* DPJP & Meta Header */}
+                    {/* Clinical Data pulled from Pemeriksaan module */}
+                    {currentMR && (
+                      <div className="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200 text-xs space-y-2 mt-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-black text-emerald-900 flex items-center gap-1.5 uppercase text-[11px]">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            Data Klinis Dari Modul Pemeriksaan ({currentEncounter?.type})
+                          </span>
+                          <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded font-bold font-mono">
+                            Auto-Pulled
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                          <div>
+                            <span className="text-slate-500 font-bold block">Diagnosis Utama:</span>
+                            <span className="font-bold text-blue-900">{currentMR.diagnosis || '-'}</span>
+                          </div>
+                          {currentMR.diagnosisSecondary && (
+                            <div>
+                              <span className="text-slate-500 font-bold block">Diagnosis Sekunder:</span>
+                              <span className="font-medium text-slate-800">{currentMR.diagnosisSecondary}</span>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-slate-500 font-bold block">Tindakan / Prosedur:</span>
+                            <span className="font-medium text-slate-800">{currentMR.actions || currentMR.plan || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-bold block">Dokter DPJP / Tanggal:</span>
+                            <span className="font-medium text-slate-800">{currentMR.doctorName || 'dr. DPJP'} &bull; {currentMR.date}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900">DPJP: {currentCPPT.staffName || 'dr. DPJP'}</span>

@@ -99,6 +99,15 @@ export interface GeneralConsent {
   patientSign: string;
   witnessSign: string;
   status: 'Signed' | 'Pending';
+  patientSignatureImage?: string;
+  witnessSignatureImage?: string;
+  signerRelation?: string;
+  signerName?: string;
+  signerPhone?: string;
+  witnessName?: string;
+  pelepasanInformasiKhusus?: string[];
+  catatanKhusus?: string;
+  updatedAt?: string;
 }
 
 export interface MedicalRecord {
@@ -108,6 +117,24 @@ export interface MedicalRecord {
   anamnesis: string;
   physicalExam: string;
   diagnosis: string;
+  diagnosisSecondary?: string;
+  actions?: string;
+  therapy?: string;
+  vitalSigns?: {
+    systolic?: string;
+    diastolic?: string;
+    heartRate?: string;
+    respRate?: string;
+    temp?: string;
+    spo2?: string;
+    gcs?: string;
+  };
+  condition?: string;
+  education?: string;
+  cpptNotes?: string;
+  otherNotes?: string;
+  triageLevel?: string;
+  room?: string;
   plan?: string;
   nurseNotes?: string;
   diagnosisStatus: 'Verified' | 'Draft' | 'Pending';
@@ -169,6 +196,19 @@ export interface InformedConsent {
   doctorId: string;
   date: string;
   status: 'Approved' | 'Pending';
+  informedConsentType?: 'Persetujuan' | 'Penolakan';
+  diagnosisInfo?: string;
+  tataCaraTindakan?: string;
+  tujuanTindakan?: string;
+  prognosis?: string;
+  alternatifRisiko?: string;
+  patientSignName?: string;
+  patientRelation?: string;
+  patientSignatureImage?: string;
+  doctorSignatureImage?: string;
+  witnessName?: string;
+  witnessSignatureImage?: string;
+  updatedAt?: string;
 }
 
 export interface Coding {
@@ -447,3 +487,105 @@ export interface ExamSubmission {
     feedback: string;
   };
 }
+
+export type ResumeMedisStatus = 'Belum Lengkap' | 'Menunggu Verifikasi' | 'Siap Difinalisasi' | 'Final';
+
+export interface ResumeMedisProcedure {
+  code?: string;
+  name: string;
+  date?: string;
+}
+
+export interface ResumeMedisHomeMed {
+  drugName: string;
+  dose: string;
+  frequency: string;
+  route?: string;
+  instructions?: string;
+}
+
+export interface ResumeMedis {
+  id: string;
+  regId: string;
+  noRM: string;
+  patientId: string;
+  doctorId: string; // DPJP ID
+  doctorName?: string;
+  admissionDate: string;
+  dischargeDate: string;
+  lengthOfStay?: number; // Hari rawat
+  admissionPoliRoom?: string;
+  dischargeRoom?: string;
+  dischargeType: 'Persetujuan Dokter' | 'Pulang Paksa (APS)' | 'Rujuk ke RS Lain' | 'Meninggal Dunia' | 'Melarikan Diri' | string;
+  dischargeCondition: 'Sembuh' | 'Membaik' | 'Belum Sembuh' | 'Perbaikan Klinis' | 'Meninggal < 48 Jam' | 'Meninggal >= 48 Jam' | string;
+  
+  // Riwayat & Pemeriksaan
+  chiefComplaint: string; // Keluhan utama
+  historyOfPresentIllness: string; // Riwayat perjalanan penyakit / anamnesis
+  pastMedicalHistory?: string;
+  vitalSignsAdmission?: {
+    td?: string;
+    nadi?: string;
+    rr?: string;
+    suhu?: string;
+    spo2?: string;
+    kesadaran?: string;
+  };
+  vitalSignsDischarge?: {
+    td?: string;
+    nadi?: string;
+    rr?: string;
+    suhu?: string;
+    spo2?: string;
+    kesadaran?: string;
+  };
+  physicalExamSummary?: string;
+
+  // Penunjang
+  labResultsSummary?: string;
+  radiologySummary?: string;
+  otherDiagnosticSummary?: string;
+
+  // Diagnosis (dengan validasi pencocokan dokumen verifikasi)
+  admissionDiagnosis: string;
+  primaryDiagnosisForm: string; // Diagnosis DPJP formulir
+  primaryDiagnosisVerified: string; // Diagnosis dari dokumen verifikasi / koding
+  isDiagnosisMatched: boolean; // Validasi kesesuaian
+  diagnosisDiscrepancyNotes?: string;
+  secondaryDiagnoses: string[];
+  secondaryDiagnosesVerified?: string[];
+
+  // Tindakan
+  procedures: ResumeMedisProcedure[];
+
+  // Terapi
+  therapyDuringHospitalization: string[];
+  homeMedications: ResumeMedisHomeMed[];
+
+  // Instruksi & Edukasi
+  dischargeInstructions: string;
+  followUpPlan: {
+    controlDate?: string;
+    controlPoli?: string;
+    controlDoctor?: string;
+    emergencyWarningSigns?: string;
+  };
+  dietRecommendation?: string;
+  activityRecommendation?: string;
+
+  // Status & Kelengkapan
+  status: ResumeMedisStatus;
+  missingFields: string[]; // Automatic completeness checking checklist
+  serviceType?: 'Rawat Inap' | 'Rawat Jalan' | 'IGD';
+  resolutionTargetHours?: number; // 48 jam (Rawat Inap) vs 24 jam (Rawat Jalan & IGD)
+  deadlineTimestamp?: string;
+  inaCbgPedomanNotes?: string[]; // Catatan pedoman verifikasi klaim INA-CBG Edisi 2
+  doctorSignature?: string;
+  doctorSignatureDate?: string;
+  finalizedAt?: string;
+  finalizedBy?: string;
+  reminderDeadline?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+

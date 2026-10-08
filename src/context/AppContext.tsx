@@ -3,7 +3,7 @@ import {
   User, Role, RoleId, Patient, Registration, GeneralConsent, MedicalRecord,
   CPPT, InformedConsent, Coding, Claim, Billing, PharmacyRecord, LabRecord,
   RadiologyRecord, Bed, AuditEntry, PraktikumModule, DokumenBerkas, AsuhanKeperawatan,
-  ExamScenario, ExamSubmission
+  ExamScenario, ExamSubmission, ResumeMedis, ResumeMedisStatus
 } from '../types';
 import {
   INITIAL_USERS, INITIAL_ROLES, INITIAL_PATIENTS, INITIAL_REGISTRATIONS,
@@ -11,11 +11,12 @@ import {
   INITIAL_INFORMED_CONSENTS, INITIAL_CODING, INITIAL_CLAIMS, INITIAL_BILLING,
   INITIAL_PHARMACY, INITIAL_LAB, INITIAL_RADIOLOGY, INITIAL_BEDS,
   INITIAL_PRAKTIKUM, INITIAL_AUDIT_TRAIL, INITIAL_ICD10, INITIAL_ICD9CM,
-  INITIAL_DOKUMEN_BERKAS
+  INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS
 } from '../data/mockData';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM } from '../data/icdDatabase';
 import { INITIAL_EXAM_SCENARIOS } from '../data/examScenariosData';
 import { buildSimulationRecords } from '../utils/pdfExtractor';
+import { checkResumeMedisCompleteness, validateDiagnosisMatching, buildAutoResumeFromEncounter } from '../utils/resumeMedisHelper';
 
 interface AppContextType {
   user: User | null;
@@ -40,6 +41,7 @@ interface AppContextType {
   asuhanKeperawatan: AsuhanKeperawatan[];
   examScenarios: ExamScenario[];
   examSubmissions: ExamSubmission[];
+  resumeMedisList: ResumeMedis[];
   activePage: string;
   params?: any;
   sidebarCollapsed: boolean;
@@ -58,6 +60,7 @@ interface AppContextType {
   updateRegistration: (regId: string, updates: Partial<Registration>) => void;
   updateBed: (bedId: string, updates: Partial<Bed>) => void;
   addGeneralConsent: (gc: Omit<GeneralConsent, 'id'>) => GeneralConsent;
+  updateGeneralConsent: (id: string, updates: Partial<GeneralConsent>) => void;
   addMedicalRecord: (mrData: any) => MedicalRecord;
   updateMedicalRecord: (mrId: string, updates: Partial<MedicalRecord>) => void;
   addCPPT: (cpptData: {
@@ -74,6 +77,7 @@ interface AppContextType {
     verified?: boolean;
   }) => CPPT;
   addInformedConsent: (icData: { cpptId: string; action: string; risk: string; complication: string }) => InformedConsent;
+  updateInformedConsent: (id: string, updates: Partial<InformedConsent>) => void;
   addCoding: (codData: {
     mrId: string;
     regId?: string;
@@ -118,6 +122,11 @@ interface AppContextType {
   saveExamSubmission: (sub: ExamSubmission) => void;
   deleteExamSubmission: (id: string) => void;
   injectSimulationPatient: (scenario: ExamScenario) => void;
+  addResumeMedis: (rmData: Partial<ResumeMedis>) => ResumeMedis;
+  updateResumeMedis: (id: string, updates: Partial<ResumeMedis>) => void;
+  finalizeResumeMedis: (id: string, doctorSignName?: string) => { success: boolean; message: string };
+  syncDiagnosisWithVerification: (id: string) => void;
+  autoPullResumeFromEncounter: (regId: string) => ResumeMedis;
   getPatient: (id: string) => Patient | undefined;
   getReg: (id: string) => Registration | undefined;
   getMR: (id: string) => MedicalRecord | undefined;
@@ -192,8 +201,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [registrations, setRegistrations] = useState<Registration[]>(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
     const saved = localStorage.getItem('simrs_registrations');
-    return saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
+    let list: Registration[] = saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
+
+    // Ensure we have active registrations for today across IGD, Rawat Jalan, and Rawat Inap
+    const hasTodayReg = list.some(r => r.date === todayStr);
+    if (!hasTodayReg) {
+      const todaySeeds: Registration[] = [
+        {
+          id: `REG-TODAY-IGD`,
+          patientId: 'P001',
+          date: todayStr,
+          type: 'IGD',
+          poli: 'Instalasi Gawat Darurat (IGD)',
+          dpjp: 'U002',
+          status: 'Dirawat',
+          sepNo: `0010R001${todayStr.replace(/-/g, '')}V001`,
+          room: 'Bed Resusitasi 01',
+          triageLevel: 'Kuning (Emergensi)',
+          reasonForVisit: 'Nyeri dada kiri menjalar & sesak napas akut'
+        },
+        {
+          id: `REG-TODAY-RALAN`,
+          patientId: 'P002',
+          date: todayStr,
+          type: 'Rawat Jalan',
+          poli: 'Poli Penyakit Dalam',
+          dpjp: 'U002',
+          status: 'Dirawat',
+          sepNo: `0010R001${todayStr.replace(/-/g, '')}V002`,
+          room: null,
+          reasonForVisit: 'Kontrol rutin hipertensi dan keluhan lemas'
+        },
+        {
+          id: `REG-TODAY-RANAP`,
+          patientId: 'P003',
+          date: todayStr,
+          type: 'Rawat Inap',
+          poli: 'Bangsal Perawatan Melati',
+          dpjp: 'U002',
+          status: 'Dirawat',
+          sepNo: `0010R001${todayStr.replace(/-/g, '')}V003`,
+          room: 'Kamar Melati 204 (Bed A)',
+          reasonForVisit: 'Demam tifoid hari ke-5 & dehidrasi sedang'
+        }
+      ];
+      list = [...todaySeeds, ...list];
+      localStorage.setItem('simrs_registrations', JSON.stringify(list));
+    }
+    return list;
   });
 
   const [generalConsents, setGeneralConsents] = useState<GeneralConsent[]>(() => {
@@ -270,6 +327,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [asuhanKeperawatan, setAsuhanKeperawatan] = useState<AsuhanKeperawatan[]>(() => {
     const saved = localStorage.getItem('simrs_asuhanKeperawatan');
     return saved ? JSON.parse(saved) : [];
+  });
+
+  const [resumeMedisList, setResumeMedisList] = useState<ResumeMedis[]>(() => {
+    const saved = localStorage.getItem('simrs_resume_medis');
+    return saved ? JSON.parse(saved) : INITIAL_RESUME_MEDIS;
   });
 
   const [examScenarios, setExamScenarios] = useState<ExamScenario[]>(() => {
@@ -353,6 +415,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { localStorage.setItem('simrs_asuhanKeperawatan', JSON.stringify(asuhanKeperawatan)); }, [asuhanKeperawatan]);
   useEffect(() => { localStorage.setItem('simrs_exam_scenarios', JSON.stringify(examScenarios)); }, [examScenarios]);
   useEffect(() => { localStorage.setItem('simrs_exam_submissions', JSON.stringify(examSubmissions)); }, [examSubmissions]);
+  useEffect(() => { localStorage.setItem('simrs_resume_medis', JSON.stringify(resumeMedisList)); }, [resumeMedisList]);
   useEffect(() => {
     if (user) {
       localStorage.setItem('simrs_current_user', JSON.stringify(user));
@@ -588,6 +651,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return gc;
   };
 
+  const updateGeneralConsent = (id: string, updates: Partial<GeneralConsent>) => {
+    setGeneralConsents(prev => prev.map(gc => gc.id === id ? { ...gc, ...updates, updatedAt: new Date().toISOString() } : gc));
+    audit('UPDATE', 'GeneralConsent', id, { field_name: 'TandaTanganElektronik', new_value: updates.patientSign || 'TTD Digital Diperbarui' });
+  };
+
   const addMedicalRecord = (mrData: any) => {
     const r = getReg(mrData.regId);
     const p = r ? getPatient(r.patientId) : undefined;
@@ -600,6 +668,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       anamnesis: mrData.anamnesis,
       physicalExam: mrData.physicalExam,
       diagnosis: mrData.diagnosis || (icd ? `${icd.code} - ${icd.desc}` : '-'),
+      diagnosisSecondary: mrData.diagnosisSecondary || '',
+      actions: mrData.actions || '',
+      therapy: mrData.therapy || '',
+      vitalSigns: mrData.vitalSigns || undefined,
+      condition: mrData.condition || '',
+      education: mrData.education || '',
+      cpptNotes: mrData.cpptNotes || '',
+      otherNotes: mrData.otherNotes || '',
+      triageLevel: mrData.triageLevel || (r?.triageLevel || ''),
+      room: mrData.room || (r?.room || ''),
       plan: mrData.plan || '',
       nurseNotes: mrData.nurseNotes || '',
       diagnosisStatus: mrData.diagnosisStatus || (icd ? 'Verified' : 'Pending'),
@@ -687,6 +765,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setInformedConsents(prev => [ic, ...prev]);
     audit('CREATE', 'InformedConsent', ic.id, { field_name: 'action', new_value: icData.action });
     return ic;
+  };
+
+  const updateInformedConsent = (id: string, updates: Partial<InformedConsent>) => {
+    setInformedConsents(prev => prev.map(ic => ic.id === id ? { ...ic, ...updates, updatedAt: new Date().toISOString() } : ic));
+    audit('UPDATE', 'InformedConsent', id, { field_name: 'TandaTanganElektronik', new_value: updates.action || 'TTD Informed Consent Diperbarui' });
   };
 
   const addCoding = (codData: {
@@ -957,6 +1040,175 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     audit('UPDATE', 'AsuhanKeperawatan', id);
   };
 
+  const addResumeMedis = (rmData: Partial<ResumeMedis>): ResumeMedis => {
+    const id = genId('RMED-');
+    const base: ResumeMedis = {
+      id,
+      regId: rmData.regId || '',
+      noRM: rmData.noRM || '',
+      patientId: rmData.patientId || '',
+      doctorId: rmData.doctorId || user?.id || 'U002',
+      doctorName: rmData.doctorName || user?.name || 'dr. DPJP',
+      admissionDate: rmData.admissionDate || new Date().toISOString().split('T')[0],
+      dischargeDate: rmData.dischargeDate || new Date().toISOString().split('T')[0],
+      lengthOfStay: rmData.lengthOfStay || 1,
+      admissionPoliRoom: rmData.admissionPoliRoom || 'Rawat Inap',
+      dischargeRoom: rmData.dischargeRoom || 'Rawat Inap',
+      dischargeType: rmData.dischargeType || 'Persetujuan Dokter',
+      dischargeCondition: rmData.dischargeCondition || 'Membaik',
+      chiefComplaint: rmData.chiefComplaint || '',
+      historyOfPresentIllness: rmData.historyOfPresentIllness || '',
+      pastMedicalHistory: rmData.pastMedicalHistory || '',
+      vitalSignsAdmission: rmData.vitalSignsAdmission,
+      vitalSignsDischarge: rmData.vitalSignsDischarge,
+      physicalExamSummary: rmData.physicalExamSummary || '',
+      labResultsSummary: rmData.labResultsSummary || '',
+      radiologySummary: rmData.radiologySummary || '',
+      admissionDiagnosis: rmData.admissionDiagnosis || '',
+      primaryDiagnosisForm: rmData.primaryDiagnosisForm || '',
+      primaryDiagnosisVerified: rmData.primaryDiagnosisVerified || '',
+      isDiagnosisMatched: rmData.isDiagnosisMatched || false,
+      diagnosisDiscrepancyNotes: rmData.diagnosisDiscrepancyNotes,
+      secondaryDiagnoses: rmData.secondaryDiagnoses || [],
+      secondaryDiagnosesVerified: rmData.secondaryDiagnosesVerified || [],
+      procedures: rmData.procedures || [],
+      therapyDuringHospitalization: rmData.therapyDuringHospitalization || [],
+      homeMedications: rmData.homeMedications || [],
+      dischargeInstructions: rmData.dischargeInstructions || '',
+      followUpPlan: rmData.followUpPlan || {},
+      dietRecommendation: rmData.dietRecommendation,
+      activityRecommendation: rmData.activityRecommendation,
+      status: 'Belum Lengkap',
+      missingFields: [],
+      reminderDeadline: new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString().replace('T', ' ').substring(0, 16),
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      ...rmData
+    };
+
+    const { missingFields, isDiagnosisMatched, status } = checkResumeMedisCompleteness(base);
+    base.missingFields = missingFields;
+    base.isDiagnosisMatched = isDiagnosisMatched;
+    base.status = status;
+
+    setResumeMedisList(prev => [base, ...prev]);
+    audit('CREATE', 'ResumeMedis', base.id, { field_name: 'status', new_value: base.status });
+    return base;
+  };
+
+  const updateResumeMedis = (id: string, updates: Partial<ResumeMedis>) => {
+    setResumeMedisList(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const merged = { ...item, ...updates, updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16) };
+
+      if (updates.primaryDiagnosisForm !== undefined || updates.primaryDiagnosisVerified !== undefined) {
+        const val = validateDiagnosisMatching(
+          merged.primaryDiagnosisForm,
+          merged.primaryDiagnosisVerified
+        );
+        merged.isDiagnosisMatched = val.isMatched;
+        merged.diagnosisDiscrepancyNotes = val.notes;
+      }
+
+      const { missingFields, isDiagnosisMatched, status } = checkResumeMedisCompleteness(merged);
+      merged.missingFields = missingFields;
+      merged.isDiagnosisMatched = isDiagnosisMatched;
+
+      if (item.status !== 'Final' || updates.status) {
+        merged.status = updates.status || status;
+      }
+
+      return merged;
+    }));
+    audit('UPDATE', 'ResumeMedis', id, { field_name: 'DataResumeMedis', new_value: 'Diperbarui' });
+  };
+
+  const syncDiagnosisWithVerification = (id: string) => {
+    setResumeMedisList(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const targetVerified = item.primaryDiagnosisVerified;
+      const updated = {
+        ...item,
+        primaryDiagnosisForm: targetVerified,
+        isDiagnosisMatched: true,
+        diagnosisDiscrepancyNotes: `✅ Diagnosis telah disinkronkan dan disesuaikan oleh ${user?.name || 'DPJP'} sesuai dokumen verifikasi koding (${targetVerified}).`,
+        updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
+      };
+      const { missingFields, status } = checkResumeMedisCompleteness(updated);
+      updated.missingFields = missingFields;
+      if (item.status !== 'Final') {
+        updated.status = status;
+      }
+      return updated;
+    }));
+    audit('UPDATE', 'ResumeMedis', id, { field_name: 'DiagnosisSync', new_value: 'Disinkronkan dengan Dokumen Verifikasi' });
+  };
+
+  const finalizeResumeMedis = (id: string, doctorSignName?: string): { success: boolean; message: string } => {
+    const item = resumeMedisList.find(r => r.id === id);
+    if (!item) {
+      return { success: false, message: 'Data Resume Medis tidak ditemukan!' };
+    }
+
+    const { missingFields, isDiagnosisMatched } = checkResumeMedisCompleteness(item);
+    if (missingFields.length > 0 || !isDiagnosisMatched) {
+      return {
+        success: false,
+        message: `Resume Medis belum dapat difinalisasi karena masih ada data wajib yang belum lengkap: ${missingFields.join(', ')}.`
+      };
+    }
+
+    const signName = doctorSignName || user?.name || item.doctorName || 'dr. DPJP';
+    const finalDate = new Date().toISOString().replace('T', ' ').substring(0, 16);
+
+    setResumeMedisList(prev => prev.map(r => {
+      if (r.id !== id) return r;
+      return {
+        ...r,
+        status: 'Final' as ResumeMedisStatus,
+        missingFields: [],
+        isDiagnosisMatched: true,
+        doctorSignature: signName,
+        doctorSignatureDate: finalDate.split(' ')[0],
+        finalizedAt: finalDate,
+        finalizedBy: `${signName} (${user?.username || 'DPJP'})`,
+        updatedAt: finalDate
+      };
+    }));
+
+    audit('UPDATE', 'ResumeMedis', id, { field_name: 'status', old_value: item.status, new_value: 'Final' });
+    return { success: true, message: 'Resume Medis berhasil difinalisasi dan berstatus FINAL.' };
+  };
+
+  const autoPullResumeFromEncounter = (regId: string): ResumeMedis => {
+    const existing = resumeMedisList.find(r => r.regId === regId);
+    if (existing) return existing;
+
+    const reg = registrations.find(r => r.id === regId);
+    if (!reg) throw new Error(`Pendaftaran ${regId} tidak ditemukan.`);
+    const patient = patients.find(p => p.id === reg.patientId);
+    if (!patient) throw new Error(`Data Pasien untuk pendaftaran ${regId} tidak ditemukan.`);
+
+    const mr = medicalRecords.find(m => m.regId === regId);
+    const doctorUser = users.find(u => u.id === reg.dpjp);
+
+    const generated = buildAutoResumeFromEncounter(
+      reg,
+      patient,
+      mr,
+      cppt,
+      lab,
+      radiology,
+      pharmacy,
+      coding,
+      doctorUser
+    );
+
+    setResumeMedisList(prev => [generated, ...prev]);
+    audit('CREATE', 'ResumeMedis', generated.id, { field_name: 'AutoPull', new_value: `Tarik Otomatis dari ${reg.id}` });
+    return generated;
+  };
+
   const injectSimulationPatient = (scenario: ExamScenario) => {
     const records = buildSimulationRecords(scenario);
     setPatients(prev => {
@@ -1069,6 +1321,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const role = getRole(user.roleId);
     if (!role) return false;
     if (role.access.includes('all')) return true;
+    if (targetPage === 'bedmanagement') {
+      return role.access.includes('all') || role.access.includes('pendaftaran') || role.access.includes('bedmanagement');
+    }
     return role.access.includes(targetPage);
   };
 
@@ -1097,6 +1352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         asuhanKeperawatan,
         examScenarios,
         examSubmissions,
+        resumeMedisList,
         activePage,
         params,
         sidebarCollapsed,
@@ -1113,10 +1369,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateRegistration,
         updateBed,
         addGeneralConsent,
+        updateGeneralConsent,
         addMedicalRecord,
         updateMedicalRecord,
         addCPPT,
         addInformedConsent,
+        updateInformedConsent,
+        addResumeMedis,
+        updateResumeMedis,
+        finalizeResumeMedis,
+        syncDiagnosisWithVerification,
+        autoPullResumeFromEncounter,
         addCoding,
         updateCoding,
         saveEncounterCoding,

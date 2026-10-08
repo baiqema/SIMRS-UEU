@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Modal } from './Modal';
 import { GeneralConsent, Patient, Registration, User } from '../types';
-import { Printer, CheckCircle2, ShieldCheck, QrCode, FileSignature, UserCheck, HeartHandshake } from 'lucide-react';
+import { Printer, CheckCircle2, ShieldCheck, QrCode, FileSignature, UserCheck, HeartHandshake, Edit3 } from 'lucide-react';
 import esaUnggulEmblem from '../assets/logo-esa-unggul-emblem.png';
 import { RmikLogo } from './Logos';
 
@@ -12,6 +12,7 @@ interface CetakGeneralConsentModalProps {
   patient: Patient | null;
   registration: Registration | null;
   doctor?: User | null;
+  onOpenEdit?: (gc: GeneralConsent) => void;
 }
 
 export const CetakGeneralConsentModal: React.FC<CetakGeneralConsentModalProps> = ({
@@ -20,7 +21,8 @@ export const CetakGeneralConsentModal: React.FC<CetakGeneralConsentModalProps> =
   consent,
   patient,
   registration,
-  doctor
+  doctor,
+  onOpenEdit
 }) => {
   const printContentRef = useRef<HTMLDivElement>(null);
 
@@ -262,12 +264,20 @@ export const CetakGeneralConsentModal: React.FC<CetakGeneralConsentModalProps> =
                 <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                   Pasien / Penanggung Jawab Pasien
                 </span>
-                <div className="my-2 flex flex-col items-center justify-center h-12">
-                  <span className="text-xs italic text-slate-400 font-serif">[ Tanda Tangan ]</span>
+                <div className="my-2 flex flex-col items-center justify-center min-h-[50px]">
+                  {consent.patientSignatureImage ? (
+                    <img
+                      src={consent.patientSignatureImage}
+                      alt="Tanda Tangan Pasien"
+                      className="h-12 max-w-[140px] object-contain drop-shadow-xs"
+                    />
+                  ) : (
+                    <span className="text-xs italic text-slate-400 font-serif">[ Tanda Tangan ]</span>
+                  )}
                 </div>
                 <div className="border-t border-slate-300 pt-1">
-                  <strong className="text-[11px] text-slate-900 block font-bold">{consent.patientSign || patient.name}</strong>
-                  <span className="text-[9.5px] text-slate-500 block">( Pasien / Wali Sah )</span>
+                  <strong className="text-[11px] text-slate-900 block font-bold">{consent.signerName || consent.patientSign || patient.name}</strong>
+                  <span className="text-[9.5px] text-slate-500 block">({consent.signerRelation || 'Pasien / Wali Sah'})</span>
                 </div>
               </div>
 
@@ -276,14 +286,24 @@ export const CetakGeneralConsentModal: React.FC<CetakGeneralConsentModalProps> =
                 <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                   Petugas Admisi / Pendaftaran (Saksi RS)
                 </span>
-                <div className="my-2 flex flex-col items-center">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
-                    <QrCode className="w-7 h-7" />
-                  </div>
-                  <span className="text-[9px] font-mono text-emerald-700 font-bold mt-0.5">✓ Terverifikasi RME</span>
+                <div className="my-2 flex flex-col items-center justify-center min-h-[50px]">
+                  {consent.witnessSignatureImage ? (
+                    <img
+                      src={consent.witnessSignatureImage}
+                      alt="Tanda Tangan Petugas"
+                      className="h-12 max-w-[140px] object-contain drop-shadow-xs"
+                    />
+                  ) : (
+                    <>
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
+                        <QrCode className="w-7 h-7" />
+                      </div>
+                      <span className="text-[9px] font-mono text-emerald-700 font-bold mt-0.5">✓ Terverifikasi RME</span>
+                    </>
+                  )}
                 </div>
                 <div className="border-t border-slate-300 pt-1">
-                  <strong className="text-[11px] text-slate-900 block font-bold">{consent.witnessSign || 'Petugas Admisi RMIK'}</strong>
+                  <strong className="text-[11px] text-slate-900 block font-bold">{consent.witnessName || consent.witnessSign || 'Petugas Admisi RMIK'}</strong>
                   <span className="text-[9.5px] text-slate-500 block">Bagian Pendaftaran & RME RS</span>
                 </div>
               </div>
@@ -293,7 +313,7 @@ export const CetakGeneralConsentModal: React.FC<CetakGeneralConsentModalProps> =
                 <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
                   Saksi Pihak Keluarga Pasien
                 </span>
-                <div className="my-2 flex flex-col items-center justify-center h-12">
+                <div className="my-2 flex flex-col items-center justify-center min-h-[50px]">
                   <span className="text-xs italic text-slate-400 font-serif">[ Tanda Tangan ]</span>
                 </div>
                 <div className="border-t border-slate-300 pt-1">
@@ -322,6 +342,21 @@ export const CetakGeneralConsentModal: React.FC<CetakGeneralConsentModalProps> =
           </button>
 
           <div className="flex items-center gap-2">
+            {onOpenEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenEdit(consent);
+                }}
+                className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Buka Formulir untuk Melakukan Tanda Tangan Digital"
+              >
+                <Edit3 className="w-4 h-4 text-amber-700" />
+                <span>Edit / TTD Digital</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handlePrint}
