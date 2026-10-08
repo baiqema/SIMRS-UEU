@@ -60,7 +60,6 @@ export const ALL_SYSTEM_MODULES = [
   {
     group: 'ADMINISTRASI & PEMBELAJARAN',
     modules: [
-      { id: 'praktikum', name: 'Modul Praktikum RMIK', desc: 'Skenario pembelajaran, evaluasi & logbook mahasiswa' },
       { id: 'audit', name: 'Audit Trail (Superadmin)', desc: 'Pelacakan integritas per field data, IP address & user log' },
       { id: 'logaktivitas', name: 'Log Aktivitas Sistem', desc: 'Catatan log sesi login, logout dan transaksi aplikasi' },
       { id: 'manajemenuser', name: 'Manajemen Pengguna & Hak Akses', desc: 'Kelola akun user, reset password, dan konfigurasi RBAC' }

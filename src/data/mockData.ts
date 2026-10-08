@@ -1,7 +1,7 @@
 import {
   User, Role, Patient, Registration, GeneralConsent, MedicalRecord,
   CPPT, InformedConsent, Coding, Claim, Billing, PharmacyRecord, LabRecord,
-  RadiologyRecord, ICD10, ICD9CM, Bed, AuditEntry, PraktikumModule, DokumenBerkas, AsuhanKeperawatan,
+  RadiologyRecord, ICD10, ICD9CM, Bed, AuditEntry, DokumenBerkas, AsuhanKeperawatan,
   ResumeMedis
 } from '../types';
 
@@ -45,7 +45,7 @@ export const INITIAL_ROLES: Role[] = [
       'dashboard', 'portal', 'pendaftaran', 'generalconsent', 'rekammedis', 'cppt', 
       'keperawatan', 'informedconsent', 'resumemedis', 'farmasi', 'laboratorium', 
       'radiologi', 'coding', 'klaim', 'pelaporan', 'billing', 'pembayaran', 
-      'praktikum', 'audit', 'logaktivitas'
+      'audit', 'logaktivitas'
     ] 
   },
   { id: 'R04', name: 'Mahasiswa (All Modul)', access: ['all'] },
@@ -624,15 +624,6 @@ export const INITIAL_BEDS: Bed[] = [
   { id: 'ICU-01', room: 'Ruang Perawatan Intensif (ICU)', floor: '2', class: 'ICU', status: 'Available', patientId: null, roomName: 'ICU Unit', bedNumber: 'Bed 01' },
   { id: 'ICU-02', room: 'Ruang Perawatan Intensif (ICU)', floor: '2', class: 'ICU', status: 'Available', patientId: null, roomName: 'ICU Unit', bedNumber: 'Bed 02' },
   { id: 'ISO-01', room: 'Ruang Isolasi Tekanan Negatif', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Isolasi 01', bedNumber: 'Bed Isolasi' },
-];
-
-export const INITIAL_PRAKTIKUM: PraktikumModule[] = [
-  { id: 'PRK001', title: 'Pendaftaran Pasien & General Consent', desc: 'Mempelajari alur pendaftaran pasien baru dan pembuatan General Consent sesuai standar rumah sakit.', modul: 'Pendaftaran', status: 'Active' },
-  { id: 'PRK002', title: 'Pengelolaan Rekam Medis Elektronik', desc: 'Praktik pengisian anamnesis, pemeriksaan fisik, dan penulisan diagnosis menggunakan ICD-10.', modul: 'Rekam Medis', status: 'Active' },
-  { id: 'PRK003', title: 'Pencatatan CPPT (SOAP)', desc: 'Latihan menulis catatan progress pasien dengan format Subjective, Objective, Assessment, Plan.', modul: 'CPPT', status: 'Active' },
-  { id: 'PRK004', title: 'Coding ICD-10 dan ICD-9-CM', desc: 'Praktik koding diagnosis dan tindakan medis sesuai standar WHO dan kemkes RI.', modul: 'Coding', status: 'Active' },
-  { id: 'PRK005', title: 'Klaim BPJS & Grouping INA-CBG\'s', desc: 'Simulasi proses klaim BPJS melalui alur coding, locking, grouping, dan submission.', modul: 'Klaim', status: 'Active' },
-  { id: 'PRK006', title: 'Audit Trail & Keamanan Informasi', desc: 'Mempelajari pentingnya audit trail dalam menjaga integritas dan akuntabilitas data medis.', modul: 'Audit', status: 'Active' },
 ];
 
 export const INITIAL_AUDIT_TRAIL: AuditEntry[] = [

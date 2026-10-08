@@ -2,20 +2,18 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   User, Role, RoleId, Patient, Registration, GeneralConsent, MedicalRecord,
   CPPT, InformedConsent, Coding, Claim, Billing, PharmacyRecord, LabRecord,
-  RadiologyRecord, Bed, AuditEntry, PraktikumModule, DokumenBerkas, AsuhanKeperawatan,
-  ExamScenario, ExamSubmission, ResumeMedis, ResumeMedisStatus
+  RadiologyRecord, Bed, AuditEntry, DokumenBerkas, AsuhanKeperawatan,
+  ResumeMedis, ResumeMedisStatus
 } from '../types';
 import {
   INITIAL_USERS, INITIAL_ROLES, INITIAL_PATIENTS, INITIAL_REGISTRATIONS,
   INITIAL_GENERAL_CONSENTS, INITIAL_MEDICAL_RECORDS, INITIAL_CPPT,
   INITIAL_INFORMED_CONSENTS, INITIAL_CODING, INITIAL_CLAIMS, INITIAL_BILLING,
   INITIAL_PHARMACY, INITIAL_LAB, INITIAL_RADIOLOGY, INITIAL_BEDS,
-  INITIAL_PRAKTIKUM, INITIAL_AUDIT_TRAIL, INITIAL_ICD10, INITIAL_ICD9CM,
+  INITIAL_AUDIT_TRAIL, INITIAL_ICD10, INITIAL_ICD9CM,
   INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS
 } from '../data/mockData';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM } from '../data/icdDatabase';
-import { INITIAL_EXAM_SCENARIOS } from '../data/examScenariosData';
-import { buildSimulationRecords } from '../utils/pdfExtractor';
 import { checkResumeMedisCompleteness, validateDiagnosisMatching, buildAutoResumeFromEncounter } from '../utils/resumeMedisHelper';
 
 interface AppContextType {
@@ -36,11 +34,8 @@ interface AppContextType {
   radiology: RadiologyRecord[];
   beds: Bed[];
   auditTrail: AuditEntry[];
-  praktikum: PraktikumModule[];
   dokumenBerkas: DokumenBerkas[];
   asuhanKeperawatan: AsuhanKeperawatan[];
-  examScenarios: ExamScenario[];
-  examSubmissions: ExamSubmission[];
   resumeMedisList: ResumeMedis[];
   activePage: string;
   params?: any;
@@ -117,11 +112,6 @@ interface AppContextType {
   deleteDokumenBerkas: (id: string) => void;
   addAsuhanKeperawatan: (data: Omit<AsuhanKeperawatan, 'id'>) => AsuhanKeperawatan;
   updateAsuhanKeperawatan: (id: string, updates: Partial<AsuhanKeperawatan>) => void;
-  saveExamScenario: (scenario: ExamScenario) => void;
-  deleteExamScenario: (id: string) => void;
-  saveExamSubmission: (sub: ExamSubmission) => void;
-  deleteExamSubmission: (id: string) => void;
-  injectSimulationPatient: (scenario: ExamScenario) => void;
   addResumeMedis: (rmData: Partial<ResumeMedis>) => ResumeMedis;
   updateResumeMedis: (id: string, updates: Partial<ResumeMedis>) => void;
   finalizeResumeMedis: (id: string, doctorSignName?: string) => { success: boolean; message: string };
@@ -334,65 +324,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_RESUME_MEDIS;
   });
 
-  const [examScenarios, setExamScenarios] = useState<ExamScenario[]>(() => {
-    const sanitizeScenarios = (scens: ExamScenario[]): ExamScenario[] => {
-      // First sort scenarios by extracted noRM or id ascending
-      const sorted = [...scens].sort((a, b) => {
-        const numA = parseInt((a.extractedPatient?.noRM || a.id || '').replace(/\D/g, '') || '0', 10);
-        const numB = parseInt((b.extractedPatient?.noRM || b.id || '').replace(/\D/g, '') || '0', 10);
-        return numA - numB;
-      });
-
-      return sorted.map((s, idx) => {
-        const targetRM = String(idx + 1).padStart(6, '0');
-        const oldRM = s.extractedPatient?.noRM || '';
-        let newContent = s.pdfContentText || '';
-        if (oldRM) {
-          newContent = newContent.replaceAll(oldRM, targetRM);
-        }
-        newContent = newContent
-          .replaceAll(/RM-9988\d\d/g, targetRM)
-          .replaceAll(/RM-99\d\d\d\d/g, targetRM)
-          .replaceAll(/Nomor Rekam Medis \(RM\):\s*(?:RM-)?\d+/g, `Nomor Rekam Medis (RM): ${targetRM}`);
-
-        return {
-          ...s,
-          pdfContentText: newContent,
-          extractedPatient: {
-            ...s.extractedPatient,
-            noRM: targetRM
-          }
-        };
-      }).sort((a, b) => {
-        const numA = parseInt(a.extractedPatient.noRM.replace(/\D/g, '') || '0', 10);
-        const numB = parseInt(b.extractedPatient.noRM.replace(/\D/g, '') || '0', 10);
-        return numA - numB;
-      });
-    };
-
-    const saved = localStorage.getItem('simrs_exam_scenarios');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const sanitized = sanitizeScenarios(parsed);
-          localStorage.setItem('simrs_exam_scenarios', JSON.stringify(sanitized));
-          return sanitized;
-        }
-      } catch (e) {
-        // Fallback
-      }
-    }
-    const initSanitized = sanitizeScenarios(INITIAL_EXAM_SCENARIOS);
-    localStorage.setItem('simrs_exam_scenarios', JSON.stringify(initSanitized));
-    return initSanitized;
-  });
-
-  const [examSubmissions, setExamSubmissions] = useState<ExamSubmission[]>(() => {
-    const saved = localStorage.getItem('simrs_exam_submissions');
-    return saved ? JSON.parse(saved) : [];
-  });
-
   const [activePage, setActivePage] = useState<string>('dashboard');
   const [params, setParams] = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
@@ -413,8 +344,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { localStorage.setItem('simrs_auditTrail', JSON.stringify(auditTrail)); }, [auditTrail]);
   useEffect(() => { localStorage.setItem('simrs_dokumenBerkas', JSON.stringify(dokumenBerkas)); }, [dokumenBerkas]);
   useEffect(() => { localStorage.setItem('simrs_asuhanKeperawatan', JSON.stringify(asuhanKeperawatan)); }, [asuhanKeperawatan]);
-  useEffect(() => { localStorage.setItem('simrs_exam_scenarios', JSON.stringify(examScenarios)); }, [examScenarios]);
-  useEffect(() => { localStorage.setItem('simrs_exam_submissions', JSON.stringify(examSubmissions)); }, [examSubmissions]);
   useEffect(() => { localStorage.setItem('simrs_resume_medis', JSON.stringify(resumeMedisList)); }, [resumeMedisList]);
   useEffect(() => {
     if (user) {
@@ -1209,115 +1138,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return generated;
   };
 
-  const injectSimulationPatient = (scenario: ExamScenario) => {
-    const records = buildSimulationRecords(scenario);
-    setPatients(prev => {
-      const idx = prev.findIndex(p => p.noRM === records.patient.noRM || p.id === records.patient.id);
-      let updated: Patient[];
-      if (idx >= 0) {
-        updated = [...prev];
-        updated[idx] = { ...updated[idx], ...records.patient };
-      } else {
-        updated = [...prev, records.patient];
-      }
-      return updated.sort((a, b) => {
-        const nA = parseInt((a.noRM || '').replace(/\D/g, '') || '0', 10);
-        const nB = parseInt((b.noRM || '').replace(/\D/g, '') || '0', 10);
-        return nA - nB;
-      });
-    });
-
-    setRegistrations(prev => {
-      const idx = prev.findIndex(r => r.id === records.registration.id);
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = { ...updated[idx], ...records.registration };
-        return updated;
-      }
-      return [records.registration, ...prev];
-    });
-
-    setMedicalRecords(prev => {
-      const idx = prev.findIndex(m => m.id === records.medicalRecord.id || m.regId === records.medicalRecord.regId);
-      let updated: MedicalRecord[];
-      if (idx >= 0) {
-        updated = [...prev];
-        updated[idx] = { ...updated[idx], ...records.medicalRecord };
-      } else {
-        updated = [...prev, records.medicalRecord];
-      }
-      return updated.sort((a, b) => {
-        const nA = parseInt((a.noRM || '').replace(/\D/g, '') || '0', 10);
-        const nB = parseInt((b.noRM || '').replace(/\D/g, '') || '0', 10);
-        return nA - nB;
-      });
-    });
-
-    setCppt(prev => {
-      const idx = prev.findIndex(c => c.id === records.cppt.id || c.regId === records.cppt.regId);
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = { ...updated[idx], ...records.cppt };
-        return updated;
-      }
-      return [records.cppt, ...prev];
-    });
-  };
-
-  const saveExamScenario = (scenario: ExamScenario) => {
-    setExamScenarios(prev => {
-      const idx = prev.findIndex(s => s.id === scenario.id);
-      let updated: ExamScenario[];
-      if (idx >= 0) {
-        updated = [...prev];
-        updated[idx] = { ...scenario, updatedAt: new Date().toISOString() };
-      } else {
-        updated = [...prev, scenario];
-      }
-      return updated.sort((a, b) => {
-        const nA = parseInt((a.extractedPatient?.noRM || '').replace(/\D/g, '') || '0', 10);
-        const nB = parseInt((b.extractedPatient?.noRM || '').replace(/\D/g, '') || '0', 10);
-        return nA - nB;
-      });
-    });
-    injectSimulationPatient(scenario);
-    audit('UPDATE', 'ExamScenario', scenario.id, { field_name: 'title', new_value: scenario.title });
-  };
-
-  const deleteExamScenario = (id: string) => {
-    setExamScenarios(prev => prev.filter(s => s.id !== id));
-    audit('DELETE', 'ExamScenario', id);
-  };
-
-  const saveExamSubmission = (sub: ExamSubmission) => {
-    setExamSubmissions(prev => {
-      const idx = prev.findIndex(s => s.id === sub.id || (s.studentId === sub.studentId && s.scenarioId === sub.scenarioId));
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = sub;
-        return updated;
-      }
-      return [sub, ...prev];
-    });
-    audit('CREATE', 'ExamSubmission', sub.id, { field_name: 'score', new_value: sub.score });
-  };
-
-  const deleteExamSubmission = (id: string) => {
-    setExamSubmissions(prev => prev.filter(s => s.id !== id));
-    audit('DELETE', 'ExamSubmission', id);
-  };
-
-  // Ensure simulation patients are initialized in state
-  useEffect(() => {
-    examScenarios.forEach(scen => {
-      injectSimulationPatient(scen);
-    });
-  }, []);
-
   const canEditPage = (pageId?: string): boolean => {
     if (!user) return false;
     const targetPage = pageId || activePage;
-    if (targetPage === 'dashboard' || targetPage === 'praktikum' || targetPage === 'audit' || targetPage === 'logaktivitas') return true;
+    if (targetPage === 'dashboard' || targetPage === 'audit' || targetPage === 'logaktivitas') return true;
     const role = getRole(user.roleId);
     if (!role) return false;
     if (role.access.includes('all')) return true;
@@ -1347,11 +1171,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         radiology,
         beds,
         auditTrail,
-        praktikum: INITIAL_PRAKTIKUM,
         dokumenBerkas,
         asuhanKeperawatan,
-        examScenarios,
-        examSubmissions,
         resumeMedisList,
         activePage,
         params,
@@ -1394,11 +1215,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteDokumenBerkas,
         addAsuhanKeperawatan,
         updateAsuhanKeperawatan,
-        saveExamScenario,
-        deleteExamScenario,
-        saveExamSubmission,
-        deleteExamSubmission,
-        injectSimulationPatient,
         getPatient,
         getReg,
         getMR,

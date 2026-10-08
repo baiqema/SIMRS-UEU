@@ -19,7 +19,6 @@ import { FarmasiView } from './views/FarmasiView';
 import { LaboratoriumView } from './views/LaboratoriumView';
 import { RadiologiView } from './views/RadiologiView';
 import { ManajemenUserView } from './views/ManajemenUserView';
-import { PraktikumView } from './views/PraktikumView';
 import { AuditTrailView } from './views/AuditTrailView';
 import { LogAktivitasView } from './views/LogAktivitasView';
 import { PelaporanView } from './views/PelaporanView';
@@ -97,8 +96,6 @@ const AppContent: React.FC = () => {
         return <RadiologiView />;
       case 'manajemenuser':
         return <ManajemenUserView />;
-      case 'praktikum':
-        return <PraktikumView />;
       case 'audit':
         return <AuditTrailView />;
       case 'logaktivitas':
