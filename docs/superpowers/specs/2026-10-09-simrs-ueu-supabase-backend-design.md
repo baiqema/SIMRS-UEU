@@ -98,8 +98,9 @@ There is one table per entity that Ema's app already persists:
 | `simrs_billing` | `billing` |
 | `simrs_beds` | `beds` |
 | `simrs_dokumenBerkas` | `dokumen_berkas` |
+| `simrs_users` (the fictional hospital staff, e.g. DPJP doctor `U002`) | `staff_directory` (class data, no passwords) |
 | `simrs_auditTrail` | `audit_log` (see §8) |
-| `simrs_users` / `simrs_current_user` | `profiles` and `class_members`, managed by Supabase Auth (see §7) |
+| login accounts / `simrs_current_user` | `profiles` and `class_members`, managed by Supabase Auth (see §7). In Supabase mode, `users` in `useApp()` = staff directory plus class members |
 | `simrs_roles` | `practice_roles`, read-only reference (see §7.2) |
 | `simrs_exam_scenarios`, `simrs_exam_submissions` | removed (see §9) |
 
@@ -114,7 +115,7 @@ There is one table per entity that Ema's app already persists:
 | `created_at`, `updated_at` | timestamptz | Set by trigger |
 
 - The primary key is `(class_id, id)`, so every class can start from the same seed ids.
-- A field gets its own column (generated from `data` and indexed) only when the database must filter or report on it: patient RM number, registration date and care type, and ICD codes in `coding`.
+- No extra generated columns for now: all filtering and RL reporting happens in Ema's screens. A field gets its own indexed column only when the database itself must filter on it.
 - When Ema adds new fields in AI Studio, they need no migration because they live inside `data`.
 
 ### 6.2 AppContext contract
@@ -142,7 +143,7 @@ Last save wins, per record. Every change is captured in the audit log (§8), so 
 
 ### 7.1 Login
 
-- The login screen keeps Ema's layout: Username/NIM, password, role picker.
+- The login screen keeps Ema's layout: Username/NIM, password, role picker. `login()` becomes async, so `LoginView.tsx` gets a minimal `await` change.
 - Under the hood, the username or NIM maps to an internal Supabase Auth email of the form `<username>@users.simrs-ueu.invalid`. Users never see it.
 - **Removed from the current login:**
   - the fallback that accepts any password for a known username
@@ -193,7 +194,7 @@ Tables map to modules as follows. This mapping is itself stored in a table, so i
 
 ### 7.4 Classes and roster screen
 
-Ema's **Hak Akses & Pengguna** screen keeps its look but becomes class and roster management, visible to dosen and admin:
+Ema's **Hak Akses & Pengguna** screen keeps its existing tabs and gains a **Kelas & Roster** tab, visible to dosen and admin. R03 Dosen gains the `manajemenuser` module so lecturers can open it. The tab provides:
 
 - Create a class, see its members, and reset the class hospital.
 - **Import roster:** paste or upload `NIM, Nama` rows. The `import-roster` Edge Function, which is the only code that holds the service-role key, then:
@@ -274,7 +275,7 @@ Each phase is one pull request into Ema's `main`.
 
 ## 13. Testing
 
-- **Database:** `supabase test db` (pgTAP) tests for each RLS rule:
+- **Database:** Vitest integration tests run against a dedicated Supabase *dev* project (no Docker is needed, unlike pgTAP's `supabase test db`). They cover each RLS rule:
   - a student cannot write a module outside their role
   - no one can read another class
   - R01 and R03 cannot be selected by students
