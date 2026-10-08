@@ -14,6 +14,8 @@ import {
   INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS
 } from '../data/mockData';
 import { sanitizePatientList, sanitizeMedicalRecords, ensureTodayRegistrations } from '../data/seedNormalizers';
+import { useSlice } from '../data-layer/useSlice';
+import { getBackendMode } from '../data-layer/config';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM } from '../data/icdDatabase';
 import { checkResumeMedisCompleteness, validateDiagnosisMatching, buildAutoResumeFromEncounter } from '../utils/resumeMedisHelper';
 
@@ -136,7 +138,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [users, setUsers] = useState<User[]>(() => {
+  const [users, setUsers] = useSlice<User>('staff', () => {
     const saved = localStorage.getItem('simrs_users');
     if (saved) {
       try {
@@ -156,7 +158,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_ROLES;
   });
 
-  const [patients, setPatients] = useState<Patient[]>(() => {
+  const [patients, setPatients] = useSlice<Patient>('patients', () => {
     const saved = localStorage.getItem('simrs_patients');
     if (saved) {
       try {
@@ -173,7 +175,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return sanitizePatientList(INITIAL_PATIENTS);
   });
 
-  const [registrations, setRegistrations] = useState<Registration[]>(() => {
+  const [registrations, setRegistrations] = useSlice<Registration>('registrations', () => {
     const todayStr = new Date().toISOString().split('T')[0];
     const saved = localStorage.getItem('simrs_registrations');
     const base: Registration[] = saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
@@ -182,12 +184,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return list;
   });
 
-  const [generalConsents, setGeneralConsents] = useState<GeneralConsent[]>(() => {
+  const [generalConsents, setGeneralConsents] = useSlice<GeneralConsent>('generalConsents', () => {
     const saved = localStorage.getItem('simrs_generalConsents');
     return saved ? JSON.parse(saved) : INITIAL_GENERAL_CONSENTS;
   });
 
-  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>(() => {
+  const [medicalRecords, setMedicalRecords] = useSlice<MedicalRecord>('medicalRecords', () => {
     const saved = localStorage.getItem('simrs_medicalRecords');
     const records = saved ? (() => {
       try { return JSON.parse(saved); } catch { return INITIAL_MEDICAL_RECORDS; }
@@ -197,27 +199,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return sanitized;
   });
 
-  const [cppt, setCppt] = useState<CPPT[]>(() => {
+  const [cppt, setCppt] = useSlice<CPPT>('cppt', () => {
     const saved = localStorage.getItem('simrs_cppt');
     return saved ? JSON.parse(saved) : INITIAL_CPPT;
   });
 
-  const [informedConsents, setInformedConsents] = useState<InformedConsent[]>(() => {
+  const [informedConsents, setInformedConsents] = useSlice<InformedConsent>('informedConsents', () => {
     const saved = localStorage.getItem('simrs_informedConsents');
     return saved ? JSON.parse(saved) : INITIAL_INFORMED_CONSENTS;
   });
 
-  const [coding, setCoding] = useState<Coding[]>(() => {
+  const [coding, setCoding] = useSlice<Coding>('coding', () => {
     const saved = localStorage.getItem('simrs_coding');
     return saved ? JSON.parse(saved) : INITIAL_CODING;
   });
 
-  const [claims, setClaims] = useState<Claim[]>(() => {
+  const [claims, setClaims] = useSlice<Claim>('claims', () => {
     const saved = localStorage.getItem('simrs_claims');
     return saved ? JSON.parse(saved) : INITIAL_CLAIMS;
   });
 
-  const [billing, setBilling] = useState<Billing[]>(() => {
+  const [billing, setBilling] = useSlice<Billing>('billing', () => {
     const saved = localStorage.getItem('simrs_billing');
     return saved ? JSON.parse(saved) : INITIAL_BILLING;
   });
@@ -225,7 +227,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [pharmacy] = useState<PharmacyRecord[]>(INITIAL_PHARMACY);
   const [lab] = useState<LabRecord[]>(INITIAL_LAB);
   const [radiology] = useState<RadiologyRecord[]>(INITIAL_RADIOLOGY);
-  const [beds, setBeds] = useState<Bed[]>(() => {
+  const [beds, setBeds] = useSlice<Bed>('beds', () => {
     const saved = localStorage.getItem('simrs_beds');
     return saved ? JSON.parse(saved) : INITIAL_BEDS;
   });
@@ -235,17 +237,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_AUDIT_TRAIL;
   });
 
-  const [dokumenBerkas, setDokumenBerkas] = useState<DokumenBerkas[]>(() => {
+  const [dokumenBerkas, setDokumenBerkas] = useSlice<DokumenBerkas>('dokumenBerkas', () => {
     const saved = localStorage.getItem('simrs_dokumenBerkas');
     return saved ? JSON.parse(saved) : INITIAL_DOKUMEN_BERKAS;
   });
 
-  const [asuhanKeperawatan, setAsuhanKeperawatan] = useState<AsuhanKeperawatan[]>(() => {
+  const [asuhanKeperawatan, setAsuhanKeperawatan] = useSlice<AsuhanKeperawatan>('asuhanKeperawatan', () => {
     const saved = localStorage.getItem('simrs_asuhanKeperawatan');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [resumeMedisList, setResumeMedisList] = useState<ResumeMedis[]>(() => {
+  const [resumeMedisList, setResumeMedisList] = useSlice<ResumeMedis>('resumeMedisList', () => {
     const saved = localStorage.getItem('simrs_resume_medis');
     return saved ? JSON.parse(saved) : INITIAL_RESUME_MEDIS;
   });
@@ -253,31 +255,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activePage, setActivePage] = useState<string>('dashboard');
   const [params, setParams] = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const backendMode = getBackendMode();
 
-  // Persistence effects
-  useEffect(() => { localStorage.setItem('simrs_roles', JSON.stringify(roles)); }, [roles]);
-  useEffect(() => { localStorage.setItem('simrs_users', JSON.stringify(users)); }, [users]);
-  useEffect(() => { localStorage.setItem('simrs_patients', JSON.stringify(patients)); }, [patients]);
-  useEffect(() => { localStorage.setItem('simrs_registrations', JSON.stringify(registrations)); }, [registrations]);
-  useEffect(() => { localStorage.setItem('simrs_generalConsents', JSON.stringify(generalConsents)); }, [generalConsents]);
-  useEffect(() => { localStorage.setItem('simrs_medicalRecords', JSON.stringify(medicalRecords)); }, [medicalRecords]);
-  useEffect(() => { localStorage.setItem('simrs_cppt', JSON.stringify(cppt)); }, [cppt]);
-  useEffect(() => { localStorage.setItem('simrs_informedConsents', JSON.stringify(informedConsents)); }, [informedConsents]);
-  useEffect(() => { localStorage.setItem('simrs_coding', JSON.stringify(coding)); }, [coding]);
-  useEffect(() => { localStorage.setItem('simrs_claims', JSON.stringify(claims)); }, [claims]);
-  useEffect(() => { localStorage.setItem('simrs_billing', JSON.stringify(billing)); }, [billing]);
-  useEffect(() => { localStorage.setItem('simrs_beds', JSON.stringify(beds)); }, [beds]);
-  useEffect(() => { localStorage.setItem('simrs_auditTrail', JSON.stringify(auditTrail)); }, [auditTrail]);
-  useEffect(() => { localStorage.setItem('simrs_dokumenBerkas', JSON.stringify(dokumenBerkas)); }, [dokumenBerkas]);
-  useEffect(() => { localStorage.setItem('simrs_asuhanKeperawatan', JSON.stringify(asuhanKeperawatan)); }, [asuhanKeperawatan]);
-  useEffect(() => { localStorage.setItem('simrs_resume_medis', JSON.stringify(resumeMedisList)); }, [resumeMedisList]);
+  // Persistence effects (persisted list slices are written by useSlice)
+  useEffect(() => { if (backendMode === 'local') localStorage.setItem('simrs_roles', JSON.stringify(roles)); }, [backendMode, roles]);
+  useEffect(() => { if (backendMode === 'local') localStorage.setItem('simrs_auditTrail', JSON.stringify(auditTrail)); }, [backendMode, auditTrail]);
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('simrs_current_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('simrs_current_user');
-    }
-  }, [user]);
+    if (backendMode !== 'local') return;
+    if (user) localStorage.setItem('simrs_current_user', JSON.stringify(user));
+    else localStorage.removeItem('simrs_current_user');
+  }, [backendMode, user]);
 
   const audit = (
     action: AuditEntry['action'],
