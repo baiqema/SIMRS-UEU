@@ -13,6 +13,7 @@ import {
   INITIAL_AUDIT_TRAIL, INITIAL_ICD10, INITIAL_ICD9CM,
   INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS
 } from '../data/mockData';
+import { sanitizePatientList, sanitizeMedicalRecords, ensureTodayRegistrations } from '../data/seedNormalizers';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM } from '../data/icdDatabase';
 import { checkResumeMedisCompleteness, validateDiagnosisMatching, buildAutoResumeFromEncounter } from '../utils/resumeMedisHelper';
 
@@ -156,24 +157,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [patients, setPatients] = useState<Patient[]>(() => {
-    const sanitizePatientList = (list: Patient[]): Patient[] => {
-      const mapped = list.map((p, idx) => {
-        const raw = p.noRM || '';
-        const digits = raw.replace(/\D/g, '');
-        if (!digits || digits.startsWith('2024') || digits.startsWith('24') || digits.startsWith('9988') || raw.includes('RM-')) {
-          return { ...p, noRM: String(idx + 1).padStart(6, '0') };
-        }
-        return { ...p, noRM: digits.padStart(6, '0') };
-      });
-
-      // Always sort ascending by noRM so 000001 is at the very top
-      return mapped.sort((a, b) => {
-        const nA = parseInt(a.noRM.replace(/\D/g, '') || '0', 10);
-        const nB = parseInt(b.noRM.replace(/\D/g, '') || '0', 10);
-        return nA - nB;
-      });
-    };
-
     const saved = localStorage.getItem('simrs_patients');
     if (saved) {
       try {
@@ -193,53 +176,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [registrations, setRegistrations] = useState<Registration[]>(() => {
     const todayStr = new Date().toISOString().split('T')[0];
     const saved = localStorage.getItem('simrs_registrations');
-    let list: Registration[] = saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
-
-    // Ensure we have active registrations for today across IGD, Rawat Jalan, and Rawat Inap
-    const hasTodayReg = list.some(r => r.date === todayStr);
-    if (!hasTodayReg) {
-      const todaySeeds: Registration[] = [
-        {
-          id: `REG-TODAY-IGD`,
-          patientId: 'P001',
-          date: todayStr,
-          type: 'IGD',
-          poli: 'Instalasi Gawat Darurat (IGD)',
-          dpjp: 'U002',
-          status: 'Dirawat',
-          sepNo: `0010R001${todayStr.replace(/-/g, '')}V001`,
-          room: 'Bed Resusitasi 01',
-          triageLevel: 'Kuning (Emergensi)',
-          reasonForVisit: 'Nyeri dada kiri menjalar & sesak napas akut'
-        },
-        {
-          id: `REG-TODAY-RALAN`,
-          patientId: 'P002',
-          date: todayStr,
-          type: 'Rawat Jalan',
-          poli: 'Poli Penyakit Dalam',
-          dpjp: 'U002',
-          status: 'Dirawat',
-          sepNo: `0010R001${todayStr.replace(/-/g, '')}V002`,
-          room: null,
-          reasonForVisit: 'Kontrol rutin hipertensi dan keluhan lemas'
-        },
-        {
-          id: `REG-TODAY-RANAP`,
-          patientId: 'P003',
-          date: todayStr,
-          type: 'Rawat Inap',
-          poli: 'Bangsal Perawatan Melati',
-          dpjp: 'U002',
-          status: 'Dirawat',
-          sepNo: `0010R001${todayStr.replace(/-/g, '')}V003`,
-          room: 'Kamar Melati 204 (Bed A)',
-          reasonForVisit: 'Demam tifoid hari ke-5 & dehidrasi sedang'
-        }
-      ];
-      list = [...todaySeeds, ...list];
-      localStorage.setItem('simrs_registrations', JSON.stringify(list));
-    }
+    const base: Registration[] = saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
+    const list = ensureTodayRegistrations(base, todayStr);
+    if (list !== base) localStorage.setItem('simrs_registrations', JSON.stringify(list));
     return list;
   });
 
@@ -253,20 +192,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const records = saved ? (() => {
       try { return JSON.parse(saved); } catch { return INITIAL_MEDICAL_RECORDS; }
     })() : INITIAL_MEDICAL_RECORDS;
-
-    const sanitized = records.map((m: MedicalRecord, idx: number) => {
-      const rawRM = m.noRM || '';
-      const digits = rawRM.replace(/\D/g, '');
-      if (!digits || rawRM.includes('2024') || digits.startsWith('2024') || digits.startsWith('24') || digits.startsWith('9988') || rawRM.includes('RM-')) {
-        return { ...m, noRM: String(idx + 1).padStart(6, '0') };
-      }
-      return { ...m, noRM: digits.padStart(6, '0') };
-    }).sort((a: MedicalRecord, b: MedicalRecord) => {
-      const nA = parseInt(a.noRM.replace(/\D/g, '') || '0', 10);
-      const nB = parseInt(b.noRM.replace(/\D/g, '') || '0', 10);
-      return nA - nB;
-    });
-
+    const sanitized = sanitizeMedicalRecords(records);
     localStorage.setItem('simrs_medicalRecords', JSON.stringify(sanitized));
     return sanitized;
   });
