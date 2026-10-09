@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { DigitalSignaturePad } from './DigitalSignaturePad';
+import { useApp } from '../context/AppContext';
 import esaUnggulEmblem from '../assets/logo-esa-unggul-emblem.png';
 
 interface AsuhanKeperawatanIgdModalProps {
@@ -25,6 +26,8 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
   registration,
   nurse
 }) => {
+  const { asuhanKeperawatan, addAsuhanKeperawatan, updateAsuhanKeperawatan } = useApp();
+
   // FORM MODE: 'view' | 'edit' | 'create'
   const [formMode, setFormMode] = useState<'view' | 'edit' | 'create'>('edit');
 
@@ -284,9 +287,10 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
           p: 'Lanjutkan rencana intervensi keperawatan SIKI.'
         }
       };
-      const existing = JSON.parse(localStorage.getItem('simrs_asuhanKeperawatan') || '[]');
-      const filtered = existing.filter((item: any) => item.regId !== registration.id);
-      localStorage.setItem('simrs_asuhanKeperawatan', JSON.stringify([askepRecord, ...filtered]));
+      const { id: _id, ...askepData } = askepRecord;
+      const existing = asuhanKeperawatan.find(item => item.regId === registration.id);
+      if (existing) updateAsuhanKeperawatan(existing.id, askepData);
+      else addAsuhanKeperawatan(askepData);
     } catch (err) {
       console.error('Error saving askep:', err);
     }
@@ -300,12 +304,13 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
     });
   };
 
-  // Load saved record from localStorage if already saved previously
+  // Load saved record from app data if already saved previously.
+  // Deps stay [registration]: re-running on asuhanKeperawatan changes (e.g. a classmate's
+  // realtime save) would overwrite in-progress edits with the stored values.
   useEffect(() => {
     if (!registration) return;
     try {
-      const savedList = JSON.parse(localStorage.getItem('simrs_asuhanKeperawatan') || '[]');
-      const found = savedList.find((item: any) => item.regId === registration.id);
+      const found = asuhanKeperawatan.find(item => item.regId === registration.id);
       if (found) {
         if (found.nurseName) setNurseSignName(found.nurseName);
         if (found.date) setTglPengkajian(found.date);
