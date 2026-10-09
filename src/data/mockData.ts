@@ -45,7 +45,7 @@ export const INITIAL_ROLES: Role[] = [
       'dashboard', 'portal', 'pendaftaran', 'generalconsent', 'rekammedis', 'cppt', 
       'keperawatan', 'informedconsent', 'resumemedis', 'farmasi', 'laboratorium', 
       'radiologi', 'coding', 'klaim', 'pelaporan', 'billing', 'pembayaran', 
-      'audit', 'logaktivitas'
+      'audit', 'logaktivitas', 'manajemenuser'
     ] 
   },
   { id: 'R04', name: 'Mahasiswa (All Modul)', access: ['all'] },
