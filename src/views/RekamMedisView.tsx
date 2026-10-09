@@ -6,6 +6,7 @@ import { FormIgd } from '../components/forms/FormIgd';
 import { FormRawatInap } from '../components/forms/FormRawatInap';
 import { TracerIgdModal } from '../components/TracerIgdModal';
 import { AsuhanKeperawatanIgdModal } from '../components/AsuhanKeperawatanIgdModal';
+import { DaftarKunjunganPemeriksaan } from '../components/pemeriksaan/DaftarKunjunganPemeriksaan';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM, ExtendedICD10, ExtendedICD9CM } from '../data/icdDatabase';
 import { DigitalSignaturePad } from '../components/DigitalSignaturePad';
 import Swal from 'sweetalert2';
@@ -16,7 +17,8 @@ import {
   Check, FileCheck, ClipboardList, Thermometer, Droplets, ShieldAlert,
   Flame, Utensils, Beaker, Radio, FileDigit, Scissors, Heart, FileSpreadsheet,
   ArrowRight, Download, Printer, Barcode, Lock, Unlock, Sparkles, Tag,
-  Layers, QrCode, BookmarkCheck, XCircle, Info, Edit3, PenTool, RotateCcw
+  Layers, QrCode, BookmarkCheck, XCircle, Info, Edit3, PenTool, RotateCcw,
+  ArrowLeft
 } from 'lucide-react';
 import { Patient, Registration, CPPT, MedicalRecord, Coding } from '../types';
 
@@ -54,10 +56,16 @@ export const RekamMedisView: React.FC = () => {
   const {
     patients, registrations, medicalRecords, cppt, coding, user, params, navigate,
     addMedicalRecord, updateMedicalRecord, addCPPT, addCoding, updateCoding, lockCoding,
-    getPatient, getReg, getUser, canEditPage
+    getPatient, getReg, getUser, canEditPage, updateRegistration
   } = useApp();
 
   const isEditable = canEditPage('rekammedis');
+
+  // Mode Halaman: 'kunjungan' (daftar pasien terdaftar) atau 'pemeriksaan' (formulir pemeriksaan)
+  const [viewMode, setViewMode] = useState<'kunjungan' | 'pemeriksaan'>(() => {
+    if (params?.patientId && params?.regId) return 'pemeriksaan';
+    return 'kunjungan';
+  });
 
   // Search & Master Pasien State
   const [searchQuery, setSearchQuery] = useState('');
@@ -173,12 +181,19 @@ export const RekamMedisView: React.FC = () => {
   useEffect(() => {
     if (params?.patientId) {
       setSelectedPatientId(params.patientId);
+      setViewMode('pemeriksaan');
     }
     if (params?.regId) {
       setSelectedRegId(params.regId);
+      setViewMode('pemeriksaan');
     }
     if (params?.initialTab) {
       setActiveTab(params.initialTab as any);
+    }
+    if (params?.viewMode === 'kunjungan') {
+      setViewMode('kunjungan');
+    } else if (params?.viewMode === 'pemeriksaan') {
+      setViewMode('pemeriksaan');
     }
   }, [params]);
 
@@ -383,10 +398,17 @@ export const RekamMedisView: React.FC = () => {
         updatedAt: new Date().toISOString()
       });
 
+      if (activeReg) {
+        updateRegistration(activeReg.id, {
+          status: 'Selesai Diperiksa',
+          examinationStatus: 'Selesai Diperiksa'
+        });
+      }
+
       Swal.fire({
         icon: 'success',
         title: 'Pemeriksaan SOAP Berhasil Diperbarui!',
-        text: `Data SOAP, Rencana Terapi (Plan), dan Tanda Tangan No. RM ${selectedPatient.noRM} berhasil diperbarui.`,
+        text: `Data SOAP, Rencana Terapi (Plan), dan Tanda Tangan No. RM ${selectedPatient.noRM} berhasil diperbarui. Status pasien: Selesai Diperiksa.`,
         timer: 1800,
         showConfirmButton: false
       });
@@ -413,16 +435,55 @@ export const RekamMedisView: React.FC = () => {
 
       addMedicalRecord(newMR);
 
+      if (activeReg) {
+        updateRegistration(activeReg.id, {
+          status: 'Selesai Diperiksa',
+          examinationStatus: 'Selesai Diperiksa'
+        });
+      }
+
       Swal.fire({
         icon: 'success',
         title: 'Pemeriksaan SOAP Berhasil Disimpan',
-        text: `Data SOAP, Rencana Terapi (Plan), dan Tanda Tangan No. RM ${selectedPatient.noRM} tersimpan ke Rekam Medis Elektronik.`,
+        text: `Data SOAP, Rencana Terapi (Plan), dan Tanda Tangan No. RM ${selectedPatient.noRM} tersimpan ke Rekam Medis Elektronik. Status: Selesai Diperiksa.`,
         timer: 1800,
         showConfirmButton: false
       });
     }
 
     setActiveTab('identitas');
+  };
+
+  // Simpan & Selesaikan Pemeriksaan (Otomatis ubah status menjadi Selesai Diperiksa)
+  const handleCompleteExamination = () => {
+    if (!activeReg) return;
+    updateRegistration(activeReg.id, {
+      status: 'Selesai Diperiksa',
+      examinationStatus: 'Selesai Diperiksa'
+    });
+    Swal.fire({
+      icon: 'success',
+      title: 'Pemeriksaan Selesai!',
+      html: `
+        <div class="text-left text-xs space-y-2 mt-2 bg-emerald-50 p-3.5 rounded-xl border border-emerald-200 text-slate-800">
+          <div><strong>No. Rekam Medis:</strong> <span class="font-mono text-blue-700 font-bold">${selectedPatient?.noRM}</span></div>
+          <div><strong>Nama Pasien:</strong> <strong>${selectedPatient?.name}</strong></div>
+          <div><strong>Unit Pelayanan:</strong> ${activeReg.type} (${activeReg.poli})</div>
+          <div class="text-emerald-700 font-bold pt-2 border-t border-emerald-200 flex items-center gap-1.5">
+            <span>✓ Status kunjungan pasien otomatis diperbarui menjadi: <strong>Selesai Diperiksa</strong></span>
+          </div>
+        </div>
+      `,
+      confirmButtonText: 'Kembali ke Daftar Kunjungan',
+      showCancelButton: true,
+      cancelButtonText: 'Tetap di Formulir',
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#64748b'
+    }).then((res) => {
+      if (res.isConfirmed) {
+        setViewMode('kunjungan');
+      }
+    });
   };
 
   // Auto-Detect ICD-10 and ICD-9-CM from Medical Record notes
@@ -558,8 +619,81 @@ export const RekamMedisView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 p-3 sm:p-6 space-y-5">
-      {/* Top Patient Bar & Quick Selector */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+      {viewMode === 'kunjungan' ? (
+        <DaftarKunjunganPemeriksaan
+          onSelectPatient={(patientId, regId, targetTab) => {
+            setSelectedPatientId(patientId);
+            setSelectedRegId(regId);
+            setActiveTab(targetTab);
+            setViewMode('pemeriksaan');
+          }}
+        />
+      ) : (
+        <>
+          {/* HEADER NAVIGASI PENGHUBUNG: KEMBALI KE DAFTAR KUNJUNGAN & STATUS PEMERIKSAAN */}
+          <div className="bg-white border-2 border-blue-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setViewMode('kunjungan')}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 border border-slate-300 shadow-2xs active:scale-95 shrink-0"
+                title="Kembali ke Halaman Depan Kunjungan & Antrean Pasien"
+              >
+                <ArrowLeft className="w-4 h-4 text-blue-700" />
+                <span>← Kembali ke Daftar Kunjungan</span>
+              </button>
+
+              <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
+
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="font-bold text-slate-500">Pasien Diperiksa:</span>
+                <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-mono font-black border border-blue-200">
+                  {selectedPatient?.noRM || '000001'}
+                </span>
+                <span className="font-extrabold text-slate-900 text-sm">
+                  {selectedPatient?.name}
+                </span>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                  {activeReg?.type || 'Rawat Jalan'} ({activeReg?.poli || 'Umum'})
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* STATUS PASIEN (SIAP DIPERIKSA / SELESAI DIPERIKSA) */}
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black shadow-2xs ${
+                activeReg?.status === 'Selesai Diperiksa' || activeReg?.examinationStatus === 'Selesai Diperiksa'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : 'bg-amber-50 text-amber-800 border-amber-300'
+              }`}>
+                {activeReg?.status === 'Selesai Diperiksa' || activeReg?.examinationStatus === 'Selesai Diperiksa' ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Status: 🟢 Selesai Diperiksa</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span>Status: 🟡 Siap Diperiksa</span>
+                  </>
+                )}
+              </div>
+
+              {/* TOMBOL SIMPAN / SELESAI PEMERIKSAAN */}
+              <button
+                type="button"
+                onClick={handleCompleteExamination}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                title="Tandai pemeriksaan selesai dan ubah status pasien menjadi Selesai Diperiksa"
+              >
+                <Check className="w-4 h-4" />
+                <span>Simpan/Selesai Pemeriksaan</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Top Patient Bar & Quick Selector */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Patient Search & Dropdown */}
           <div className="flex items-center gap-3 flex-1">
@@ -1117,6 +1251,12 @@ export const RekamMedisView: React.FC = () => {
               registration={activeReg}
               user={user}
               onSaveSuccess={() => {
+                if (activeReg) {
+                  updateRegistration(activeReg.id, {
+                    status: 'Selesai Diperiksa',
+                    examinationStatus: 'Selesai Diperiksa'
+                  });
+                }
                 setActiveTab('identitas');
               }}
             />
@@ -1129,6 +1269,12 @@ export const RekamMedisView: React.FC = () => {
               registration={activeReg}
               user={user}
               onSaveSuccess={() => {
+                if (activeReg) {
+                  updateRegistration(activeReg.id, {
+                    status: 'Selesai Diperiksa',
+                    examinationStatus: 'Selesai Diperiksa'
+                  });
+                }
                 setActiveTab('identitas');
               }}
             />
@@ -1141,6 +1287,12 @@ export const RekamMedisView: React.FC = () => {
               registration={activeReg}
               user={user}
               onSaveSuccess={() => {
+                if (activeReg) {
+                  updateRegistration(activeReg.id, {
+                    status: 'Selesai Diperiksa',
+                    examinationStatus: 'Selesai Diperiksa'
+                  });
+                }
                 setActiveTab('identitas');
               }}
             />
@@ -2174,6 +2326,8 @@ export const RekamMedisView: React.FC = () => {
           )}
         </div>
       </div>
+        </>
+      )}
 
       {/* MODAL TRACER IGD */}
       <TracerIgdModal

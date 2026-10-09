@@ -24,7 +24,6 @@ import { AuditTrailView } from './views/AuditTrailView';
 import { LogAktivitasView } from './views/LogAktivitasView';
 import { PelaporanView } from './views/PelaporanView';
 import { MetadataRmeView } from './views/MetadataRmeView';
-import { PemeriksaanView } from './views/PemeriksaanView';
 import { ShieldAlert } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -73,8 +72,6 @@ const AppContent: React.FC = () => {
         return <GeneralConsentView />;
       case 'rekammedis':
         return <RekamMedisView />;
-      case 'pemeriksaan':
-        return <PemeriksaanView />;
       case 'cppt':
         return <CPPTView />;
       case 'informedconsent':

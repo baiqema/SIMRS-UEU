@@ -74,18 +74,23 @@ export interface Patient {
 }
 
 export type RegistrationType = 'Rawat Jalan' | 'Rawat Inap' | 'IGD' | 'Bayi Baru Lahir';
-export type RegistrationStatus = 'Dirawat' | 'Selesai' | 'Dirujuk' | 'Batal';
+export type RegistrationStatus = 'Dirawat' | 'Selesai' | 'Dirujuk' | 'Batal' | 'Siap Diperiksa' | 'Selesai Diperiksa';
+export type ExaminationStatus = 'Siap Diperiksa' | 'Selesai Diperiksa';
 
 export interface Registration {
   id: string;
   patientId: string;
   date: string;
+  registrationTime?: string;
   type: RegistrationType;
   poli: string;
   dpjp: string; // User ID
   status: RegistrationStatus;
+  examinationStatus?: ExaminationStatus;
   sepNo: string;
   room?: string | null;
+  bedId?: string;
+  naikKelas?: { isNaik: boolean; dari?: string; ke?: string };
   triageLevel?: 'Merah (Resusitasi)' | 'Kuning (Emergensi)' | 'Hijau (Non-Emergensi)' | 'Hitam (Meninggal)';
   admissionSource?: string;
   reasonForVisit?: string;
@@ -117,24 +122,6 @@ export interface MedicalRecord {
   anamnesis: string;
   physicalExam: string;
   diagnosis: string;
-  diagnosisSecondary?: string;
-  actions?: string;
-  therapy?: string;
-  vitalSigns?: {
-    systolic?: string;
-    diastolic?: string;
-    heartRate?: string;
-    respRate?: string;
-    temp?: string;
-    spo2?: string;
-    gcs?: string;
-  };
-  condition?: string;
-  education?: string;
-  cpptNotes?: string;
-  otherNotes?: string;
-  triageLevel?: string;
-  room?: string;
   plan?: string;
   nurseNotes?: string;
   diagnosisStatus: 'Verified' | 'Draft' | 'Pending';

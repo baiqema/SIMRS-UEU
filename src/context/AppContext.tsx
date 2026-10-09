@@ -201,56 +201,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [registrations, setRegistrations] = useState<Registration[]>(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
     const saved = localStorage.getItem('simrs_registrations');
-    let list: Registration[] = saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
-
-    // Ensure we have active registrations for today across IGD, Rawat Jalan, and Rawat Inap
-    const hasTodayReg = list.some(r => r.date === todayStr);
-    if (!hasTodayReg) {
-      const todaySeeds: Registration[] = [
-        {
-          id: `REG-TODAY-IGD`,
-          patientId: 'P001',
-          date: todayStr,
-          type: 'IGD',
-          poli: 'Instalasi Gawat Darurat (IGD)',
-          dpjp: 'U002',
-          status: 'Dirawat',
-          sepNo: `0010R001${todayStr.replace(/-/g, '')}V001`,
-          room: 'Bed Resusitasi 01',
-          triageLevel: 'Kuning (Emergensi)',
-          reasonForVisit: 'Nyeri dada kiri menjalar & sesak napas akut'
-        },
-        {
-          id: `REG-TODAY-RALAN`,
-          patientId: 'P002',
-          date: todayStr,
-          type: 'Rawat Jalan',
-          poli: 'Poli Penyakit Dalam',
-          dpjp: 'U002',
-          status: 'Dirawat',
-          sepNo: `0010R001${todayStr.replace(/-/g, '')}V002`,
-          room: null,
-          reasonForVisit: 'Kontrol rutin hipertensi dan keluhan lemas'
-        },
-        {
-          id: `REG-TODAY-RANAP`,
-          patientId: 'P003',
-          date: todayStr,
-          type: 'Rawat Inap',
-          poli: 'Bangsal Perawatan Melati',
-          dpjp: 'U002',
-          status: 'Dirawat',
-          sepNo: `0010R001${todayStr.replace(/-/g, '')}V003`,
-          room: 'Kamar Melati 204 (Bed A)',
-          reasonForVisit: 'Demam tifoid hari ke-5 & dehidrasi sedang'
-        }
-      ];
-      list = [...todaySeeds, ...list];
-      localStorage.setItem('simrs_registrations', JSON.stringify(list));
-    }
-    return list;
+    return saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
   });
 
   const [generalConsents, setGeneralConsents] = useState<GeneralConsent[]>(() => {
@@ -568,16 +520,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addRegistration = (regData: { patientId: string; type: Registration['type']; poli: string; dpjp: string; sepNo?: string; room?: string; bedId?: string; naikKelas?: { isNaik: boolean; dari?: string; ke?: string } }) => {
     const today = new Date().toISOString().split('T')[0];
+    const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(':', '.');
     const newReg: Registration = {
       id: genId('REG'),
       patientId: regData.patientId,
       date: today,
+      registrationTime: nowTime,
       type: regData.type,
       poli: regData.poli,
       dpjp: regData.dpjp,
-      status: regData.type === 'Rawat Inap' ? 'Dirawat' : 'Selesai',
+      status: 'Siap Diperiksa',
+      examinationStatus: 'Siap Diperiksa',
       sepNo: regData.sepNo || '-',
-      room: regData.room || null
+      room: regData.room || null,
+      bedId: regData.bedId,
+      naikKelas: regData.naikKelas
     };
 
     setRegistrations(prev => [newReg, ...prev]);
@@ -668,16 +625,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       anamnesis: mrData.anamnesis,
       physicalExam: mrData.physicalExam,
       diagnosis: mrData.diagnosis || (icd ? `${icd.code} - ${icd.desc}` : '-'),
-      diagnosisSecondary: mrData.diagnosisSecondary || '',
-      actions: mrData.actions || '',
-      therapy: mrData.therapy || '',
-      vitalSigns: mrData.vitalSigns || undefined,
-      condition: mrData.condition || '',
-      education: mrData.education || '',
-      cpptNotes: mrData.cpptNotes || '',
-      otherNotes: mrData.otherNotes || '',
-      triageLevel: mrData.triageLevel || (r?.triageLevel || ''),
-      room: mrData.room || (r?.room || ''),
       plan: mrData.plan || '',
       nurseNotes: mrData.nurseNotes || '',
       diagnosisStatus: mrData.diagnosisStatus || (icd ? 'Verified' : 'Pending'),

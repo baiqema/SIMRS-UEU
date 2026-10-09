@@ -232,70 +232,84 @@ export const INITIAL_PATIENTS: Patient[] = [
   }
 ];
 
+const getTodayDateStr = () => new Date().toISOString().split('T')[0];
+
 export const INITIAL_REGISTRATIONS: Registration[] = [
   {
     id: 'REG001',
     patientId: 'P001',
-    date: '2026-08-28',
-    type: 'IGD',
-    poli: 'IGD',
+    date: getTodayDateStr(),
+    registrationTime: '08.15',
+    type: 'Rawat Jalan',
+    poli: 'Poli Penyakit Dalam',
     dpjp: 'U002',
-    status: 'Dirawat',
+    status: 'Siap Diperiksa',
+    examinationStatus: 'Siap Diperiksa',
     sepNo: '0010R0010826V000001',
-    room: 'IGD-01'
+    room: null
   },
   {
     id: 'REG002',
     patientId: 'P002',
-    date: '2026-08-29',
-    type: 'Rawat Inap',
-    poli: 'Penyakit Dalam',
-    dpjp: 'U002',
-    status: 'Dirawat',
-    sepNo: '0010R0010826V000002',
-    room: 'VVIP-201'
-  },
-  {
-    id: 'REG003',
-    patientId: 'P003',
-    date: '2026-08-30',
-    type: 'Rawat Jalan',
-    poli: 'Poli Jantung',
-    dpjp: 'U002',
-    status: 'Selesai',
-    sepNo: '-',
-    room: null
-  },
-  {
-    id: 'REG004',
-    patientId: 'P004',
-    date: '2026-08-30',
+    date: getTodayDateStr(),
+    registrationTime: '08.30',
     type: 'IGD',
     poli: 'IGD',
     dpjp: 'U002',
-    status: 'Selesai',
+    status: 'Siap Diperiksa',
+    examinationStatus: 'Siap Diperiksa',
+    sepNo: '0010R0010826V000002',
+    room: 'IGD-01'
+  },
+  {
+    id: 'REG003',
+    patientId: 'P005',
+    date: getTodayDateStr(),
+    registrationTime: '09.00',
+    type: 'Rawat Inap',
+    poli: 'Rawat Inap Melati',
+    dpjp: 'U002',
+    status: 'Selesai Diperiksa',
+    examinationStatus: 'Selesai Diperiksa',
+    sepNo: '0010R0010826V000003',
+    room: 'VVIP-201'
+  },
+  {
+    id: 'REG004',
+    patientId: 'P003',
+    date: getTodayDateStr(),
+    registrationTime: '09.15',
+    type: 'Rawat Jalan',
+    poli: 'Poli Jantung & Pembuluh Darah',
+    dpjp: 'U002',
+    status: 'Siap Diperiksa',
+    examinationStatus: 'Siap Diperiksa',
     sepNo: '0010R0010826V000004',
     room: null
   },
   {
     id: 'REG005',
-    patientId: 'P005',
-    date: '2026-08-30',
-    type: 'Rawat Jalan',
-    poli: 'Poli Penyakit Dalam',
+    patientId: 'P004',
+    date: getTodayDateStr(),
+    registrationTime: '09.30',
+    type: 'IGD',
+    poli: 'IGD',
     dpjp: 'U002',
-    status: 'Selesai',
+    status: 'Selesai Diperiksa',
+    examinationStatus: 'Selesai Diperiksa',
     sepNo: '0010R0010826V000005',
-    room: null
+    room: 'IGD-02'
   },
   {
     id: 'REG006',
     patientId: 'P001',
     date: '2026-09-11',
+    registrationTime: '10.00',
     type: 'Rawat Jalan',
     poli: 'Poli Penyakit Dalam',
     dpjp: 'U002',
-    status: 'Selesai',
+    status: 'Selesai Diperiksa',
+    examinationStatus: 'Selesai Diperiksa',
     sepNo: '0010R0010826V000006',
     room: null
   },
@@ -303,10 +317,12 @@ export const INITIAL_REGISTRATIONS: Registration[] = [
     id: 'REG007',
     patientId: 'P002',
     date: '2026-09-11',
+    registrationTime: '10.30',
     type: 'Rawat Jalan',
     poli: 'Poli Jantung & Pembuluh Darah',
     dpjp: 'U002',
-    status: 'Selesai',
+    status: 'Selesai Diperiksa',
+    examinationStatus: 'Selesai Diperiksa',
     sepNo: '0010R0010826V000007',
     room: null
   }

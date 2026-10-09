@@ -2617,9 +2617,15 @@ export const PendaftaranView: React.FC = () => {
                         </td>
                         <td className="p-3">
                           <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                            r.status === 'Batal' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
+                            r.status === 'Siap Diperiksa'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                              : r.status === 'Selesai Diperiksa'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : r.status === 'Batal'
+                              ? 'bg-rose-100 text-rose-700'
+                              : 'bg-emerald-100 text-emerald-700'
                           }`}>
-                            {r.status || 'Selesai'}
+                            {r.status || 'Siap Diperiksa'}
                           </span>
                         </td>
                         <td className="p-3 text-right" onClick={e => e.stopPropagation()}>
@@ -2671,16 +2677,7 @@ export const PendaftaranView: React.FC = () => {
                               </button>
                             )}
 
-                            {/* 5. Periksa Pasien */}
-                            <button
-                              onClick={() => navigate('pemeriksaan', { regId: r.id, tab: r.type, patientId: r.patientId })}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors shadow-2xs ml-0.5"
-                              title="Buka Formulir Pemeriksaan Pasien"
-                            >
-                              Periksa
-                            </button>
-
-                            {/* 6. Buka RME */}
+                            {/* 5. Buka RME */}
                             <button
                               onClick={() => navigate('rekammedis', { patientId: r.patientId, regId: r.id })}
                               className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors shadow-2xs ml-0.5"

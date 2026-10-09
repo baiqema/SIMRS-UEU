@@ -36,9 +36,8 @@ export const Sidebar: React.FC = () => {
     {
       group: 'PEMERIKSAAN & CLINICAL',
       items: [
-        { id: 'pemeriksaan', label: 'Pemeriksaan Pasien', icon: Stethoscope },
         { id: 'cppt', label: 'CPPT / Asesmen SOAP', icon: FilePenLine },
-        { id: 'rekammedis', label: 'Pemeriksaan Rawat Jalan', icon: FileText },
+        { id: 'rekammedis', label: 'Pemeriksaan Pasien (RME)', icon: Stethoscope },
         { id: 'informedconsent', label: 'Informed Consent', icon: Handshake },
         { id: 'resumemedis', label: 'Resume Medis', icon: FileText }
       ]
@@ -84,7 +83,7 @@ export const Sidebar: React.FC = () => {
 
   const handleNavClick = (itemId: string) => {
     if (itemId === 'kunjungan') {
-      navigate('pendaftaran', { tab: 'kunjungan' });
+      navigate('rekammedis', { viewMode: 'kunjungan' });
     } else if (itemId === 'bedmanagement') {
       navigate('bedmanagement');
     } else {

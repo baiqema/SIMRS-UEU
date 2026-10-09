@@ -845,13 +845,13 @@ export const PelaporanView: React.FC = () => {
         </div>
       </div>
 
-      {/* BAB CATEGORY TABS (5 BAB KEMENKES) */}
+      {/* KATEGORI TABS (5 KEMENKES) */}
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
         <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-700 px-2 pt-1">
           <span className="flex items-center gap-1.5 text-sky-800">
-            <Layers className="w-4 h-4 text-sky-600" /> BAB PELAPORAN SIRS REVISI 6.3:
+            <Layers className="w-4 h-4 text-sky-600" /> PELAPORAN SIRS REVISI 6.3:
           </span>
-          <span className="text-slate-500 font-mono">Pilih BAB untuk membuka formulir RL terkait</span>
+          <span className="text-slate-500 font-mono">Pilih kategori untuk membuka formulir RL terkait</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
@@ -864,7 +864,7 @@ export const PelaporanView: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <div className="text-[10px] font-black opacity-80">BAB II</div>
+            <div className="text-[10px] font-black opacity-80">II</div>
             <div className="font-extrabold text-xs truncate">Data Identitas RS</div>
             <div className="text-[10px] opacity-90 mt-0.5">RL 1.1 s/d RL 1.4</div>
           </button>
@@ -878,7 +878,7 @@ export const PelaporanView: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <div className="text-[10px] font-black opacity-80">BAB III</div>
+            <div className="text-[10px] font-black opacity-80">III</div>
             <div className="font-extrabold text-xs truncate">Data Ketenagaan</div>
             <div className="text-[10px] opacity-90 mt-0.5">Formulir RL 2 (SISDMK)</div>
           </button>
@@ -892,7 +892,7 @@ export const PelaporanView: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <div className="text-[10px] font-black opacity-80">BAB IV</div>
+            <div className="text-[10px] font-black opacity-80">IV</div>
             <div className="font-extrabold text-xs truncate">Rekapitulasi Pelayanan</div>
             <div className="text-[10px] opacity-90 mt-0.5">RL 3.1 s/d RL 3.19</div>
           </button>
@@ -906,7 +906,7 @@ export const PelaporanView: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <div className="text-[10px] font-black opacity-80">BAB V</div>
+            <div className="text-[10px] font-black opacity-80">V</div>
             <div className="font-extrabold text-xs truncate">Morbiditas Rawat Inap</div>
             <div className="text-[10px] opacity-90 mt-0.5">RL 4.1 s/d RL 4.3</div>
           </button>
@@ -920,7 +920,7 @@ export const PelaporanView: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <div className="text-[10px] font-black opacity-80">BAB VI</div>
+            <div className="text-[10px] font-black opacity-80">VI</div>
             <div className="font-extrabold text-xs truncate">Morbiditas Rawat Jalan</div>
             <div className="text-[10px] opacity-90 mt-0.5">RL 5.1 s/d RL 5.3</div>
           </button>

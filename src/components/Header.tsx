@@ -22,7 +22,6 @@ export const Header: React.FC = () => {
       dashboard: 'Dashboard Eksekutif',
       pendaftaran: 'Pelayanan / Pendaftaran Pasien',
       generalconsent: 'Pelayanan / General Consent',
-      pemeriksaan: 'Pelayanan / Pemeriksaan Pasien',
       rekammedis: 'Rekam Medis / Rekam Medis Elektronik',
       cppt: 'Rekam Medis / CPPT',
       informedconsent: 'Rekam Medis / Informed Consent',
