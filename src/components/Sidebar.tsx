@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import {
   LayoutDashboard, ClipboardList, FileSignature, FileText,
   FilePenLine, Handshake, Barcode, ShieldAlert, Receipt,
-  Banknote, Pill, FlaskConical, Radio, Users, GraduationCap,
+  Banknote, Pill, FlaskConical, Radio, Users,
   ShieldCheck, History, BarChart3, BookOpen, Bed, Stethoscope
 } from 'lucide-react';
 import esaUnggulEmblem from '../assets/logo-esa-unggul-emblem.png';
@@ -70,7 +70,6 @@ export const Sidebar: React.FC = () => {
     {
       group: 'PRAKTIKUM & ADMIN',
       items: [
-        { id: 'praktikum', label: 'Ujian Praktik & Simulasi', icon: GraduationCap },
         { id: 'audit', label: 'Audit Trail (Superadmin)', icon: ShieldCheck, superadminOnly: true },
         { id: 'logaktivitas', label: 'Log Aktivitas', icon: History },
         { id: 'manajemenuser', label: 'Hak Akses & Pengguna', icon: Users }
@@ -194,7 +193,7 @@ export const Sidebar: React.FC = () => {
                         R01
                       </span>
                     )}
-                    {!sidebarCollapsed && !item.superadminOnly && !isEditable && item.id !== 'dashboard' && item.id !== 'praktikum' && (
+                    {!sidebarCollapsed && !item.superadminOnly && !isEditable && item.id !== 'dashboard' && (
                       <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0 ${
                         isActive ? 'bg-blue-500 text-blue-100' : 'bg-slate-200 text-slate-600'
                       }`}>

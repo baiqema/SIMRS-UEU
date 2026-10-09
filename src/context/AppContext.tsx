@@ -1,21 +1,28 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   User, Role, RoleId, Patient, Registration, GeneralConsent, MedicalRecord,
   CPPT, InformedConsent, Coding, Claim, Billing, PharmacyRecord, LabRecord,
-  RadiologyRecord, Bed, AuditEntry, PraktikumModule, DokumenBerkas, AsuhanKeperawatan,
-  ExamScenario, ExamSubmission, ResumeMedis, ResumeMedisStatus
+  RadiologyRecord, Bed, AuditEntry, DokumenBerkas, AsuhanKeperawatan,
+  ResumeMedis, ResumeMedisStatus
 } from '../types';
 import {
   INITIAL_USERS, INITIAL_ROLES, INITIAL_PATIENTS, INITIAL_REGISTRATIONS,
   INITIAL_GENERAL_CONSENTS, INITIAL_MEDICAL_RECORDS, INITIAL_CPPT,
   INITIAL_INFORMED_CONSENTS, INITIAL_CODING, INITIAL_CLAIMS, INITIAL_BILLING,
   INITIAL_PHARMACY, INITIAL_LAB, INITIAL_RADIOLOGY, INITIAL_BEDS,
-  INITIAL_PRAKTIKUM, INITIAL_AUDIT_TRAIL, INITIAL_ICD10, INITIAL_ICD9CM,
+  INITIAL_AUDIT_TRAIL, INITIAL_ICD10, INITIAL_ICD9CM,
   INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS
 } from '../data/mockData';
+import { sanitizePatientList, sanitizeMedicalRecords, ensureTodayRegistrations } from '../data/seedNormalizers';
+import { useSlice } from '../data-layer/useSlice';
+import { getBackendMode } from '../data-layer/config';
+import { useSupabaseSession } from '../data-layer/useSupabaseSession';
+import { mergeStaffAndMembers, logNavigate, updateRoleAccess } from '../data-layer/supabaseQueries';
+import { notifyInfo, notifySaveError } from '../data-layer/notify';
+import { getSupabase } from '../lib/supabaseClient';
+import type { BackendMode } from '../data-layer/config';
+import type { AccountType, ClassInfo } from '../data-layer/session';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM } from '../data/icdDatabase';
-import { INITIAL_EXAM_SCENARIOS } from '../data/examScenariosData';
-import { buildSimulationRecords } from '../utils/pdfExtractor';
 import { checkResumeMedisCompleteness, validateDiagnosisMatching, buildAutoResumeFromEncounter } from '../utils/resumeMedisHelper';
 
 interface AppContextType {
@@ -36,18 +43,25 @@ interface AppContextType {
   radiology: RadiologyRecord[];
   beds: Bed[];
   auditTrail: AuditEntry[];
-  praktikum: PraktikumModule[];
   dokumenBerkas: DokumenBerkas[];
   asuhanKeperawatan: AsuhanKeperawatan[];
-  examScenarios: ExamScenario[];
-  examSubmissions: ExamSubmission[];
   resumeMedisList: ResumeMedis[];
   activePage: string;
   params?: any;
   sidebarCollapsed: boolean;
   
   toggleSidebar: () => void;
-  login: (u: string, p: string, selectedRoleId?: RoleId) => { success: boolean; error?: string };
+  login: (u: string, p: string, selectedRoleId?: RoleId) => Promise<{ success: boolean; error?: string; needsClassChoice?: boolean }>;
+  backendMode: BackendMode;
+  booting: boolean;
+  accountType: AccountType | null;
+  mustChangePassword: boolean;
+  classOptions: ClassInfo[] | null;
+  activeClass: ClassInfo | null;
+  chooseClass: (classId: string) => Promise<{ success: boolean; error?: string }>;
+  changePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  resetActiveClass: () => Promise<{ success: boolean; error?: string }>;
+  setMemberActive: (userId: string, active: boolean) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   navigate: (page: string, params?: any) => void;
   audit: (action: AuditEntry['action'], entity: string, entityId: string, details?: { field_name?: string; old_value?: any; new_value?: any }) => void;
@@ -117,11 +131,6 @@ interface AppContextType {
   deleteDokumenBerkas: (id: string) => void;
   addAsuhanKeperawatan: (data: Omit<AsuhanKeperawatan, 'id'>) => AsuhanKeperawatan;
   updateAsuhanKeperawatan: (id: string, updates: Partial<AsuhanKeperawatan>) => void;
-  saveExamScenario: (scenario: ExamScenario) => void;
-  deleteExamScenario: (id: string) => void;
-  saveExamSubmission: (sub: ExamSubmission) => void;
-  deleteExamSubmission: (id: string) => void;
-  injectSimulationPatient: (scenario: ExamScenario) => void;
   addResumeMedis: (rmData: Partial<ResumeMedis>) => ResumeMedis;
   updateResumeMedis: (id: string, updates: Partial<ResumeMedis>) => void;
   finalizeResumeMedis: (id: string, doctorSignName?: string) => { success: boolean; message: string };
@@ -141,11 +150,12 @@ const genId = (prefix: string) => prefix + Date.now().toString(36).toUpperCase()
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
+    if (getBackendMode() === 'supabase') return null;
     const saved = localStorage.getItem('simrs_current_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [users, setUsers] = useState<User[]>(() => {
+  const [users, setUsers] = useSlice<User>('staff', () => {
     const saved = localStorage.getItem('simrs_users');
     if (saved) {
       try {
@@ -165,25 +175,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_ROLES;
   });
 
-  const [patients, setPatients] = useState<Patient[]>(() => {
-    const sanitizePatientList = (list: Patient[]): Patient[] => {
-      const mapped = list.map((p, idx) => {
-        const raw = p.noRM || '';
-        const digits = raw.replace(/\D/g, '');
-        if (!digits || digits.startsWith('2024') || digits.startsWith('24') || digits.startsWith('9988') || raw.includes('RM-')) {
-          return { ...p, noRM: String(idx + 1).padStart(6, '0') };
-        }
-        return { ...p, noRM: digits.padStart(6, '0') };
-      });
-
-      // Always sort ascending by noRM so 000001 is at the very top
-      return mapped.sort((a, b) => {
-        const nA = parseInt(a.noRM.replace(/\D/g, '') || '0', 10);
-        const nB = parseInt(b.noRM.replace(/\D/g, '') || '0', 10);
-        return nA - nB;
-      });
-    };
-
+  const [patients, setPatients] = useSlice<Patient>('patients', () => {
     const saved = localStorage.getItem('simrs_patients');
     if (saved) {
       try {
@@ -200,108 +192,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return sanitizePatientList(INITIAL_PATIENTS);
   });
 
-  const [registrations, setRegistrations] = useState<Registration[]>(() => {
+  const [registrations, setRegistrations] = useSlice<Registration>('registrations', () => {
     const todayStr = new Date().toISOString().split('T')[0];
     const saved = localStorage.getItem('simrs_registrations');
-    let list: Registration[] = saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
-
-    // Ensure we have active registrations for today across IGD, Rawat Jalan, and Rawat Inap
-    const hasTodayReg = list.some(r => r.date === todayStr);
-    if (!hasTodayReg) {
-      const todaySeeds: Registration[] = [
-        {
-          id: `REG-TODAY-IGD`,
-          patientId: 'P001',
-          date: todayStr,
-          type: 'IGD',
-          poli: 'Instalasi Gawat Darurat (IGD)',
-          dpjp: 'U002',
-          status: 'Dirawat',
-          sepNo: `0010R001${todayStr.replace(/-/g, '')}V001`,
-          room: 'Bed Resusitasi 01',
-          triageLevel: 'Kuning (Emergensi)',
-          reasonForVisit: 'Nyeri dada kiri menjalar & sesak napas akut'
-        },
-        {
-          id: `REG-TODAY-RALAN`,
-          patientId: 'P002',
-          date: todayStr,
-          type: 'Rawat Jalan',
-          poli: 'Poli Penyakit Dalam',
-          dpjp: 'U002',
-          status: 'Dirawat',
-          sepNo: `0010R001${todayStr.replace(/-/g, '')}V002`,
-          room: null,
-          reasonForVisit: 'Kontrol rutin hipertensi dan keluhan lemas'
-        },
-        {
-          id: `REG-TODAY-RANAP`,
-          patientId: 'P003',
-          date: todayStr,
-          type: 'Rawat Inap',
-          poli: 'Bangsal Perawatan Melati',
-          dpjp: 'U002',
-          status: 'Dirawat',
-          sepNo: `0010R001${todayStr.replace(/-/g, '')}V003`,
-          room: 'Kamar Melati 204 (Bed A)',
-          reasonForVisit: 'Demam tifoid hari ke-5 & dehidrasi sedang'
-        }
-      ];
-      list = [...todaySeeds, ...list];
-      localStorage.setItem('simrs_registrations', JSON.stringify(list));
-    }
+    const base: Registration[] = saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
+    const list = ensureTodayRegistrations(base, todayStr);
+    if (list !== base) localStorage.setItem('simrs_registrations', JSON.stringify(list));
     return list;
   });
 
-  const [generalConsents, setGeneralConsents] = useState<GeneralConsent[]>(() => {
+  const [generalConsents, setGeneralConsents] = useSlice<GeneralConsent>('generalConsents', () => {
     const saved = localStorage.getItem('simrs_generalConsents');
     return saved ? JSON.parse(saved) : INITIAL_GENERAL_CONSENTS;
   });
 
-  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>(() => {
+  const [medicalRecords, setMedicalRecords] = useSlice<MedicalRecord>('medicalRecords', () => {
     const saved = localStorage.getItem('simrs_medicalRecords');
     const records = saved ? (() => {
       try { return JSON.parse(saved); } catch { return INITIAL_MEDICAL_RECORDS; }
     })() : INITIAL_MEDICAL_RECORDS;
-
-    const sanitized = records.map((m: MedicalRecord, idx: number) => {
-      const rawRM = m.noRM || '';
-      const digits = rawRM.replace(/\D/g, '');
-      if (!digits || rawRM.includes('2024') || digits.startsWith('2024') || digits.startsWith('24') || digits.startsWith('9988') || rawRM.includes('RM-')) {
-        return { ...m, noRM: String(idx + 1).padStart(6, '0') };
-      }
-      return { ...m, noRM: digits.padStart(6, '0') };
-    }).sort((a: MedicalRecord, b: MedicalRecord) => {
-      const nA = parseInt(a.noRM.replace(/\D/g, '') || '0', 10);
-      const nB = parseInt(b.noRM.replace(/\D/g, '') || '0', 10);
-      return nA - nB;
-    });
-
+    const sanitized = sanitizeMedicalRecords(records);
     localStorage.setItem('simrs_medicalRecords', JSON.stringify(sanitized));
     return sanitized;
   });
 
-  const [cppt, setCppt] = useState<CPPT[]>(() => {
+  const [cppt, setCppt] = useSlice<CPPT>('cppt', () => {
     const saved = localStorage.getItem('simrs_cppt');
     return saved ? JSON.parse(saved) : INITIAL_CPPT;
   });
 
-  const [informedConsents, setInformedConsents] = useState<InformedConsent[]>(() => {
+  const [informedConsents, setInformedConsents] = useSlice<InformedConsent>('informedConsents', () => {
     const saved = localStorage.getItem('simrs_informedConsents');
     return saved ? JSON.parse(saved) : INITIAL_INFORMED_CONSENTS;
   });
 
-  const [coding, setCoding] = useState<Coding[]>(() => {
+  const [coding, setCoding] = useSlice<Coding>('coding', () => {
     const saved = localStorage.getItem('simrs_coding');
     return saved ? JSON.parse(saved) : INITIAL_CODING;
   });
 
-  const [claims, setClaims] = useState<Claim[]>(() => {
+  const [claims, setClaims] = useSlice<Claim>('claims', () => {
     const saved = localStorage.getItem('simrs_claims');
     return saved ? JSON.parse(saved) : INITIAL_CLAIMS;
   });
 
-  const [billing, setBilling] = useState<Billing[]>(() => {
+  const [billing, setBilling] = useSlice<Billing>('billing', () => {
     const saved = localStorage.getItem('simrs_billing');
     return saved ? JSON.parse(saved) : INITIAL_BILLING;
   });
@@ -309,7 +244,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [pharmacy] = useState<PharmacyRecord[]>(INITIAL_PHARMACY);
   const [lab] = useState<LabRecord[]>(INITIAL_LAB);
   const [radiology] = useState<RadiologyRecord[]>(INITIAL_RADIOLOGY);
-  const [beds, setBeds] = useState<Bed[]>(() => {
+  const [beds, setBeds] = useSlice<Bed>('beds', () => {
     const saved = localStorage.getItem('simrs_beds');
     return saved ? JSON.parse(saved) : INITIAL_BEDS;
   });
@@ -319,110 +254,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_AUDIT_TRAIL;
   });
 
-  const [dokumenBerkas, setDokumenBerkas] = useState<DokumenBerkas[]>(() => {
+  const [dokumenBerkas, setDokumenBerkas] = useSlice<DokumenBerkas>('dokumenBerkas', () => {
     const saved = localStorage.getItem('simrs_dokumenBerkas');
     return saved ? JSON.parse(saved) : INITIAL_DOKUMEN_BERKAS;
   });
 
-  const [asuhanKeperawatan, setAsuhanKeperawatan] = useState<AsuhanKeperawatan[]>(() => {
+  const [asuhanKeperawatan, setAsuhanKeperawatan] = useSlice<AsuhanKeperawatan>('asuhanKeperawatan', () => {
     const saved = localStorage.getItem('simrs_asuhanKeperawatan');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [resumeMedisList, setResumeMedisList] = useState<ResumeMedis[]>(() => {
+  const [resumeMedisList, setResumeMedisList] = useSlice<ResumeMedis>('resumeMedisList', () => {
     const saved = localStorage.getItem('simrs_resume_medis');
     return saved ? JSON.parse(saved) : INITIAL_RESUME_MEDIS;
-  });
-
-  const [examScenarios, setExamScenarios] = useState<ExamScenario[]>(() => {
-    const sanitizeScenarios = (scens: ExamScenario[]): ExamScenario[] => {
-      // First sort scenarios by extracted noRM or id ascending
-      const sorted = [...scens].sort((a, b) => {
-        const numA = parseInt((a.extractedPatient?.noRM || a.id || '').replace(/\D/g, '') || '0', 10);
-        const numB = parseInt((b.extractedPatient?.noRM || b.id || '').replace(/\D/g, '') || '0', 10);
-        return numA - numB;
-      });
-
-      return sorted.map((s, idx) => {
-        const targetRM = String(idx + 1).padStart(6, '0');
-        const oldRM = s.extractedPatient?.noRM || '';
-        let newContent = s.pdfContentText || '';
-        if (oldRM) {
-          newContent = newContent.replaceAll(oldRM, targetRM);
-        }
-        newContent = newContent
-          .replaceAll(/RM-9988\d\d/g, targetRM)
-          .replaceAll(/RM-99\d\d\d\d/g, targetRM)
-          .replaceAll(/Nomor Rekam Medis \(RM\):\s*(?:RM-)?\d+/g, `Nomor Rekam Medis (RM): ${targetRM}`);
-
-        return {
-          ...s,
-          pdfContentText: newContent,
-          extractedPatient: {
-            ...s.extractedPatient,
-            noRM: targetRM
-          }
-        };
-      }).sort((a, b) => {
-        const numA = parseInt(a.extractedPatient.noRM.replace(/\D/g, '') || '0', 10);
-        const numB = parseInt(b.extractedPatient.noRM.replace(/\D/g, '') || '0', 10);
-        return numA - numB;
-      });
-    };
-
-    const saved = localStorage.getItem('simrs_exam_scenarios');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const sanitized = sanitizeScenarios(parsed);
-          localStorage.setItem('simrs_exam_scenarios', JSON.stringify(sanitized));
-          return sanitized;
-        }
-      } catch (e) {
-        // Fallback
-      }
-    }
-    const initSanitized = sanitizeScenarios(INITIAL_EXAM_SCENARIOS);
-    localStorage.setItem('simrs_exam_scenarios', JSON.stringify(initSanitized));
-    return initSanitized;
-  });
-
-  const [examSubmissions, setExamSubmissions] = useState<ExamSubmission[]>(() => {
-    const saved = localStorage.getItem('simrs_exam_submissions');
-    return saved ? JSON.parse(saved) : [];
   });
 
   const [activePage, setActivePage] = useState<string>('dashboard');
   const [params, setParams] = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const backendMode = getBackendMode();
+  const sb = useSupabaseSession({
+    setUser, setRoles, setAuditTrail,
+    onExit: () => setActivePage('dashboard'),
+  });
+  const exposedUsers = useMemo(
+    () => (backendMode === 'supabase' ? mergeStaffAndMembers(users, sb.members) : users),
+    [backendMode, users, sb.members],
+  );
 
-  // Persistence effects
-  useEffect(() => { localStorage.setItem('simrs_roles', JSON.stringify(roles)); }, [roles]);
-  useEffect(() => { localStorage.setItem('simrs_users', JSON.stringify(users)); }, [users]);
-  useEffect(() => { localStorage.setItem('simrs_patients', JSON.stringify(patients)); }, [patients]);
-  useEffect(() => { localStorage.setItem('simrs_registrations', JSON.stringify(registrations)); }, [registrations]);
-  useEffect(() => { localStorage.setItem('simrs_generalConsents', JSON.stringify(generalConsents)); }, [generalConsents]);
-  useEffect(() => { localStorage.setItem('simrs_medicalRecords', JSON.stringify(medicalRecords)); }, [medicalRecords]);
-  useEffect(() => { localStorage.setItem('simrs_cppt', JSON.stringify(cppt)); }, [cppt]);
-  useEffect(() => { localStorage.setItem('simrs_informedConsents', JSON.stringify(informedConsents)); }, [informedConsents]);
-  useEffect(() => { localStorage.setItem('simrs_coding', JSON.stringify(coding)); }, [coding]);
-  useEffect(() => { localStorage.setItem('simrs_claims', JSON.stringify(claims)); }, [claims]);
-  useEffect(() => { localStorage.setItem('simrs_billing', JSON.stringify(billing)); }, [billing]);
-  useEffect(() => { localStorage.setItem('simrs_beds', JSON.stringify(beds)); }, [beds]);
-  useEffect(() => { localStorage.setItem('simrs_auditTrail', JSON.stringify(auditTrail)); }, [auditTrail]);
-  useEffect(() => { localStorage.setItem('simrs_dokumenBerkas', JSON.stringify(dokumenBerkas)); }, [dokumenBerkas]);
-  useEffect(() => { localStorage.setItem('simrs_asuhanKeperawatan', JSON.stringify(asuhanKeperawatan)); }, [asuhanKeperawatan]);
-  useEffect(() => { localStorage.setItem('simrs_exam_scenarios', JSON.stringify(examScenarios)); }, [examScenarios]);
-  useEffect(() => { localStorage.setItem('simrs_exam_submissions', JSON.stringify(examSubmissions)); }, [examSubmissions]);
-  useEffect(() => { localStorage.setItem('simrs_resume_medis', JSON.stringify(resumeMedisList)); }, [resumeMedisList]);
+  // Persistence effects (persisted list slices are written by useSlice)
+  useEffect(() => { if (backendMode === 'local') localStorage.setItem('simrs_roles', JSON.stringify(roles)); }, [backendMode, roles]);
+  useEffect(() => { if (backendMode === 'local') localStorage.setItem('simrs_auditTrail', JSON.stringify(auditTrail)); }, [backendMode, auditTrail]);
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('simrs_current_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('simrs_current_user');
-    }
-  }, [user]);
+    if (backendMode !== 'local') return;
+    if (user) localStorage.setItem('simrs_current_user', JSON.stringify(user));
+    else localStorage.removeItem('simrs_current_user');
+  }, [backendMode, user]);
 
   const audit = (
     action: AuditEntry['action'],
@@ -430,6 +297,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     entityId: string,
     details?: { field_name?: string; old_value?: any; new_value?: any }
   ) => {
+    if (backendMode === 'supabase') {
+      // CREATE/UPDATE/DELETE are written by database triggers; LOGIN/LOGOUT by session RPCs.
+      if (action === 'NAVIGATE') logNavigate(getSupabase(), entityId);
+      return;
+    }
     const newEntry: AuditEntry = {
       id: genId('AT'),
       timestamp: new Date().toISOString(),
@@ -450,7 +322,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleSidebar = () => setSidebarCollapsed(prev => !prev);
 
-  const login = (u: string, p: string, selectedRoleId?: RoleId) => {
+  const loginLocal = (u: string, p: string, selectedRoleId?: RoleId) => {
     const cleanU = u.trim();
     const cleanP = p.trim();
 
@@ -493,12 +365,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
-  const logout = () => {
+  const login = async (u: string, p: string, selectedRoleId?: RoleId) => {
+    if (backendMode === 'supabase') return sb.login(u, p, selectedRoleId ?? 'R04');
+    return loginLocal(u, p, selectedRoleId);
+  };
+
+  const logoutLocal = () => {
     if (user) {
       audit('LOGOUT', 'User', user.id, { field_name: 'status', old_value: 'online', new_value: 'offline' });
     }
     setUser(null);
     setActivePage('dashboard');
+  };
+
+  const logout = () => {
+    if (backendMode === 'supabase') { sb.logout().catch(notifySaveError); return; }
+    logoutLocal();
   };
 
   const navigate = (page: string, newParams?: any) => {
@@ -510,7 +392,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getPatient = (id: string) => patients.find(p => p.id === id);
   const getReg = (id: string) => registrations.find(r => r.id === id);
   const getMR = (id: string) => medicalRecords.find(m => m.id === id);
-  const getUser = (id: string) => users.find(u => u.id === id);
+  const getUser = (id: string) => exposedUsers.find(u => u.id === id);
   const getRole = (id: string) => roles.find(r => r.id === id) || INITIAL_ROLES.find(r => r.id === id);
 
   const generateNoRM = (): string => {
@@ -986,17 +868,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       roleId: userData.roleId,
       active: true
     };
+    if (backendMode === 'supabase') {
+      // staff_directory never stores passwords (spec §6.1); staff entries are directory records only.
+      delete newUser.password;
+    }
     setUsers(prev => [...prev, newUser]);
     audit('CREATE', 'User', newUser.id, { field_name: 'name', new_value: newUser.name });
     return { success: true };
   };
 
+  const isClassMember = (id: string) => backendMode === 'supabase' && sb.members.some(m => m.id === id);
+
   const updateUser = (id: string, updates: Partial<User>) => {
+    if (isClassMember(id)) {
+      // Class members are real accounts: only their class membership status is editable here.
+      const member = sb.members.find(m => m.id === id)!;
+      const otherEdits = (updates.name !== undefined && updates.name !== member.name)
+        || (updates.roleId !== undefined && updates.roleId !== member.roleId);
+      const wantsToggle = typeof updates.active === 'boolean' && updates.active !== member.active;
+      (wantsToggle ? sb.setMemberActive(id, updates.active as boolean) : Promise.resolve({ success: true } as { success: boolean; error?: string }))
+        .then(res => {
+          if (!res.success) notifySaveError(new Error(res.error));
+          else if (otherEdits) notifyInfo('Nama/peran akun dikelola lewat roster kelas');
+        })
+        .catch(notifySaveError);
+      return;
+    }
     setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
     audit('UPDATE', 'User', id);
   };
 
   const deleteUser = (id: string) => {
+    if (isClassMember(id)) {
+      const message = 'Akun mahasiswa/dosen tidak dihapus dari sini. Nonaktifkan anggota sebagai gantinya.';
+      notifyInfo(message);
+      return { success: false, message };
+    }
     if (id === 'U001') {
       return { success: false, message: 'Super Administrator utama tidak dapat dihapus!' };
     }
@@ -1006,6 +913,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateRolePermissions = (roleId: RoleId, newAccess: string[]) => {
+    if (backendMode === 'supabase') {
+      updateRoleAccess(getSupabase(), roleId, newAccess)
+        .then(() => setRoles(prev => prev.map(r => r.id === roleId ? { ...r, access: newAccess } : r)))
+        .catch(notifySaveError);
+      return;
+    }
     setRoles(prev => prev.map(r => r.id === roleId ? { ...r, access: newAccess } : r));
     audit('UPDATE', 'Role', roleId, { field_name: 'access', new_value: newAccess.join(',') });
   };
@@ -1209,115 +1122,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return generated;
   };
 
-  const injectSimulationPatient = (scenario: ExamScenario) => {
-    const records = buildSimulationRecords(scenario);
-    setPatients(prev => {
-      const idx = prev.findIndex(p => p.noRM === records.patient.noRM || p.id === records.patient.id);
-      let updated: Patient[];
-      if (idx >= 0) {
-        updated = [...prev];
-        updated[idx] = { ...updated[idx], ...records.patient };
-      } else {
-        updated = [...prev, records.patient];
-      }
-      return updated.sort((a, b) => {
-        const nA = parseInt((a.noRM || '').replace(/\D/g, '') || '0', 10);
-        const nB = parseInt((b.noRM || '').replace(/\D/g, '') || '0', 10);
-        return nA - nB;
-      });
-    });
-
-    setRegistrations(prev => {
-      const idx = prev.findIndex(r => r.id === records.registration.id);
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = { ...updated[idx], ...records.registration };
-        return updated;
-      }
-      return [records.registration, ...prev];
-    });
-
-    setMedicalRecords(prev => {
-      const idx = prev.findIndex(m => m.id === records.medicalRecord.id || m.regId === records.medicalRecord.regId);
-      let updated: MedicalRecord[];
-      if (idx >= 0) {
-        updated = [...prev];
-        updated[idx] = { ...updated[idx], ...records.medicalRecord };
-      } else {
-        updated = [...prev, records.medicalRecord];
-      }
-      return updated.sort((a, b) => {
-        const nA = parseInt((a.noRM || '').replace(/\D/g, '') || '0', 10);
-        const nB = parseInt((b.noRM || '').replace(/\D/g, '') || '0', 10);
-        return nA - nB;
-      });
-    });
-
-    setCppt(prev => {
-      const idx = prev.findIndex(c => c.id === records.cppt.id || c.regId === records.cppt.regId);
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = { ...updated[idx], ...records.cppt };
-        return updated;
-      }
-      return [records.cppt, ...prev];
-    });
-  };
-
-  const saveExamScenario = (scenario: ExamScenario) => {
-    setExamScenarios(prev => {
-      const idx = prev.findIndex(s => s.id === scenario.id);
-      let updated: ExamScenario[];
-      if (idx >= 0) {
-        updated = [...prev];
-        updated[idx] = { ...scenario, updatedAt: new Date().toISOString() };
-      } else {
-        updated = [...prev, scenario];
-      }
-      return updated.sort((a, b) => {
-        const nA = parseInt((a.extractedPatient?.noRM || '').replace(/\D/g, '') || '0', 10);
-        const nB = parseInt((b.extractedPatient?.noRM || '').replace(/\D/g, '') || '0', 10);
-        return nA - nB;
-      });
-    });
-    injectSimulationPatient(scenario);
-    audit('UPDATE', 'ExamScenario', scenario.id, { field_name: 'title', new_value: scenario.title });
-  };
-
-  const deleteExamScenario = (id: string) => {
-    setExamScenarios(prev => prev.filter(s => s.id !== id));
-    audit('DELETE', 'ExamScenario', id);
-  };
-
-  const saveExamSubmission = (sub: ExamSubmission) => {
-    setExamSubmissions(prev => {
-      const idx = prev.findIndex(s => s.id === sub.id || (s.studentId === sub.studentId && s.scenarioId === sub.scenarioId));
-      if (idx >= 0) {
-        const updated = [...prev];
-        updated[idx] = sub;
-        return updated;
-      }
-      return [sub, ...prev];
-    });
-    audit('CREATE', 'ExamSubmission', sub.id, { field_name: 'score', new_value: sub.score });
-  };
-
-  const deleteExamSubmission = (id: string) => {
-    setExamSubmissions(prev => prev.filter(s => s.id !== id));
-    audit('DELETE', 'ExamSubmission', id);
-  };
-
-  // Ensure simulation patients are initialized in state
-  useEffect(() => {
-    examScenarios.forEach(scen => {
-      injectSimulationPatient(scen);
-    });
-  }, []);
-
   const canEditPage = (pageId?: string): boolean => {
     if (!user) return false;
     const targetPage = pageId || activePage;
-    if (targetPage === 'dashboard' || targetPage === 'praktikum' || targetPage === 'audit' || targetPage === 'logaktivitas') return true;
+    if (targetPage === 'dashboard' || targetPage === 'audit' || targetPage === 'logaktivitas') return true;
     const role = getRole(user.roleId);
     if (!role) return false;
     if (role.access.includes('all')) return true;
@@ -1331,7 +1139,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         user,
-        users,
+        users: exposedUsers,
         roles,
         patients,
         registrations,
@@ -1347,11 +1155,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         radiology,
         beds,
         auditTrail,
-        praktikum: INITIAL_PRAKTIKUM,
         dokumenBerkas,
         asuhanKeperawatan,
-        examScenarios,
-        examSubmissions,
         resumeMedisList,
         activePage,
         params,
@@ -1394,17 +1199,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteDokumenBerkas,
         addAsuhanKeperawatan,
         updateAsuhanKeperawatan,
-        saveExamScenario,
-        deleteExamScenario,
-        saveExamSubmission,
-        deleteExamSubmission,
-        injectSimulationPatient,
         getPatient,
         getReg,
         getMR,
         getUser,
         getRole,
-        canEditPage
+        canEditPage,
+        backendMode,
+        booting: sb.booting,
+        accountType: sb.accountType,
+        mustChangePassword: sb.mustChangePassword,
+        classOptions: sb.classOptions,
+        activeClass: sb.activeClass,
+        chooseClass: sb.chooseClass,
+        changePassword: sb.changePassword,
+        resetActiveClass: sb.resetActiveClass,
+        setMemberActive: sb.setMemberActive
       }}
     >
       {children}

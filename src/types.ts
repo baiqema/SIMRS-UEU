@@ -310,7 +310,7 @@ export interface AuditEntry {
   timestamp: string;
   userId: string;
   userName: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'NAVIGATE';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'NAVIGATE' | 'RESET';
   entity: string;
   entityId: string;
   field_name?: string | null;
@@ -333,14 +333,6 @@ export interface Bed {
   note?: string;
   maintenanceReason?: string;
   occupiedSince?: string;
-}
-
-export interface PraktikumModule {
-  id: string;
-  title: string;
-  desc: string;
-  modul: string;
-  status: string;
 }
 
 export interface DokumenBerkas {
@@ -389,102 +381,6 @@ export interface AsuhanKeperawatan {
     o: string;
     a: string;
     p: string;
-  };
-}
-
-export interface ExamScenario {
-  id: string;
-  title: string;
-  category: 'RMIK' | 'Keperawatan';
-  description: string;
-  durationMinutes: number;
-  status: 'Aktif' | 'Draft' | 'Arsip';
-  pdfFileName: string;
-  pdfFileUrl?: string;
-  pdfContentText: string;
-  extractedPatient: {
-    name: string;
-    noRM: string;
-    nik: string;
-    birthDate: string;
-    gender: 'L' | 'P';
-    age: number;
-    address: string;
-    insurance: string;
-  };
-  extractedEncounter: {
-    regId: string;
-    poli: string;
-    dpjpName: string;
-    date: string;
-    subjective: string;
-    objective: string;
-    vitalSigns: {
-      td: string;
-      nadi: string;
-      suhu: string;
-      rr: string;
-      spo2: string;
-    };
-    assessment: string;
-    plan: string;
-    penunjang?: {
-      lab?: string;
-      radiologi?: string;
-      tindakan?: string;
-    };
-  };
-  answerKey: {
-    // For RMIK:
-    icd10Primary: string;
-    icd10Secondary: string[];
-    icd9Procedures: string[];
-    // For Keperawatan:
-    diagnosaSDKI: string[];
-    luaranSLKI: string;
-    intervensiSIKI: string[];
-    rubrikPenilaian?: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-}
-
-export interface ExamSubmission {
-  id: string;
-  scenarioId: string;
-  studentId: string;
-  studentName: string;
-  submittedAt: string;
-  timeSpentSeconds: number;
-  autoSubmitted: boolean;
-  studentAnswer: {
-    // For RMIK:
-    icd10Primary: string;
-    icd10Secondary: string[];
-    icd9Procedures: string[];
-    coderNotes: string;
-    // For Keperawatan:
-    diagnosaSDKI: string[];
-    luaranSLKI: string;
-    intervensiSIKI: string[];
-    catatanImplementasi: string;
-  };
-  score: number;
-  scoreDetails: {
-    icd10PrimaryMatch: boolean;
-    icd10SecondaryMatches: string[];
-    icd10SecondaryMissing: string[];
-    icd10SecondaryExtra: string[];
-    icd9Matches: string[];
-    icd9Missing: string[];
-    icd9Extra: string[];
-    sdkiMatches: string[];
-    sdkiMissing: string[];
-    sikiMatches: string[];
-    sikiMissing: string[];
-    slkiScore: number;
-    feedback: string;
   };
 }
 

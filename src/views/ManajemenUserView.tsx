@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Modal } from '../components/Modal';
+import { KelasRosterPanel } from '../components/kelas/KelasRosterPanel';
 import Swal from 'sweetalert2';
 import {
   Users, Plus, ShieldCheck, UserCheck, Key, ShieldAlert,
   Edit3, Trash2, CheckCircle2, Lock, Unlock, Search,
-  CheckSquare, Square, Save, RefreshCw, Layers, Sliders, Check
+  CheckSquare, Square, Save, RefreshCw, Layers, Sliders, Check, School
 } from 'lucide-react';
 import { RoleId, User } from '../types';
 
@@ -60,7 +61,6 @@ export const ALL_SYSTEM_MODULES = [
   {
     group: 'ADMINISTRASI & PEMBELAJARAN',
     modules: [
-      { id: 'praktikum', name: 'Modul Praktikum RMIK', desc: 'Skenario pembelajaran, evaluasi & logbook mahasiswa' },
       { id: 'audit', name: 'Audit Trail (Superadmin)', desc: 'Pelacakan integritas per field data, IP address & user log' },
       { id: 'logaktivitas', name: 'Log Aktivitas Sistem', desc: 'Catatan log sesi login, logout dan transaksi aplikasi' },
       { id: 'manajemenuser', name: 'Manajemen Pengguna & Hak Akses', desc: 'Kelola akun user, reset password, dan konfigurasi RBAC' }
@@ -69,12 +69,13 @@ export const ALL_SYSTEM_MODULES = [
 ];
 
 export const ManajemenUserView: React.FC = () => {
-  const { users, roles, user: currentUser, addUser, updateUser, deleteUser, updateRolePermissions, getRole, canEditPage } = useApp();
+  const { users, roles, user: currentUser, addUser, updateUser, deleteUser, updateRolePermissions, getRole, canEditPage, backendMode, accountType } = useApp();
+  const showKelasTab = backendMode === 'supabase' && (accountType === 'dosen' || accountType === 'admin');
   const isEditable = canEditPage('user');
   const isSuperAdmin = currentUser?.roleId === 'R01';
 
   // Active View Tab: 'users' (Daftar Pengguna) | 'rbac' (Matriks Hak Akses)
-  const [activeTab, setActiveTab] = useState<'users' | 'rbac'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'rbac' | 'kelas'>('users');
 
   // Search & Filter Users
   const [searchTerm, setSearchTerm] = useState('');
@@ -345,6 +346,17 @@ export const ManajemenUserView: React.FC = () => {
               R01
             </span>
           </button>
+          {showKelasTab && (
+            <button
+              onClick={() => setActiveTab('kelas')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'kelas' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-700 hover:text-slate-900'
+              }`}
+            >
+              <School className="w-4 h-4" />
+              <span>Kelas & Roster</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -369,6 +381,8 @@ export const ManajemenUserView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeTab === 'kelas' && showKelasTab && <KelasRosterPanel />}
 
       {/* TAB 1: DAFTAR PENGGUNA (USERS TABLE) */}
       {activeTab === 'users' && (

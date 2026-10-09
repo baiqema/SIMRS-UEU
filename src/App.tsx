@@ -3,6 +3,8 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { LoginView } from './views/LoginView';
+import { PilihKelasView } from './views/PilihKelasView';
+import { GantiPasswordView } from './views/GantiPasswordView';
 import { DashboardView } from './views/DashboardView';
 import { PendaftaranView } from './views/PendaftaranView';
 import { BedManagementView } from './views/BedManagementView';
@@ -19,7 +21,6 @@ import { FarmasiView } from './views/FarmasiView';
 import { LaboratoriumView } from './views/LaboratoriumView';
 import { RadiologiView } from './views/RadiologiView';
 import { ManajemenUserView } from './views/ManajemenUserView';
-import { PraktikumView } from './views/PraktikumView';
 import { AuditTrailView } from './views/AuditTrailView';
 import { LogAktivitasView } from './views/LogAktivitasView';
 import { PelaporanView } from './views/PelaporanView';
@@ -28,10 +29,22 @@ import { PemeriksaanView } from './views/PemeriksaanView';
 import { ShieldAlert } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const { user, activePage, sidebarCollapsed, getRole } = useApp();
+  const { user, activePage, sidebarCollapsed, getRole, booting, classOptions, mustChangePassword } = useApp();
+
+  if (booting) {
+    return (
+      <div className="min-h-screen bg-[#EEF4FB] flex items-center justify-center text-xs font-bold text-slate-500">
+        Memuat sesi SIMRS…
+      </div>
+    );
+  }
 
   if (!user) {
-    return <LoginView />;
+    return classOptions ? <PilihKelasView /> : <LoginView />;
+  }
+
+  if (mustChangePassword) {
+    return <GantiPasswordView />;
   }
 
   const role = getRole(user.roleId);
@@ -40,7 +53,7 @@ const AppContent: React.FC = () => {
   const hasPageAccess = (pageId: string) => {
     if (pageId === 'kunjungan') return access.includes('all') || access.includes('pendaftaran') || access.includes('kunjungan');
     if (pageId === 'bedmanagement') return access.includes('all') || access.includes('pendaftaran') || access.includes('bedmanagement');
-    if (pageId === 'audit') return user.roleId === 'R01';
+    if (pageId === 'audit') return user.roleId === 'R01' || user.roleId === 'R03';
     return access.includes('all') || access.includes(pageId);
   };
 
@@ -97,8 +110,6 @@ const AppContent: React.FC = () => {
         return <RadiologiView />;
       case 'manajemenuser':
         return <ManajemenUserView />;
-      case 'praktikum':
-        return <PraktikumView />;
       case 'audit':
         return <AuditTrailView />;
       case 'logaktivitas':

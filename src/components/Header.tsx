@@ -35,7 +35,6 @@ export const Header: React.FC = () => {
       laboratorium: 'Penunjang / Laboratorium',
       radiologi: 'Penunjang / Radiologi',
       manajemenuser: 'Administrasi / Manajemen Pengguna',
-      praktikum: 'Administrasi / Praktikum RMIK',
       audit: 'Administrasi / Audit Trail',
       logaktivitas: 'Administrasi / Log Aktivitas',
       pelaporan: 'Pelaporan / Indikator & Laporan RS',
