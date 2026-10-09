@@ -11,14 +11,14 @@
 2. Follow the self-hosting guide; set strong `POSTGRES_PASSWORD`, `JWT_SECRET`, `ANON_KEY`, `SERVICE_ROLE_KEY`, `DASHBOARD_PASSWORD`.
 3. In the Auth settings (`.env` of the Supabase stack): `DISABLE_SIGNUP=true`, `ENABLE_EMAIL_AUTOCONFIRM=true`.
 4. From a checkout of this repository:
-   - `npx supabase db push --db-url "postgresql://postgres:<pw>@<server>:5432/postgres" --include-seed`. The migrations include `20261009000500_audit_session_switch.sql`.
+   - `npx supabase db push --db-url "postgresql://postgres:<pw>@<server>:5432/postgres" --include-seed`. The migrations include `20261009000500_audit_session_switch.sql` and `20261009000600_member_admin_and_hardening.sql` (member activation RPC, anon revokes).
    - Copy `supabase/functions/import-roster` into the stack's `volumes/functions/` folder and restart the functions container. The function returns per-row statuses (`created|existing|skipped|failed`).
 5. Bootstrap the first admin and class:
    `npm run bootstrap -- --env .env.bootstrap.local --admin-password '<strong>' --class "<nama kelas>"`
    where `.env.bootstrap.local` contains `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` of the internal stack. Do NOT use `--demo`.
 6. Build the app with `VITE_SUPABASE_URL=<internal API URL> VITE_SUPABASE_ANON_KEY=<anon> VITE_DEMO_MODE=false npm run build` and serve `dist/` (SPA fallback to `index.html`).
    - Note: `LoginView` still pre-fills the demo NIM/password in its initial state. Before an internal deployment, set those initial values to empty (`src/views/LoginView.tsx`, the `useState('20240306044')` and `useState('mhs123')` lines).
-7. Admin creates dosen accounts (`import-roster` action `create_dosen`); dosen create classes and import rosters in the app.
+7. Admin creates dosen accounts in *Hak Akses & Pengguna* → *Kelas & Roster* → *Buat Akun Dosen* (calls `import-roster` action `create_dosen`); dosen create classes, import rosters and activate/deactivate members there.
 
 ## Backups
 `pg_dump` the `public` and `auth` schemas daily. `audit_log` is append-only by design; plan retention with the lab.

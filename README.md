@@ -7,5 +7,4 @@
 
 - Pull from GitHub (Settings → GitHub → Pull) before every AI Studio session.
 - Never use "Force push".
-- Do not use Force push.
 - Screens talk to data only through `useApp()`; do not edit `src/data-layer/`, `src/lib/` or `supabase/` from AI Studio.

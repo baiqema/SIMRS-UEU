@@ -31,10 +31,11 @@ async function ensure(username: string, password: string, name: string, type: 'a
   return data.user.id;
 }
 
-const demoAdmin = DEMO_ACCOUNTS.find(a => a.accountType === 'admin')!;
 const adminUsername = values['admin-username']!;
-const adminPassword = values['admin-password'] ?? (values.demo ? demoAdmin.p : undefined);
-if (!adminPassword) throw new Error('--admin-password is required outside --demo');
+const adminPassword = values['admin-password'];
+// Always required, also with --demo: the real admin must never use the public demo password.
+if (!adminPassword) throw new Error('--admin-password is required');
+if (DEMO_ACCOUNTS.some(a => a.p === adminPassword)) throw new Error('--admin-password must not be a demo preset password');
 await ensure(adminUsername, adminPassword, 'Super Administrator', 'admin');
 
 const asAdmin = createClient(url, anonKey, { auth: { persistSession: false } });
@@ -45,14 +46,19 @@ if (cErr) throw cErr;
 console.log(`Class "${values.class}" created: ${classId}`);
 
 if (values.demo) {
-  for (const acc of DEMO_ACCOUNTS.filter(a => a.u !== adminUsername)) {
+  // The admin preset is not created: in Supabase mode the admin is the real account above.
+  for (const acc of DEMO_ACCOUNTS.filter(a => a.accountType !== 'admin' && a.u !== adminUsername)) {
     const id = await ensure(acc.u, acc.p, acc.label, acc.accountType);
-    if (acc.accountType !== 'admin') {
-      await admin.from('class_members').upsert(
-        { class_id: classId, user_id: id, member_role: acc.accountType, active: true },
-        { onConflict: 'class_id,user_id' },
-      );
-    }
+    // Presets must log in with the published password: reset it on every run.
+    const { error: uErr } = await admin.auth.admin.updateUserById(id, { password: acc.p });
+    if (uErr) throw uErr;
+    const { error: mErr } = await admin.from('profiles').update({ must_change_password: false, active: true }).eq('id', id);
+    if (mErr) throw mErr;
+    const { error: cmErr } = await admin.from('class_members').upsert(
+      { class_id: classId, user_id: id, member_role: acc.accountType, active: true },
+      { onConflict: 'class_id,user_id' },
+    );
+    if (cmErr) throw cmErr;
     console.log(`demo account ready: ${acc.u}`);
   }
 }
