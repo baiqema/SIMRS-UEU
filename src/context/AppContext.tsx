@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   User, Role, RoleId, Patient, Registration, GeneralConsent, MedicalRecord,
   CPPT, InformedConsent, Coding, Claim, Billing, PharmacyRecord, LabRecord,
@@ -16,6 +16,12 @@ import {
 import { sanitizePatientList, sanitizeMedicalRecords, ensureTodayRegistrations } from '../data/seedNormalizers';
 import { useSlice } from '../data-layer/useSlice';
 import { getBackendMode } from '../data-layer/config';
+import { useSupabaseSession } from '../data-layer/useSupabaseSession';
+import { mergeStaffAndMembers, logNavigate, updateRoleAccess } from '../data-layer/supabaseQueries';
+import { notifySaveError } from '../data-layer/notify';
+import { getSupabase } from '../lib/supabaseClient';
+import type { BackendMode } from '../data-layer/config';
+import type { AccountType, ClassInfo } from '../data-layer/session';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM } from '../data/icdDatabase';
 import { checkResumeMedisCompleteness, validateDiagnosisMatching, buildAutoResumeFromEncounter } from '../utils/resumeMedisHelper';
 
@@ -45,7 +51,16 @@ interface AppContextType {
   sidebarCollapsed: boolean;
   
   toggleSidebar: () => void;
-  login: (u: string, p: string, selectedRoleId?: RoleId) => { success: boolean; error?: string };
+  login: (u: string, p: string, selectedRoleId?: RoleId) => Promise<{ success: boolean; error?: string; needsClassChoice?: boolean }>;
+  backendMode: BackendMode;
+  booting: boolean;
+  accountType: AccountType | null;
+  mustChangePassword: boolean;
+  classOptions: ClassInfo[] | null;
+  activeClass: ClassInfo | null;
+  chooseClass: (classId: string) => Promise<{ success: boolean; error?: string }>;
+  changePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  resetActiveClass: () => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   navigate: (page: string, params?: any) => void;
   audit: (action: AuditEntry['action'], entity: string, entityId: string, details?: { field_name?: string; old_value?: any; new_value?: any }) => void;
@@ -134,6 +149,7 @@ const genId = (prefix: string) => prefix + Date.now().toString(36).toUpperCase()
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
+    if (getBackendMode() === 'supabase') return null;
     const saved = localStorage.getItem('simrs_current_user');
     return saved ? JSON.parse(saved) : null;
   });
@@ -256,6 +272,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [params, setParams] = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const backendMode = getBackendMode();
+  const sb = useSupabaseSession({
+    setUser, setRoles, setAuditTrail,
+    onExit: () => setActivePage('dashboard'),
+  });
+  const exposedUsers = useMemo(
+    () => (backendMode === 'supabase' ? mergeStaffAndMembers(users, sb.members) : users),
+    [backendMode, users, sb.members],
+  );
 
   // Persistence effects (persisted list slices are written by useSlice)
   useEffect(() => { if (backendMode === 'local') localStorage.setItem('simrs_roles', JSON.stringify(roles)); }, [backendMode, roles]);
@@ -272,6 +296,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     entityId: string,
     details?: { field_name?: string; old_value?: any; new_value?: any }
   ) => {
+    if (backendMode === 'supabase') {
+      // CREATE/UPDATE/DELETE are written by database triggers; LOGIN/LOGOUT by session RPCs.
+      if (action === 'NAVIGATE') logNavigate(getSupabase(), entityId);
+      return;
+    }
     const newEntry: AuditEntry = {
       id: genId('AT'),
       timestamp: new Date().toISOString(),
@@ -292,7 +321,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleSidebar = () => setSidebarCollapsed(prev => !prev);
 
-  const login = (u: string, p: string, selectedRoleId?: RoleId) => {
+  const loginLocal = (u: string, p: string, selectedRoleId?: RoleId) => {
     const cleanU = u.trim();
     const cleanP = p.trim();
 
@@ -335,12 +364,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
-  const logout = () => {
+  const login = async (u: string, p: string, selectedRoleId?: RoleId) => {
+    if (backendMode === 'supabase') return sb.login(u, p, selectedRoleId ?? 'R04');
+    return loginLocal(u, p, selectedRoleId);
+  };
+
+  const logoutLocal = () => {
     if (user) {
       audit('LOGOUT', 'User', user.id, { field_name: 'status', old_value: 'online', new_value: 'offline' });
     }
     setUser(null);
     setActivePage('dashboard');
+  };
+
+  const logout = () => {
+    if (backendMode === 'supabase') { void sb.logout(); return; }
+    logoutLocal();
   };
 
   const navigate = (page: string, newParams?: any) => {
@@ -352,7 +391,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getPatient = (id: string) => patients.find(p => p.id === id);
   const getReg = (id: string) => registrations.find(r => r.id === id);
   const getMR = (id: string) => medicalRecords.find(m => m.id === id);
-  const getUser = (id: string) => users.find(u => u.id === id);
+  const getUser = (id: string) => exposedUsers.find(u => u.id === id);
   const getRole = (id: string) => roles.find(r => r.id === id) || INITIAL_ROLES.find(r => r.id === id);
 
   const generateNoRM = (): string => {
@@ -848,6 +887,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateRolePermissions = (roleId: RoleId, newAccess: string[]) => {
+    if (backendMode === 'supabase') {
+      updateRoleAccess(getSupabase(), roleId, newAccess)
+        .then(() => setRoles(prev => prev.map(r => r.id === roleId ? { ...r, access: newAccess } : r)))
+        .catch(notifySaveError);
+      return;
+    }
     setRoles(prev => prev.map(r => r.id === roleId ? { ...r, access: newAccess } : r));
     audit('UPDATE', 'Role', roleId, { field_name: 'access', new_value: newAccess.join(',') });
   };
@@ -1068,7 +1113,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         user,
-        users,
+        users: exposedUsers,
         roles,
         patients,
         registrations,
@@ -1133,7 +1178,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getMR,
         getUser,
         getRole,
-        canEditPage
+        canEditPage,
+        backendMode,
+        booting: sb.booting,
+        accountType: sb.accountType,
+        mustChangePassword: sb.mustChangePassword,
+        classOptions: sb.classOptions,
+        activeClass: sb.activeClass,
+        chooseClass: sb.chooseClass,
+        changePassword: sb.changePassword,
+        resetActiveClass: sb.resetActiveClass
       }}
     >
       {children}
