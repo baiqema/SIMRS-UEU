@@ -60,9 +60,18 @@ describe('start_practice_session', () => {
     expect((await m.client.rpc('my_practice_session')).data).toEqual([]);
   });
 
-  it('my_classes lists active memberships only', async () => {
-    const { data } = await m.client.rpc('my_classes');
-    expect(data.map((c: { id: string }) => c.id)).toContain(cls);
-    expect((await inactive.client.rpc('my_classes')).data).toEqual([]);
+  it('my_classes lists active memberships only and hides TEST-* classes', async () => {
+    // A non-TEST class is needed to see a listing; it has no audit rows, so it can be deleted afterwards.
+    const visible = await insertClassDirect(`tmp-my-classes-${Date.now()}`);
+    try {
+      await addMember(visible, m.id, 'mahasiswa');
+      await addMember(visible, inactive.id, 'mahasiswa', false);
+      const ids = ((await m.client.rpc('my_classes')).data as { id: string }[]).map(c => c.id);
+      expect(ids).toContain(visible);
+      expect(ids).not.toContain(cls);
+      expect((await inactive.client.rpc('my_classes')).data).toEqual([]);
+    } finally {
+      await admin().from('classes').delete().eq('id', visible);
+    }
   });
 });
