@@ -33,23 +33,37 @@ export function useSupabaseSession(deps: Deps) {
 
   async function enterClass(p: Profile, cls: ClassInfo, roleId: RoleId, existing?: PracticeSession) {
     const client = getSupabase();
-    const session = existing ?? await startPractice(client, cls.id, roleId);
-    const engine = createSyncEngine(client, cls.id);
-    setSlicePersistence({ ...engine, onSaveError: notifySaveError });
-    const [rows, roles, memberUsers, audit] = await Promise.all([
-      engine.loadAll(), loadPracticeRoles(client), loadMembers(client, cls.id), loadAudit(client, cls.id),
-    ]);
-    sliceRegistry.hydrateAll(rows);
-    deps.setRoles(roles);
-    deps.setAuditTrail(audit);
-    setMembers(memberUsers);
-    const offData = engine.subscribe();
-    const offAudit = subscribeAudit(client, cls.id, e => deps.setAuditTrail(prev => [e, ...prev].slice(0, 500)));
-    teardown.current = () => { offData(); offAudit(); };
-    setProfile(p);
-    setActiveClass(cls);
-    setClassOptions(null);
-    deps.setUser({ id: p.id, username: p.username, name: p.full_name, roleId: session.role_id as RoleId, active: true });
+    try {
+      const session = existing ?? await startPractice(client, cls.id, roleId);
+      const engine = createSyncEngine(client, cls.id);
+      setSlicePersistence({ ...engine, onSaveError: notifySaveError });
+      const [rows, roles, memberUsers, audit] = await Promise.all([
+        engine.loadAll(), loadPracticeRoles(client), loadMembers(client, cls.id), loadAudit(client, cls.id),
+      ]);
+      sliceRegistry.hydrateAll(rows);
+      deps.setRoles(roles);
+      deps.setAuditTrail(audit);
+      setMembers(memberUsers);
+      const offData = engine.subscribe();
+      const offAudit = subscribeAudit(client, cls.id, e => deps.setAuditTrail(prev => [e, ...prev].slice(0, 500)));
+      teardown.current = () => { offData(); offAudit(); };
+      setProfile(p);
+      setActiveClass(cls);
+      setClassOptions(null);
+      deps.setUser({ id: p.id, username: p.username, name: p.full_name, roleId: session.role_id as RoleId, active: true });
+    } catch (e) {
+      // Leave nothing behind: no subscriptions, no slice persistence, no open practice
+      // session, and no authenticated session without an app user.
+      teardown.current?.();
+      teardown.current = null;
+      setSlicePersistence(null);
+      // A restored session is left open (a transient load failure should not end it);
+      // one we just started (or are about to) is ended, which also signs out.
+      if (!existing) {
+        try { await endPractice(client); } catch { /* best effort */ }
+      }
+      throw e;
+    }
   }
 
   function clearLocal() {
@@ -98,7 +112,7 @@ export function useSupabaseSession(deps: Deps) {
       await enterClass(res.profile, res.classes[0], roleId);
       return { success: true };
     } catch (e) {
-      await getSupabase().auth.signOut();
+      // enterClass already ended the practice session and signed out.
       return { success: false, error: (e as Error).message };
     }
   }
@@ -112,6 +126,9 @@ export function useSupabaseSession(deps: Deps) {
       pending.current = null;
       return { success: true };
     } catch (e) {
+      // enterClass signed the user out; drop the picker so they restart from the login form.
+      pending.current = null;
+      setClassOptions(null);
       return { success: false, error: (e as Error).message };
     }
   }
@@ -135,9 +152,13 @@ export function useSupabaseSession(deps: Deps) {
     if (!activeClass || !profile) return { success: false, error: 'Tidak ada kelas aktif' };
     const { error } = await getSupabase().rpc('reset_class', { p_class: activeClass.id });
     if (error) return { success: false, error: error.message };
-    const rows = await createSyncEngine(getSupabase(), activeClass.id).loadAll();
-    sliceRegistry.hydrateAll(rows);
-    return { success: true };
+    try {
+      const rows = await createSyncEngine(getSupabase(), activeClass.id).loadAll();
+      sliceRegistry.hydrateAll(rows);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
   }
 
   return {

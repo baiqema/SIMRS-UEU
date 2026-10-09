@@ -378,7 +378,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = () => {
-    if (backendMode === 'supabase') { void sb.logout(); return; }
+    if (backendMode === 'supabase') { sb.logout().catch(notifySaveError); return; }
     logoutLocal();
   };
 
