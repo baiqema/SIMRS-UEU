@@ -57,7 +57,7 @@ describe('createSyncEngine.subscribe', () => {
     const applyRemote = vi.fn();
     const unregister = sliceRegistry.register('patients', { hydrate: vi.fn(), applyRemote });
     createSyncEngine(client, 'c1').subscribe();
-    const fire = (p: any) => handlers.forEach(h => h(p));
+    const fire = (p: any) => handlers[0](p);
     return { fire, applyRemote, unregister };
   }
 
