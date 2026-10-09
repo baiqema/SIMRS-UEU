@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { addMember, anon, cleanupUsers, EMAIL_DOMAIN, insertClassDirect, makeUser, type TestUser } from './helpers';
+import { addMember, admin, anon, cleanupUsers, EMAIL_DOMAIN, insertClassDirect, makeUser, type TestUser } from './helpers';
 
 let cls: string, m: TestUser, d: TestUser, a: TestUser, inactive: TestUser;
 
@@ -32,8 +32,11 @@ describe('start_practice_session', () => {
   });
 
   it('switching role keeps exactly one open session', async () => {
-    await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R07' });
-    await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R06' });
+    expect((await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R07' })).error).toBeNull();
+    expect((await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R06' })).error).toBeNull();
+    const { data: logouts } = await admin().from('audit_log').select('details')
+      .eq('class_id', cls).eq('actor_id', m.id).eq('action', 'LOGOUT');
+    expect(logouts!.map(l => l.details.roleId)).toContain('R07');
     const { data } = await m.client.rpc('my_practice_session');
     expect(data).toHaveLength(1);
     expect(data[0].role_id).toBe('R06');
@@ -48,7 +51,12 @@ describe('start_practice_session', () => {
   });
 
   it('end_practice_session closes it and logs LOGOUT', async () => {
-    await m.client.rpc('end_practice_session');
+    const before = (await admin().from('audit_log').select('id', { count: 'exact', head: true })
+      .eq('class_id', cls).eq('actor_id', m.id).eq('action', 'LOGOUT')).count!;
+    expect((await m.client.rpc('end_practice_session')).error).toBeNull();
+    const after = (await admin().from('audit_log').select('id', { count: 'exact', head: true })
+      .eq('class_id', cls).eq('actor_id', m.id).eq('action', 'LOGOUT')).count!;
+    expect(after).toBe(before + 1);
     expect((await m.client.rpc('my_practice_session')).data).toEqual([]);
   });
 
