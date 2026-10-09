@@ -310,7 +310,7 @@ export interface AuditEntry {
   timestamp: string;
   userId: string;
   userName: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'NAVIGATE';
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'NAVIGATE' | 'RESET';
   entity: string;
   entityId: string;
   field_name?: string | null;
