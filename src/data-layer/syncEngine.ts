@@ -49,8 +49,11 @@ export function createSyncEngine(client: SupabaseClient, classId: string): SyncE
         if (error) throw new Error(error.message);
       }
       for (let i = 0; i < diff.deletes.length; i += CHUNK) {
-        const { error } = await client.from(table).delete().eq('class_id', classId).in('id', diff.deletes.slice(i, i + CHUNK));
+        const chunk = diff.deletes.slice(i, i + CHUNK);
+        const { data, error } = await client.from(table).delete().eq('class_id', classId).in('id', chunk).select('id');
         if (error) throw new Error(error.message);
+        // RLS filters refused deletes silently; a short count means the role may not delete here.
+        if ((data?.length ?? 0) < chunk.length) throw new Error('42501: hapus ditolak');
       }
     },
     refetch: fetchSlice,

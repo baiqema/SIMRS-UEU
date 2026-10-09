@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { getBackendMode, type BackendMode } from './config';
 import { diffById, type SliceDiff } from './diff';
+import { notifyInfo } from './notify';
 import { applyRemoteChange, sliceRegistry } from './registry';
 import { SLICES, type SliceName } from './slices';
 
@@ -12,6 +13,9 @@ export interface SlicePersistence {
 
 let persistence: SlicePersistence | null = null;
 export function setSlicePersistence(p: SlicePersistence | null): void { persistence = p; }
+
+// One push chain per slice: saves reach the server in the order they were made.
+const queues = new Map<SliceName, Promise<void>>();
 
 export function createSliceSetter<T extends { id: string }>(
   name: SliceName,
@@ -29,12 +33,20 @@ export function createSliceSetter<T extends { id: string }>(
     if (mode !== 'supabase' || !p) return;
     const diff = diffById(prev, next);
     if (diff.upserts.length === 0 && diff.deletes.length === 0) return;
-    p.push(name, diff).catch(async err => {
-      p.onSaveError(err);
-      const rows = (await p.refetch(name)) as T[];
-      ref.current = rows;
-      setState(rows);
-    });
+    const run = (queues.get(name) ?? Promise.resolve())
+      .then(() => p.push(name, diff))
+      .catch(async err => {
+        p.onSaveError(err);
+        try {
+          const rows = (await p.refetch(name)) as T[];
+          ref.current = rows;
+          setState(rows);
+        } catch {
+          notifyInfo('Koneksi bermasalah. Muat ulang halaman untuk melihat data terbaru.');
+        }
+      });
+    queues.set(name, run);
+    void run.then(() => { if (queues.get(name) === run) queues.delete(name); });
   };
 }
 

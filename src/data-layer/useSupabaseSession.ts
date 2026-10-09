@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { getSupabase } from '../lib/supabaseClient';
 import type { AuditEntry, Role, RoleId, User } from '../types';
 import { getBackendMode } from './config';
+import { installFocusRefresh } from './focusRefresh';
 import { notifySaveError } from './notify';
 import { sliceRegistry } from './registry';
 import {
@@ -46,7 +47,21 @@ export function useSupabaseSession(deps: Deps) {
       setMembers(memberUsers);
       const offData = engine.subscribe();
       const offAudit = subscribeAudit(client, cls.id, e => deps.setAuditTrail(prev => [e, ...prev].slice(0, 500)));
-      teardown.current = () => { offData(); offAudit(); };
+      let live = true;
+      const offFocus = installFocusRefresh({
+        win: window,
+        doc: document,
+        refresh: async () => {
+          const [freshRows, freshMembers, freshAudit] = await Promise.all([
+            engine.loadAll(), loadMembers(client, cls.id), loadAudit(client, cls.id),
+          ]);
+          if (!live) return;
+          sliceRegistry.hydrateAll(freshRows);
+          setMembers(freshMembers);
+          deps.setAuditTrail(freshAudit);
+        },
+      });
+      teardown.current = () => { live = false; offData(); offAudit(); offFocus(); };
       setProfile(p);
       setActiveClass(cls);
       setClassOptions(null);
@@ -127,6 +142,7 @@ export function useSupabaseSession(deps: Deps) {
       return { success: true };
     } catch (e) {
       // enterClass signed the user out; drop the picker so they restart from the login form.
+      notifySaveError(e);
       pending.current = null;
       setClassOptions(null);
       return { success: false, error: (e as Error).message };
@@ -161,8 +177,18 @@ export function useSupabaseSession(deps: Deps) {
     }
   }
 
+  async function setMemberActive(userId: string, active: boolean): Promise<Result> {
+    if (!activeClass) return { success: false, error: 'Tidak ada kelas aktif' };
+    const { error } = await getSupabase().rpc('set_member_active', {
+      p_class: activeClass.id, p_user: userId, p_active: active,
+    });
+    if (error) return { success: false, error: error.message };
+    setMembers(prev => prev.map(m => (m.id === userId ? { ...m, active } : m)));
+    return { success: true };
+  }
+
   return {
-    enabled, booting, members, classOptions, activeClass,
+    enabled, booting, members, classOptions, activeClass, setMemberActive,
     accountType: (profile?.account_type ?? null) as AccountType | null,
     mustChangePassword: profile?.must_change_password ?? false,
     login, chooseClass, logout, changePassword, resetActiveClass,

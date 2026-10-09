@@ -19,14 +19,20 @@ describe('normalizeLoaded', () => {
   });
 });
 
-function fakeClient() {
+function fakeClient(deletedIds?: (ids: string[]) => string[]) {
   const calls: any[] = [];
   const builder = (table: string) => {
+    let ids: string[] = [];
     const b: any = {
       upsert: (rows: any, opts: any) => { calls.push(['upsert', table, rows, opts]); return Promise.resolve({ error: null }); },
       delete: () => b,
       eq: (c: string, v: string) => { calls.push(['eq', table, c, v]); return b; },
-      in: (c: string, v: string[]) => { calls.push(['in', table, c, v]); return Promise.resolve({ error: null }); },
+      in: (c: string, v: string[]) => { calls.push(['in', table, c, v]); ids = v; return b; },
+      select: (cols: string) => {
+        calls.push(['select', table, cols]);
+        const kept = deletedIds ? deletedIds(ids) : ids;
+        return Promise.resolve({ data: kept.map(id => ({ id })), error: null });
+      },
     };
     return b;
   };
@@ -41,6 +47,18 @@ describe('createSyncEngine.push', () => {
     expect(calls).toContainEqual(['upsert', 'patients', [{ class_id: 'c1', id: 'P1', data: { id: 'P1' } }], { onConflict: 'class_id,id' }]);
     expect(calls).toContainEqual(['eq', 'patients', 'class_id', 'c1']);
     expect(calls).toContainEqual(['in', 'patients', 'id', ['P2']]);
+  });
+
+  it('throws a permission error when RLS silently filters some deletes', async () => {
+    const { client } = fakeClient(() => []);
+    await expect(createSyncEngine(client, 'c1').push('patients', { upserts: [], deletes: ['P2', 'P3'] }))
+      .rejects.toThrow('42501');
+  });
+
+  it('accepts deletes when every id comes back', async () => {
+    const { calls, client } = fakeClient();
+    await createSyncEngine(client, 'c1').push('patients', { upserts: [], deletes: ['P2'] });
+    expect(calls).toContainEqual(['select', 'patients', 'id']);
   });
 
   it('throws when Supabase returns an error', async () => {
