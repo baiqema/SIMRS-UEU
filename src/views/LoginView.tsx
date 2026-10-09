@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { RoleId } from '../types';
+import { DEMO_ACCOUNTS } from '../data/demoAccounts';
+import { isDemoMode } from '../data-layer/config';
 import { Building2, Eye, EyeOff, LogIn, ShieldAlert, FileText, Activity, GraduationCap, HelpCircle, CheckCircle2, UserCheck, Lock } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
@@ -13,24 +15,25 @@ export const LoginView: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [showForgotModal, setShowForgotModal] = useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
       setErrorMsg('Username/NIM dan password wajib diisi');
       return;
     }
-    const res = login(username.trim(), password.trim(), selectedRole);
+    const res = await login(username.trim(), password.trim(), selectedRole);
     if (!res.success) {
       setErrorMsg(res.error || 'Login gagal. Periksa kembali Username/NIM & password');
     }
   };
 
-  const handlePresetFill = (u: string, p: string, r: RoleId) => {
+  const handlePresetFill = async (u: string, p: string, r: RoleId) => {
     setUsername(u);
     setPassword(p);
     setSelectedRole(r);
     setErrorMsg('');
-    login(u, p, r);
+    const res = await login(u, p, r);
+    if (!res.success) setErrorMsg(res.error || 'Login gagal');
   };
 
   const roleOptions: { id: RoleId; label: string; desc: string }[] = [
@@ -43,14 +46,7 @@ export const LoginView: React.FC = () => {
     { id: 'R04', label: 'Mahasiswa (All Modul)', desc: 'Akses Penuh Seluruh Modul untuk Latihan Bebas' },
   ];
 
-  const demoAccounts = [
-    { label: 'Mahasiswa Coding (NIM 20240306044)', u: '20240306044', p: 'mhs123', roleId: 'R09' as RoleId },
-    { label: 'Mahasiswa Pendaftaran', u: 'mhs.pendaftaran', p: 'pendaftaran123', roleId: 'R07' as RoleId },
-    { label: 'Mahasiswa Perawat', u: 'mhs.perawat', p: 'perawat123', roleId: 'R06' as RoleId },
-    { label: 'Mahasiswa Pelaporan', u: 'mhs.pelaporan', p: 'pelaporan123', roleId: 'R13' as RoleId },
-    { label: 'Dosen Pengampu (Dr. Wati)', u: 'dsn.dr.wati', p: 'dosen123', roleId: 'R03' as RoleId },
-    { label: 'Super Administrator', u: 'admin', p: 'admin123', roleId: 'R01' as RoleId },
-  ];
+  const demoAccounts = DEMO_ACCOUNTS;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 text-slate-800 flex items-center justify-center p-4 relative overflow-hidden font-sans">
@@ -236,6 +232,7 @@ export const LoginView: React.FC = () => {
             </form>
 
             {/* Quick Demo Login */}
+            {isDemoMode() && (
             <div className="mt-5 pt-4 border-t border-slate-100">
               <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-2">
                 Preset Akun Demo Praktikum (Klik Langsung Masuk):
@@ -261,6 +258,7 @@ export const LoginView: React.FC = () => {
                 ))}
               </div>
             </div>
+            )}
           </div>
         </div>
       </div>
