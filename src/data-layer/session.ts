@@ -19,7 +19,8 @@ export function usernameToEmail(username: string): string {
 }
 
 async function loadProfile(client: SupabaseClient, userId: string): Promise<Profile | null> {
-  const { data } = await client.from('profiles').select('*').eq('id', userId).maybeSingle();
+  const { data, error } = await client.from('profiles').select('*').eq('id', userId).maybeSingle();
+  if (error) throw new Error(error.message);
   return (data as Profile) ?? null;
 }
 
@@ -36,17 +37,22 @@ export async function signIn(
   try { email = usernameToEmail(username); } catch (e) { return { error: (e as Error).message }; }
   const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error || !data.user) return { error: 'Username/NIM atau password salah' };
-  const profile = await loadProfile(client, data.user.id);
-  if (!profile || !profile.active) {
-    await client.auth.signOut();
-    return { error: 'Akun non-aktif. Hubungi dosen atau admin.' };
+  try {
+    const profile = await loadProfile(client, data.user.id);
+    if (!profile || !profile.active) {
+      await client.auth.signOut();
+      return { error: 'Akun non-aktif. Hubungi dosen atau admin.' };
+    }
+    const classes = await loadClasses(client);
+    if (classes.length === 0) {
+      await client.auth.signOut();
+      return { error: 'Akun Anda belum terdaftar di kelas mana pun. Hubungi dosen.' };
+    }
+    return { profile, classes };
+  } catch {
+    try { await client.auth.signOut(); } catch { /* ignore */ }
+    return { error: 'Gagal memuat data akun. Coba lagi.' };
   }
-  const classes = await loadClasses(client);
-  if (classes.length === 0) {
-    await client.auth.signOut();
-    return { error: 'Akun Anda belum terdaftar di kelas mana pun. Hubungi dosen.' };
-  }
-  return { profile, classes };
 }
 
 export async function startPractice(client: SupabaseClient, classId: string, roleId: string): Promise<PracticeSession> {

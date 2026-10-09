@@ -63,8 +63,8 @@ export async function loadMembers(client: SupabaseClient, classId: string): Prom
     .select('member_role, active, profiles(id, username, full_name)')
     .eq('class_id', classId);
   if (error) throw new Error(error.message);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data ?? []).map((m: any) => ({
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  return (data ?? []).filter((m: any) => m.profiles).map((m: any) => ({
     id: m.profiles.id,
     username: m.profiles.username,
     name: m.profiles.full_name,

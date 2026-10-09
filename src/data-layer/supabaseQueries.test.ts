@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mapAuditRow, mergeStaffAndMembers } from './supabaseQueries';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { loadMembers, mapAuditRow, mergeStaffAndMembers } from './supabaseQueries';
 import type { User } from '../types';
 
 describe('mapAuditRow', () => {
@@ -32,5 +33,17 @@ describe('mergeStaffAndMembers', () => {
     const out = mergeStaffAndMembers(staff, members);
     expect(out.map(u => u.id)).toEqual(['U002', 'uuid-1']);
     expect(out[0].name).toBe('dr. A');
+  });
+});
+
+describe('loadMembers', () => {
+  it('skips memberships whose profile is hidden', async () => {
+    const rows = [
+      { member_role: 'mahasiswa', active: true, profiles: null },
+      { member_role: 'dosen', active: true, profiles: { id: 'p1', username: 'd', full_name: 'Dosen' } },
+    ];
+    const client = { from: () => ({ select: () => ({ eq: () => Promise.resolve({ data: rows, error: null }) }) }) } as unknown as SupabaseClient;
+    const out = await loadMembers(client, 'c');
+    expect(out).toEqual([{ id: 'p1', username: 'd', name: 'Dosen', roleId: 'R03', active: true }]);
   });
 });
