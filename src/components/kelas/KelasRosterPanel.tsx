@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
-import { Upload, RefreshCw, Download, School } from 'lucide-react';
+import { Upload, RefreshCw, Download, School, UserPlus } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { getSupabase } from '../../lib/supabaseClient';
 import { buildRosterCsv } from './rosterCsv';
@@ -13,16 +13,64 @@ const STATUS_LABEL: Record<AccountStatus, string> = {
   created: 'Akun baru', existing: 'Sudah ada', skipped: 'Dilewati', failed: 'Gagal',
 };
 
+const escapeHtml = (v: string) =>
+  v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
 export const KelasRosterPanel: React.FC = () => {
-  const { activeClass, users, resetActiveClass, accountType } = useApp();
+  const { activeClass, users, user, resetActiveClass, accountType, setMemberActive } = useApp();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Account[]>([]);
   const [newClassName, setNewClassName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [dosenUsername, setDosenUsername] = useState('');
+  const [dosenName, setDosenName] = useState('');
+  const [creatingDosen, setCreatingDosen] = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
   useEffect(() => { setResult([]); }, [activeClass?.id]);
   const parsed = parseRoster(text);
-  const members = users.filter((u: { id: string }) => /^[0-9a-f-]{36}$/.test(u.id));
+  const members: { id: string; username: string; name: string; roleId: string; active: boolean }[] =
+    users.filter((u: { id: string }) => /^[0-9a-f-]{36}$/.test(u.id));
+  const isAdmin = accountType === 'admin';
+
+  const functionError = async (error: { message: string }) => {
+    let msg = error.message;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const body = await (error as any).context?.json?.();
+      if (body && typeof body.error === 'string') msg = body.error;
+    } catch { /* keep default message */ }
+    return msg;
+  };
+
+  const createDosen = async () => {
+    if (!dosenUsername.trim() || !dosenName.trim() || creatingDosen) return;
+    setCreatingDosen(true);
+    const { data, error } = await getSupabase().functions.invoke('import-roster', {
+      body: { action: 'create_dosen', username: dosenUsername.trim(), name: dosenName.trim() },
+    });
+    setCreatingDosen(false);
+    if (error) { void Swal.fire({ icon: 'error', title: 'Gagal membuat akun dosen', text: await functionError(error) }); return; }
+    const acc = Array.isArray(data?.accounts) ? (data.accounts[0] as Account | undefined) : undefined;
+    if (!acc) { void Swal.fire({ icon: 'error', title: 'Gagal membuat akun dosen', text: 'Respons server tidak valid.' }); return; }
+    setDosenUsername('');
+    setDosenName('');
+    void Swal.fire({
+      icon: 'success',
+      title: acc.tempPassword ? 'Akun dosen dibuat' : 'Akun sudah ada',
+      html: acc.tempPassword
+        ? `Username <b>${escapeHtml(acc.username)}</b><br/>Password sementara: <b style="font-family:monospace">${escapeHtml(acc.tempPassword)}</b><br/><span style="font-size:11px">Hanya ditampilkan sekali. Dosen wajib menggantinya saat login pertama.</span>`
+        : `Username <b>${escapeHtml(acc.username)}</b> sudah terdaftar; password tidak diubah.`,
+      confirmButtonColor: '#2563eb',
+    });
+  };
+
+  const toggleMember = async (m: { id: string; name: string; active: boolean }) => {
+    setToggling(m.id);
+    const res = await setMemberActive(m.id, !m.active);
+    setToggling(null);
+    if (!res.success) void Swal.fire({ icon: 'error', title: 'Gagal mengubah status anggota', text: res.error });
+  };
 
   const importRoster = async () => {
     if (!activeClass || parsed.rows.length === 0) return;
@@ -32,13 +80,7 @@ export const KelasRosterPanel: React.FC = () => {
     });
     setBusy(false);
     if (error) {
-      let msg: string = error.message;
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const body = await (error as any).context?.json?.();
-        if (body && typeof body.error === 'string') msg = body.error;
-      } catch { /* keep default message */ }
-      void Swal.fire({ icon: 'error', title: 'Impor gagal', text: msg });
+      void Swal.fire({ icon: 'error', title: 'Impor gagal', text: await functionError(error) });
       return;
     }
     if (!data || !Array.isArray(data.accounts)) {
@@ -151,8 +193,48 @@ export const KelasRosterPanel: React.FC = () => {
         </div>
       )}
 
-      {accountType === 'admin' && (
-        <p className="text-[11px] text-slate-500">Admin: akun dosen dibuat melalui fungsi <span className="font-mono">import-roster</span> (aksi <span className="font-mono">create_dosen</span>); lihat runbook.</p>
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+        <div className="text-xs font-black text-slate-800">Anggota Kelas</div>
+        <p className="text-[11px] text-slate-500">Anggota nonaktif tidak dapat masuk ke kelas ini. Status dosen hanya dapat diubah oleh admin.</p>
+        <table className="w-full text-[11px]">
+          <thead><tr className="text-left text-slate-500"><th>Username</th><th>Nama</th><th>Peran</th><th>Status</th></tr></thead>
+          <tbody>
+            {members.map(m => {
+              const isDosen = m.roleId === 'R03';
+              const locked = m.id === user?.id || (isDosen && !isAdmin);
+              return (
+                <tr key={m.id} className="border-t border-slate-100">
+                  <td className="font-mono py-1">{m.username}</td>
+                  <td>{m.name}</td>
+                  <td>{isDosen ? 'Dosen' : 'Mahasiswa'}</td>
+                  <td>
+                    <button type="button" disabled={locked || toggling === m.id} onClick={() => toggleMember(m)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed ${m.active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                      {m.active ? 'Aktif' : 'Nonaktif'}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {isAdmin && (
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+          <div className="text-xs font-black text-slate-800">Buat Akun Dosen</div>
+          <p className="text-[11px] text-slate-500">Khusus admin. Password sementara ditampilkan sekali setelah akun dibuat.</p>
+          <div className="flex flex-wrap gap-2">
+            <input value={dosenUsername} onChange={e => setDosenUsername(e.target.value)} placeholder="Username (mis. dsn.budi)"
+              className="px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500" />
+            <input value={dosenName} onChange={e => setDosenName(e.target.value)} placeholder="Nama lengkap"
+              className="px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500" />
+            <button type="button" onClick={createDosen} disabled={creatingDosen || !dosenUsername.trim() || !dosenName.trim()}
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer disabled:opacity-60">
+              <UserPlus className="w-4 h-4" /> Buat Akun Dosen
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

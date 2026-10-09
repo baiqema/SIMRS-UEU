@@ -18,7 +18,7 @@ import { useSlice } from '../data-layer/useSlice';
 import { getBackendMode } from '../data-layer/config';
 import { useSupabaseSession } from '../data-layer/useSupabaseSession';
 import { mergeStaffAndMembers, logNavigate, updateRoleAccess } from '../data-layer/supabaseQueries';
-import { notifySaveError } from '../data-layer/notify';
+import { notifyInfo, notifySaveError } from '../data-layer/notify';
 import { getSupabase } from '../lib/supabaseClient';
 import type { BackendMode } from '../data-layer/config';
 import type { AccountType, ClassInfo } from '../data-layer/session';
@@ -61,6 +61,7 @@ interface AppContextType {
   chooseClass: (classId: string) => Promise<{ success: boolean; error?: string }>;
   changePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   resetActiveClass: () => Promise<{ success: boolean; error?: string }>;
+  setMemberActive: (userId: string, active: boolean) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   navigate: (page: string, params?: any) => void;
   audit: (action: AuditEntry['action'], entity: string, entityId: string, details?: { field_name?: string; old_value?: any; new_value?: any }) => void;
@@ -867,17 +868,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       roleId: userData.roleId,
       active: true
     };
+    if (backendMode === 'supabase') {
+      // staff_directory never stores passwords (spec §6.1); staff entries are directory records only.
+      delete newUser.password;
+    }
     setUsers(prev => [...prev, newUser]);
     audit('CREATE', 'User', newUser.id, { field_name: 'name', new_value: newUser.name });
     return { success: true };
   };
 
+  const isClassMember = (id: string) => backendMode === 'supabase' && sb.members.some(m => m.id === id);
+
   const updateUser = (id: string, updates: Partial<User>) => {
+    if (isClassMember(id)) {
+      // Class members are real accounts: only their class membership status is editable here.
+      const member = sb.members.find(m => m.id === id)!;
+      const otherEdits = (updates.name !== undefined && updates.name !== member.name)
+        || (updates.roleId !== undefined && updates.roleId !== member.roleId);
+      const wantsToggle = typeof updates.active === 'boolean' && updates.active !== member.active;
+      (wantsToggle ? sb.setMemberActive(id, updates.active as boolean) : Promise.resolve({ success: true } as { success: boolean; error?: string }))
+        .then(res => {
+          if (!res.success) notifySaveError(new Error(res.error));
+          else if (otherEdits) notifyInfo('Nama/peran akun dikelola lewat roster kelas');
+        })
+        .catch(notifySaveError);
+      return;
+    }
     setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
     audit('UPDATE', 'User', id);
   };
 
   const deleteUser = (id: string) => {
+    if (isClassMember(id)) {
+      const message = 'Akun mahasiswa/dosen tidak dihapus dari sini. Nonaktifkan anggota sebagai gantinya.';
+      notifyInfo(message);
+      return { success: false, message };
+    }
     if (id === 'U001') {
       return { success: false, message: 'Super Administrator utama tidak dapat dihapus!' };
     }
@@ -1187,7 +1213,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeClass: sb.activeClass,
         chooseClass: sb.chooseClass,
         changePassword: sb.changePassword,
-        resetActiveClass: sb.resetActiveClass
+        resetActiveClass: sb.resetActiveClass,
+        setMemberActive: sb.setMemberActive
       }}
     >
       {children}
