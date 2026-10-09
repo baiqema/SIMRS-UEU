@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
 import { Upload, RefreshCw, Download, School } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { getSupabase } from '../../lib/supabaseClient';
+import { buildRosterCsv } from './rosterCsv';
 import { parseRoster } from '../../../supabase/functions/import-roster/validate';
 
 type AccountStatus = 'created' | 'existing' | 'skipped' | 'failed';
@@ -12,14 +13,14 @@ const STATUS_LABEL: Record<AccountStatus, string> = {
   created: 'Akun baru', existing: 'Sudah ada', skipped: 'Dilewati', failed: 'Gagal',
 };
 
-const csvCell = (v: string) => `"${v.replace(/"/g, '""')}"`;
-
 export const KelasRosterPanel: React.FC = () => {
   const { activeClass, users, resetActiveClass, accountType } = useApp();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Account[]>([]);
   const [newClassName, setNewClassName] = useState('');
+  const [creating, setCreating] = useState(false);
+  useEffect(() => { setResult([]); }, [activeClass?.id]);
   const parsed = parseRoster(text);
   const members = users.filter((u: { id: string }) => /^[0-9a-f-]{36}$/.test(u.id));
 
@@ -30,7 +31,20 @@ export const KelasRosterPanel: React.FC = () => {
       body: { action: 'import_roster', classId: activeClass.id, rows: parsed.rows },
     });
     setBusy(false);
-    if (error) { void Swal.fire({ icon: 'error', title: 'Impor gagal', text: error.message }); return; }
+    if (error) {
+      let msg: string = error.message;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const body = await (error as any).context?.json?.();
+        if (body && typeof body.error === 'string') msg = body.error;
+      } catch { /* keep default message */ }
+      void Swal.fire({ icon: 'error', title: 'Impor gagal', text: msg });
+      return;
+    }
+    if (!data || !Array.isArray(data.accounts)) {
+      void Swal.fire({ icon: 'error', title: 'Impor gagal', text: 'Respons server tidak valid.' });
+      return;
+    }
     const accounts = data.accounts as Account[];
     setResult(accounts);
     setText('');
@@ -45,15 +59,13 @@ export const KelasRosterPanel: React.FC = () => {
   };
 
   const downloadCsv = () => {
-    const lines = [
-      'NIM,Nama,Status,Keterangan,Password Sementara',
-      ...result.map(a => [a.username, csvCell(a.name), STATUS_LABEL[a.status], csvCell(a.message ?? ''), a.tempPassword ?? '-'].join(',')),
-    ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    const csv = buildRosterCsv(result.map(a => ({ username: a.username, name: a.name, statusLabel: STATUS_LABEL[a.status], message: a.message, tempPassword: a.tempPassword })));
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `akun-${activeClass?.name ?? 'kelas'}.csv`;
     a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   const reset = async () => {
@@ -68,8 +80,10 @@ export const KelasRosterPanel: React.FC = () => {
   };
 
   const createClass = async () => {
-    if (!newClassName.trim()) return;
+    if (!newClassName.trim() || creating) return;
+    setCreating(true);
     const { error } = await getSupabase().rpc('create_class', { p_name: newClassName.trim() });
+    setCreating(false);
     if (error) { void Swal.fire({ icon: 'error', title: 'Gagal membuat kelas', text: error.message }); return; }
     setNewClassName('');
     void Swal.fire({ icon: 'success', title: 'Kelas dibuat', text: 'Keluar lalu masuk kembali untuk memilih kelas baru.' });
@@ -88,7 +102,7 @@ export const KelasRosterPanel: React.FC = () => {
         <div className="flex flex-wrap gap-2">
           <input value={newClassName} onChange={e => setNewClassName(e.target.value)} placeholder="Nama kelas baru"
             className="px-3 py-2 border border-slate-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500" />
-          <button type="button" onClick={createClass} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold cursor-pointer">Buat Kelas</button>
+          <button type="button" onClick={createClass} disabled={creating} className="px-3 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold cursor-pointer disabled:opacity-60">Buat Kelas</button>
           <button type="button" onClick={reset} className="px-3 py-2 bg-amber-100 text-amber-900 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer">
             <RefreshCw className="w-4 h-4" /> Reset Data Kelas
           </button>
