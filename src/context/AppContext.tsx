@@ -509,13 +509,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updatePatient = (patientId: string, updates: Partial<Patient>) => {
+    let oldName = '';
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
-        audit('UPDATE', 'Pasien', patientId, { field_name: 'bpjs_vclaim_update', new_value: JSON.stringify(updates) });
+        oldName = p.name;
+        audit('UPDATE', 'Pasien', patientId, { 
+          field_name: updates.name && updates.name !== p.name ? 'name' : 'patient_identity_update', 
+          old_value: p.name,
+          new_value: JSON.stringify(updates) 
+        });
         return { ...p, ...updates };
       }
       return p;
     }));
+
+    if (updates.name && oldName && updates.name !== oldName) {
+      setGeneralConsents(prev => prev.map(gc => {
+        const reg = registrations.find(r => r.id === gc.regId);
+        if (reg?.patientId === patientId && (gc.patientSign === oldName || gc.patientSign === 'Pasien / Wali')) {
+          return { ...gc, patientSign: updates.name };
+        }
+        return gc;
+      }));
+    }
   };
 
   const addRegistration = (regData: { patientId: string; type: Registration['type']; poli: string; dpjp: string; sepNo?: string; room?: string; bedId?: string; naikKelas?: { isNaik: boolean; dari?: string; ke?: string } }) => {

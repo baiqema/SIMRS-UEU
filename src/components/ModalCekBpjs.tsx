@@ -13,6 +13,7 @@ interface ModalCekBpjsProps {
   patients: Patient[];
   initialNoBpjs?: string;
   initialNik?: string;
+  initialName?: string;
   onApplyToForm?: (data: {
     noBPJS: string;
     nik: string;
@@ -45,12 +46,13 @@ export const ModalCekBpjs: React.FC<ModalCekBpjsProps> = ({
   patients,
   initialNoBpjs = '',
   initialNik = '',
+  initialName = '',
   onApplyToForm,
   onAddToLog
 }) => {
   const [searchMethod, setSearchMethod] = useState<'noBpjs' | 'nik' | 'patientList'>('noBpjs');
-  const [inputNoBpjs, setInputNoBpjs] = useState(initialNoBpjs || '0001234567891');
-  const [inputNik, setInputNik] = useState(initialNik || '3174011505920001');
+  const [inputNoBpjs, setInputNoBpjs] = useState(initialNoBpjs);
+  const [inputNik, setInputNik] = useState(initialNik);
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
   const [tanggalPelayanan, setTanggalPelayanan] = useState<string>(() => new Date().toISOString().substring(0, 10));
   
@@ -147,7 +149,7 @@ export const ModalCekBpjs: React.FC<ModalCekBpjsProps> = ({
         (selectedPatientId && p.id === selectedPatientId)
       );
 
-      const resolvedName = matched ? matched.name : (inputNoBpjs === '0001234567891' ? 'Tn. Ahmad Fauzi' : inputNoBpjs === '0001234567894' ? 'An. Rizky Pratama' : 'Peserta BPJS Terdaftar');
+      const resolvedName = matched?.name || initialName || (inputNoBpjs === '0001234567891' ? 'Tn. Ahmad Fauzi' : inputNoBpjs === '0001234567894' ? 'An. Rizky Pratama' : '');
       const resolvedRM = matched ? matched.noRM : '000001';
       const resolvedNik = matched ? matched.nik : (inputNik || '3174011505920001');
       const resolvedBpjs = matched && matched.noBPJS !== '-' ? matched.noBPJS : (inputNoBpjs || '0001234567891');
@@ -208,7 +210,7 @@ export const ModalCekBpjs: React.FC<ModalCekBpjsProps> = ({
       onApplyToForm({
         noBPJS: checkResult.noBPJS,
         nik: checkResult.nik,
-        name: checkResult.nama,
+        name: checkResult.nama || initialName || '',
         hakKelas: checkResult.hakKelas,
         status: checkResult.status,
         statusDesc: checkResult.statusDesc,
@@ -218,7 +220,9 @@ export const ModalCekBpjs: React.FC<ModalCekBpjsProps> = ({
     Swal.fire({
       icon: 'success',
       title: 'Data BPJS Diterapkan',
-      text: `Data peserta ${checkResult.nama} (${checkResult.noBPJS}) telah dimasukkan ke formulir pendaftaran.`,
+      text: checkResult.nama 
+        ? `Data peserta ${checkResult.nama} (${checkResult.noBPJS}) telah dimasukkan ke formulir pendaftaran.`
+        : `Nomor kartu BPJS ${checkResult.noBPJS} berhasil diverifikasi dan diterapkan.`,
       timer: 1500,
       showConfirmButton: false
     });

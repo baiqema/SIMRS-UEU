@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ClipboardList, FileSignature, FileText,
   FilePenLine, Handshake, Barcode, ShieldAlert, Receipt,
   Banknote, Pill, FlaskConical, Radio, Users, GraduationCap,
-  ShieldCheck, History, BarChart3, BookOpen, Bed, Stethoscope
+  ShieldCheck, History, BarChart3, BookOpen, Bed, Stethoscope, Contact
 } from 'lucide-react';
 import esaUnggulEmblem from '../assets/logo-esa-unggul-emblem.png';
 import { RmikLogo } from './Logos';
@@ -29,6 +29,7 @@ export const Sidebar: React.FC = () => {
       items: [
         { id: 'pendaftaran', label: 'Pendaftaran & IGD', icon: ClipboardList },
         { id: 'kunjungan', label: 'Kunjungan Pasien', icon: Users },
+        { id: 'indekspasien', label: 'Indeks Utama Pasien (KIUP)', icon: Contact },
         { id: 'bedmanagement', label: 'Bed Management (Ranap)', icon: Bed },
         { id: 'generalconsent', label: 'General Consent', icon: FileSignature }
       ]
@@ -84,6 +85,8 @@ export const Sidebar: React.FC = () => {
   const handleNavClick = (itemId: string) => {
     if (itemId === 'kunjungan') {
       navigate('rekammedis', { viewMode: 'kunjungan' });
+    } else if (itemId === 'indekspasien') {
+      navigate('pendaftaran', { viewMode: 'indeks' });
     } else if (itemId === 'bedmanagement') {
       navigate('bedmanagement');
     } else {

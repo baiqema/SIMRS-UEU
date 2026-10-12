@@ -43,11 +43,15 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
 
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
+  const unitTypeUpper = (registration.type || 'RAWAT JALAN').toUpperCase();
+  const isIgd = registration.type === 'IGD';
+  const isRanap = registration.type === 'Rawat Inap';
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Tracer Rekam Medis IGD (Outguide Pelacakan Berkas)"
+      title={`Tracer Rekam Medis ${registration.type} (Outguide Pelacakan Berkas)`}
     >
       <div className="space-y-4 text-slate-800">
         {/* Printable Tracer Area */}
@@ -62,16 +66,16 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
                 SIMRS 3.0 &bull; UNIVERSITAS ESA UNGGUL
               </div>
               <h2 className="text-base font-black tracking-tight text-slate-800 flex items-center gap-1.5">
-                <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
-                TRACER REKAM MEDIS PASIEN IGD
+                <ShieldAlert className={`w-5 h-5 ${isIgd ? 'text-rose-600' : 'text-blue-600'} shrink-0`} />
+                TRACER REKAM MEDIS PASIEN {unitTypeUpper}
               </h2>
               <p className="text-[11px] font-medium text-slate-600">
                 Lembar Pengganti / Outguide Pelacakan Berkas RM di Ruang Storage Filing
               </p>
             </div>
             <div className="text-right shrink-0">
-              <span className="px-2.5 py-1 bg-rose-600 text-white font-black text-xs rounded-lg uppercase tracking-wider inline-block">
-                PRIORITAS IGD
+              <span className={`px-2.5 py-1 ${isIgd ? 'bg-rose-600' : isRanap ? 'bg-amber-600' : 'bg-blue-600'} text-white font-black text-xs rounded-lg uppercase tracking-wider inline-block`}>
+                PRIORITAS {unitTypeUpper}
               </span>
               <div className="text-[10px] font-mono font-bold text-slate-500 mt-1">
                 {registration.date} {currentTime} WIB
@@ -188,9 +192,9 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
                 <div className="font-extrabold text-slate-800">Storage Depo Rekam Medis Utama</div>
               </div>
 
-              <div className="bg-white p-2 rounded-lg border border-rose-200">
+              <div className="bg-white p-2 rounded-lg border border-sky-200">
                 <div className="text-[10px] font-bold text-slate-500">UNIT TUJUAN TRACER:</div>
-                <div className="font-extrabold text-rose-800">INSTALASI GAWAT DARURAT (IGD)</div>
+                <div className="font-extrabold text-blue-900">{(registration.poli || registration.room || registration.type).toUpperCase()}</div>
               </div>
             </div>
 

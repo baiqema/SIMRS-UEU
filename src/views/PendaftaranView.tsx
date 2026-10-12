@@ -9,6 +9,7 @@ import { ProfilPasienKomprehensifModal } from '../components/ProfilPasienKompreh
 import { CetakStrukKunjunganModal } from '../components/CetakStrukKunjunganModal';
 import { CetakGeneralConsentModal } from '../components/CetakGeneralConsentModal';
 import { EditKunjunganModal } from '../components/EditKunjunganModal';
+import { EditIdentitasPasienModal } from '../components/EditIdentitasPasienModal';
 import { ModalCekBpjs } from '../components/ModalCekBpjs';
 import { BedManagementView } from '../components/bed/BedManagementView';
 import Swal from 'sweetalert2';
@@ -17,29 +18,32 @@ import {
   Plus, Eye, FileText, ArrowRight, CheckCircle2, Building2,
   Phone, Mail, Calendar, UserPlus, HeartPulse, ShieldAlert,
   Search, Check, Printer, FileCheck, Layers, MapPin, UserCheck, CheckSquare, Square, Bed,
-  Download, Edit3, XCircle, AlertTriangle, Filter, BarChart3, Hash, Tag, Baby, FileSignature, X
+  Download, Edit3, XCircle, AlertTriangle, Filter, BarChart3, Hash, Tag, Baby, FileSignature, X, History, Contact, Users
 } from 'lucide-react';
 import { RegistrationType, Patient, Registration } from '../types';
 import { IndonesianAddressSelector } from '../components/common/IndonesianAddressSelector';
 
 export const PendaftaranView: React.FC = () => {
   const {
-    registrations, patients, users, beds, generalConsents,
+    registrations, patients, users, beds, generalConsents, medicalRecords,
     addRegistration, addPatient, updatePatient, getPatient, getUser, params, navigate, canEditPage,
     generateNoRM, cancelRegistration, updateRegistration, activePage
   } = useApp();
 
   const isEditable = canEditPage('pendaftaran');
 
-  // Active view mode: 'form' (Form Registrasi) | 'laporan' (Kunjungan Pasien) | 'list' (Monitoring & Antrean) | 'bedmanagement' (Bed Management Rawat Inap)
-  const [viewMode, setViewMode] = useState<'form' | 'laporan' | 'list' | 'bedmanagement'>(() => {
+  // Active view mode: 'form' (Form Registrasi) | 'laporan' (Kunjungan Pasien) | 'indeks' (Indeks Utama Pasien / KIUP) | 'list' (Monitoring & Antrean) | 'bedmanagement' (Bed Management Rawat Inap)
+  const [viewMode, setViewMode] = useState<'form' | 'laporan' | 'indeks' | 'list' | 'bedmanagement'>(() => {
+    if (params?.viewMode === 'indeks' || activePage === 'indekspasien') return 'indeks';
     if (params?.viewMode === 'bedmanagement' || activePage === 'bedmanagement') return 'bedmanagement';
     if (params?.tab === 'kunjungan' || params?.viewMode === 'laporan' || activePage === 'kunjungan') return 'laporan';
     return 'form';
   });
 
   useEffect(() => {
-    if (params?.viewMode === 'bedmanagement' || activePage === 'bedmanagement') {
+    if (params?.viewMode === 'indeks' || activePage === 'indekspasien') {
+      setViewMode('indeks');
+    } else if (params?.viewMode === 'bedmanagement' || activePage === 'bedmanagement') {
       setViewMode('bedmanagement');
     } else if (params?.tab === 'kunjungan' || params?.viewMode === 'laporan' || activePage === 'kunjungan') {
       setViewMode('laporan');
@@ -80,6 +84,9 @@ export const PendaftaranView: React.FC = () => {
   const [printStrukRegId, setPrintStrukRegId] = useState<string | null>(null);
   const [printGcRegId, setPrintGcRegId] = useState<string | null>(null);
   const [editRegId, setEditRegId] = useState<string | null>(null);
+  const [editIdentitasPatientId, setEditIdentitasPatientId] = useState<string | null>(null);
+  const [kiupSearchTerm, setKiupSearchTerm] = useState('');
+  const [selectedHistoryPatientId, setSelectedHistoryPatientId] = useState<string | null>(null);
   const [editPoli, setEditPoli] = useState('');
   const [editDpjp, setEditDpjp] = useState('');
   const [editStatus, setEditStatus] = useState<Registration['status']>('Selesai');
@@ -141,7 +148,7 @@ export const PendaftaranView: React.FC = () => {
   const [wniWna, setWniWna] = useState<'WNI' | 'WNA'>('WNI');
   const [nik, setNik] = useState('');
   const [noIdentitasLain, setNoIdentitasLain] = useState('');
-  const [namaIbuKandung, setNamaIbuKandung] = useState('Siti Aminah');
+  const [namaIbuKandung, setNamaIbuKandung] = useState('');
   const [satuSehatId, setSatuSehatId] = useState('');
   const [satuSehatSyncing, setSatuSehatSyncing] = useState(false);
   const [namaLengkap, setNamaLengkap] = useState('');
@@ -149,37 +156,97 @@ export const PendaftaranView: React.FC = () => {
   // 5 GENDER OPTIONS ACCORDING TO KMK 1423 / STANDAR KEMENKES RI:
   // 1: Laki-laki, 2: Perempuan, 0: Tidak diketahui, 3: Tidak dapat ditentukan, 4: Tidak mengisi
   const [jenisKelamin, setJenisKelamin] = useState<string>('1');
-  const [tempatLahir, setTempatLahir] = useState('Jakarta');
-  const [tanggalLahir, setTanggalLahir] = useState('1992-05-15');
-  const [statusPernikahan, setStatusPernikahan] = useState('Menikah');
+  const [tempatLahir, setTempatLahir] = useState('');
+  const [tanggalLahir, setTanggalLahir] = useState('');
+  const [statusPernikahan, setStatusPernikahan] = useState('Belum Menikah');
   const [agama, setAgama] = useState('Islam');
   const [pendidikan, setPendidikan] = useState('SMA / Sederajat');
-  const [pekerjaan, setPekerjaan] = useState('Karyawan Swasta');
+  const [pekerjaan, setPekerjaan] = useState('');
   const [golonganDarah, setGolonganDarah] = useState('O');
-  const [riwayatAlergi, setRiwayatAlergi] = useState('Tidak Ada Alergi');
+  const [riwayatAlergi, setRiwayatAlergi] = useState('');
 
   // Structured Patient Address State (KMK 1423 Berjenjang)
   const [negaraPasien, setNegaraPasien] = useState('INDONESIA');
-  const [provinsi, setProvinsi] = useState('DKI JAKARTA');
-  const [kabupaten, setKabupaten] = useState('KOTA JAKARTA BARAT');
-  const [kecamatan, setKecamatan] = useState('KEBON JERUK');
-  const [kelurahan, setKelurahan] = useState('DURI KEPA');
-  const [alamatJalanKtp, setAlamatJalanKtp] = useState('Jl. Arjuna Utara No. 9, RT 003 / RW 002');
-  const [alamatDomisili, setAlamatDomisili] = useState('Jl. Arjuna Utara No. 9, RT 003 / RW 002');
-  const [noTelp, setNoTelp] = useState('081289123456');
-  const [email, setEmail] = useState('pasien@esauggul.ac.id');
+  const [provinsi, setProvinsi] = useState('');
+  const [kabupaten, setKabupaten] = useState('');
+  const [kecamatan, setKecamatan] = useState('');
+  const [kelurahan, setKelurahan] = useState('');
+  const [alamatJalanKtp, setAlamatJalanKtp] = useState('');
+  const [alamatDomisili, setAlamatDomisili] = useState('');
+  const [noTelp, setNoTelp] = useState('');
+  const [email, setEmail] = useState('');
 
   // SECTION II: PENANGGUNG JAWAB (GUARANTOR) STATE
-  const [namaPenanggungJawab, setNamaPenanggungJawab] = useState('Hendra Wijaya');
-  const [noHpPenanggungJawab, setNoHpPenanggungJawab] = useState('081398765432');
-  const [hubunganPenanggungJawab, setHubunganPenanggungJawab] = useState('Suami');
+  const [namaPenanggungJawab, setNamaPenanggungJawab] = useState('');
+  const [noHpPenanggungJawab, setNoHpPenanggungJawab] = useState('');
+  const [hubunganPenanggungJawab, setHubunganPenanggungJawab] = useState('Keluarga');
   const [negaraPJ, setNegaraPJ] = useState('INDONESIA');
-  const [provinsiPJ, setProvinsiPJ] = useState('DKI JAKARTA');
-  const [kabupatenPJ, setKabupatenPJ] = useState('KOTA JAKARTA BARAT');
-  const [kecamatanPJ, setKecamatanPJ] = useState('KEBON JERUK');
-  const [kelurahanPJ, setKelurahanPJ] = useState('DURI KEPA');
-  const [alamatJalanPJ, setAlamatJalanPJ] = useState('Jl. Arjuna Utara No. 9, RT 003 / RW 002');
+  const [provinsiPJ, setProvinsiPJ] = useState('');
+  const [kabupatenPJ, setKabupatenPJ] = useState('');
+  const [kecamatanPJ, setKecamatanPJ] = useState('');
+  const [kelurahanPJ, setKelurahanPJ] = useState('');
+  const [alamatJalanPJ, setAlamatJalanPJ] = useState('');
   const [pjSamaDenganPasien, setPjSamaDenganPasien] = useState(false);
+
+  // Helper untuk reset form ke kondisi bersih/kosong tanpa isian dummy
+  const resetFormToEmpty = () => {
+    setSelectedPasienLamaId('');
+    setNamaLengkap('');
+    setNik('');
+    setTempatLahir('');
+    setTanggalLahir('');
+    setNamaIbuKandung('');
+    setSatuSehatId('');
+    setAlamatJalanKtp('');
+    setAlamatDomisili('');
+    setNoTelp('');
+    setEmail('');
+    setProvinsi('');
+    setKabupaten('');
+    setKecamatan('');
+    setKelurahan('');
+    setPekerjaan('');
+    setRiwayatAlergi('');
+    setNamaPenanggungJawab('');
+    setNoHpPenanggungJawab('');
+    setHubunganPenanggungJawab('Keluarga');
+    setAlamatJalanPJ('');
+    setProvinsiPJ('');
+    setKabupatenPJ('');
+    setKecamatanPJ('');
+    setKelurahanPJ('');
+    setNoAsuransi('');
+    setNoRujukanFktp('');
+    setCatatanKunjungan('');
+    setGeneratedSepDummy('');
+    // Reset clinical & admission inputs to clean state
+    setIgdKeluhanUtama('');
+    setRanapDiagnosisAwal('');
+    setBblNamaIbu('');
+    setBblNoRMIbu('');
+    setBblNikIbu('');
+    setBblUmurIbu('');
+    setBblParitas('');
+    setBblJamLahir('');
+    setBblBeratLahir('');
+    setBblPanjangBadan('');
+    setBblLingkarKepala('');
+    setBblLingkarDada('');
+    setBblPenolongPersalinan('');
+    setBblRuangPerawatan('');
+    setBblKelainanBawaan('');
+    setCurrentVclaimStatus({
+      checked: false,
+      status: 'Aktif',
+      statusDesc: 'Belum dicek',
+      hakKelas: 'Kelas 1',
+      faskes1: '-',
+      lastChecked: '-',
+      responseCode: '-',
+      dbSynced: false
+    });
+    setNoRM(generateNoRM());
+  };
 
   // SECTION III: DATA KUNJUNGAN UMUM
   const [kodeBooking, setKodeBooking] = useState(() => 'JKN-' + Math.floor(100000 + Math.random() * 900000));
@@ -192,7 +259,7 @@ export const PendaftaranView: React.FC = () => {
   const [igdCaraDatang, setIgdCaraDatang] = useState('Datang Sendiri (Mandiri)');
   const [igdSebabMasuk, setIgdSebabMasuk] = useState('Non Trauma (Penyakit Akut)');
   const [igdGcs, setIgdGcs] = useState('E4M6V5 (Compos Mentis - GCS 15)');
-  const [igdKeluhanUtama, setIgdKeluhanUtama] = useState('Sesak napas mendadak disertai nyeri dada dan keringat dingin sejak 2 jam lalu');
+  const [igdKeluhanUtama, setIgdKeluhanUtama] = useState('');
   const [igdDokterJaga, setIgdDokterJaga] = useState('U002');
 
   // SECTION SPECIFIC: 2. RAWAT JALAN (POLIKLINIK)
@@ -200,7 +267,7 @@ export const PendaftaranView: React.FC = () => {
   const [dokterSpesialis, setDokterSpesialis] = useState('');
   const [jadwalDokter, setJadwalDokter] = useState('Pagi (08:00 - 12:00 WIB)');
   const [ralanCaraMasuk, setRalanCaraMasuk] = useState('Rujukan FKTP (Puskesmas / Klinik)');
-  const [noRujukanFktp, setNoRujukanFktp] = useState('RUK-0112-2026-004812');
+  const [noRujukanFktp, setNoRujukanFktp] = useState('');
 
   // SECTION SPECIFIC: 3. RAWAT INAP (ADMISI BANGSAL)
   const [ruangRawatBangsal, setRuangRawatBangsal] = useState('Bangsal Mawar - Penyakit Dalam');
@@ -211,32 +278,32 @@ export const PendaftaranView: React.FC = () => {
   const [naikKelasDari, setNaikKelasDari] = useState<string>('Kelas 2');
   const [naikKelasKe, setNaikKelasKe] = useState<string>('Kelas 1');
   const [ranapAsalPasien, setRanapAsalPasien] = useState('Rujukan IGD (Emergency Admission)');
-  const [ranapDiagnosisAwal, setRanapDiagnosisAwal] = useState('Hipertensi Urgensi dengan decompensasi cordis NYHA II');
+  const [ranapDiagnosisAwal, setRanapDiagnosisAwal] = useState('');
   const [ranapDpjpUtama, setRanapDpjpUtama] = useState('');
 
   // SECTION SPECIFIC: 4. BAYI BARU LAHIR (NEONATUS / BBL)
-  const [bblNamaIbu, setBblNamaIbu] = useState('Ny. Siti Rahmawati');
-  const [bblNoRMIbu, setBblNoRMIbu] = useState('000003');
-  const [bblNikIbu, setBblNikIbu] = useState('3173055406930002');
-  const [bblUmurIbu, setBblUmurIbu] = useState('29 Tahun');
-  const [bblParitas, setBblParitas] = useState('G2P1A0 (Gestasi 39 Minggu)');
+  const [bblNamaIbu, setBblNamaIbu] = useState('');
+  const [bblNoRMIbu, setBblNoRMIbu] = useState('');
+  const [bblNikIbu, setBblNikIbu] = useState('');
+  const [bblUmurIbu, setBblUmurIbu] = useState('');
+  const [bblParitas, setBblParitas] = useState('');
   const [bblJenisKelahiran, setBblJenisKelahiran] = useState('Tunggal (Single)');
   const [bblCaraPersalinan, setBblCaraPersalinan] = useState('Spontan Pervaginam (Normal)');
-  const [bblJamLahir, setBblJamLahir] = useState('06:45 WIB');
+  const [bblJamLahir, setBblJamLahir] = useState('');
   const [bblApgar1, setBblApgar1] = useState('8');
   const [bblApgar5, setBblApgar5] = useState('9');
   const [bblApgar10, setBblApgar10] = useState('10');
-  const [bblBeratLahir, setBblBeratLahir] = useState('3200'); // gram
-  const [bblPanjangBadan, setBblPanjangBadan] = useState('50'); // cm
-  const [bblLingkarKepala, setBblLingkarKepala] = useState('34'); // cm
-  const [bblLingkarDada, setBblLingkarDada] = useState('33'); // cm
-  const [bblPenolongPersalinan, setBblPenolongPersalinan] = useState('dr. Maya Indriani, Sp.A & Bidan RS');
-  const [bblRuangPerawatan, setBblRuangPerawatan] = useState('Ruang Rawat Gabung Ibu-Anak (Rooming-In)');
-  const [bblKelainanBawaan, setBblKelainanBawaan] = useState('Tidak Ada Kelainan (Normal / Bugar)');
+  const [bblBeratLahir, setBblBeratLahir] = useState(''); // gram
+  const [bblPanjangBadan, setBblPanjangBadan] = useState(''); // cm
+  const [bblLingkarKepala, setBblLingkarKepala] = useState(''); // cm
+  const [bblLingkarDada, setBblLingkarDada] = useState(''); // cm
+  const [bblPenolongPersalinan, setBblPenolongPersalinan] = useState('');
+  const [bblRuangPerawatan, setBblRuangPerawatan] = useState('');
+  const [bblKelainanBawaan, setBblKelainanBawaan] = useState('');
 
   // SECTION IV: CARA PEMBAYARAN & JAMINAN
   const [caraPembayaran, setCaraPembayaran] = useState('BPJS KESEHATAN');
-  const [noAsuransi, setNoAsuransi] = useState('0001829384912');
+  const [noAsuransi, setNoAsuransi] = useState('');
   const [catatanKunjungan, setCatatanKunjungan] = useState('');
 
   // VClaim Bridging & Real-Time Sync State
@@ -381,6 +448,37 @@ export const PendaftaranView: React.FC = () => {
     }
   }, [doctors]);
 
+  // Auto-select doctor corresponding to selected Poliklinik spesialis
+  useEffect(() => {
+    if (doctors.length === 0) return;
+    const pLower = poliklinikTujuan.toLowerCase();
+    let matchedDoc: typeof doctors[0] | undefined;
+
+    if (pLower.includes('anak') || pLower.includes('pediatri')) {
+      matchedDoc = doctors.find(d => d.id === 'U002_ANAK' || d.name.toLowerCase().includes('sp.a'));
+    } else if (pLower.includes('bedah')) {
+      matchedDoc = doctors.find(d => d.id === 'U002_BEDAH' || d.name.toLowerCase().includes('sp.b'));
+    } else if (pLower.includes('kebidanan') || pLower.includes('kandungan') || pLower.includes('obgyn')) {
+      matchedDoc = doctors.find(d => d.id === 'U002_OBGYN' || d.name.toLowerCase().includes('sp.og'));
+    } else if (pLower.includes('jantung')) {
+      matchedDoc = doctors.find(d => d.id === 'U002_JANTUNG' || d.name.toLowerCase().includes('sp.jp'));
+    } else if (pLower.includes('saraf') || pLower.includes('neuro')) {
+      matchedDoc = doctors.find(d => d.id === 'U002_SARAF' || d.name.toLowerCase().includes('sp.s'));
+    } else if (pLower.includes('mata')) {
+      matchedDoc = doctors.find(d => d.id === 'U002_MATA' || d.name.toLowerCase().includes('sp.m'));
+    } else if (pLower.includes('tht')) {
+      matchedDoc = doctors.find(d => d.id === 'U002_THT' || d.name.toLowerCase().includes('sp.tht'));
+    } else if (pLower.includes('gigi')) {
+      matchedDoc = doctors.find(d => d.id === 'U002_GIGI' || d.name.toLowerCase().includes('sp.kg') || d.name.toLowerCase().includes('drg'));
+    } else if (pLower.includes('dalam')) {
+      matchedDoc = doctors.find(d => d.id === 'U002' || d.name.toLowerCase().includes('sp.pd'));
+    }
+
+    if (matchedDoc) {
+      setDokterSpesialis(matchedDoc.id);
+    }
+  }, [poliklinikTujuan, doctors]);
+
   // Sync PJ Address if checkbox checked
   useEffect(() => {
     if (pjSamaDenganPasien) {
@@ -433,10 +531,10 @@ export const PendaftaranView: React.FC = () => {
         (namaLengkap && p.name.toLowerCase() === namaLengkap.toLowerCase())
       );
 
-      const resolvedName = namaLengkap || matchedPatient?.name || 'Peserta BPJS Terdaftar';
-      const resolvedBpjs = noAsuransi || matchedPatient?.noBPJS || '0001829384912';
-      const resolvedNik = nik || matchedPatient?.nik || '3173012903840001';
-      const resolvedRM = noRM || matchedPatient?.noRM || '000001';
+      const resolvedName = namaLengkap.trim() || matchedPatient?.name || (noAsuransi ? `Peserta BPJS (${noAsuransi})` : '-');
+      const resolvedBpjs = noAsuransi || matchedPatient?.noBPJS || '';
+      const resolvedNik = nik || matchedPatient?.nik || '';
+      const resolvedRM = noRM || matchedPatient?.noRM || '-';
 
       // Cek apakah aktif atau tidak aktif
       const isCardActive = matchedPatient
@@ -656,13 +754,66 @@ export const PendaftaranView: React.FC = () => {
       return;
     }
 
+    const trimmedName = namaLengkap.trim();
+    if (!trimmedName && serviceType !== 'Bayi Baru Lahir') {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Nama Pasien Wajib Diisi',
+        text: 'Nama Lengkap Pasien merupakan data mandatory dan wajib diisi sebelum menyimpan pendaftaran.',
+        confirmButtonColor: '#2563eb'
+      });
+      return;
+    }
+
     const finalPatientName = serviceType === 'Bayi Baru Lahir'
-      ? (namaLengkap || `By. Ny. ${bblNamaIbu}`)
-      : namaLengkap;
+      ? (trimmedName || `By. Ny. ${bblNamaIbu.trim() || 'Pasien'}`)
+      : trimmedName;
 
     if (!finalPatientName.trim()) {
-      Swal.fire({ icon: 'warning', title: 'Validasi Data', text: 'Nama Lengkap Pasien wajib diisi', confirmButtonColor: '#2563eb' });
+      Swal.fire({
+        icon: 'warning',
+        title: 'Nama Pasien Wajib Diisi',
+        text: 'Nama Lengkap Pasien wajib diisi.',
+        confirmButtonColor: '#2563eb'
+      });
       return;
+    }
+
+    let targetPatientId = jenisPasien === 'lama' ? selectedPasienLamaId : '';
+
+    // Validasi Duplikat Pendaftaran di Hari yang Sama (>1x tidak boleh kecuali Pasien Umum)
+    const isUmum = caraPembayaran.toUpperCase().includes('UMUM') || 
+                   caraPembayaran.toUpperCase().includes('CASH') || 
+                   caraPembayaran.toUpperCase().includes('MANDIRI');
+
+    if (!isUmum) {
+      const todayDate = tglKunjungan || new Date().toISOString().split('T')[0];
+      const duplicateReg = registrations.find(r => {
+        if (r.status === 'Batal' || r.date !== todayDate) return false;
+        if (targetPatientId && r.patientId === targetPatientId) return true;
+        const p = getPatient(r.patientId);
+        if (!p) return false;
+        if (noRM && p.noRM === noRM) return true;
+        if (nik && p.nik === nik) return true;
+        if (noAsuransi && p.noBPJS && p.noBPJS === noAsuransi) return true;
+        if (finalPatientName && p.name.trim().toLowerCase() === finalPatientName.trim().toLowerCase() && tanggalLahir && p.dob === tanggalLahir) return true;
+        return false;
+      });
+
+      if (duplicateReg) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Pendaftaran Duplikat Ditolak',
+          html: `
+            <div class="text-left text-xs space-y-2 mt-1">
+              <p class="font-bold text-rose-700">Pasien <strong>${finalPatientName}</strong> sudah memiliki pendaftaran aktif pada hari ini (${todayDate}) dengan No. Registrasi <strong>${duplicateReg.id}</strong> di unit <strong>${duplicateReg.type} (${duplicateReg.poli})</strong>.</p>
+              <p class="text-slate-600">Sesuai regulasi penjamin ${caraPembayaran}, pasien tidak diperkenankan mendaftar lebih dari 1 kali pada hari yang sama <strong>kecuali sebagai Pasien UMUM / Mandiri</strong>.</p>
+            </div>
+          `,
+          confirmButtonColor: '#2563eb'
+        });
+        return;
+      }
     }
 
     // Validasi No. BPJS: Harus angka dan 13 digit
@@ -682,11 +833,9 @@ export const PendaftaranView: React.FC = () => {
     if (serviceType === 'Bayi Baru Lahir') effectiveDoctor = 'U002';
     if (!effectiveDoctor && doctors.length > 0) effectiveDoctor = doctors[0].id;
 
-    let targetPatientId = selectedPasienLamaId;
-
     // 1. Create or resolve Patient
     if (jenisPasien === 'baru' || !targetPatientId) {
-      const fullAddr = `${alamatJalanKtp || 'Jl. Raya No. 12'}, Kel. ${kelurahan}, Kec. ${kecamatan}, ${kabupaten}, ${provinsi}, ${negaraPasien}`;
+      const fullAddr = `${alamatJalanKtp || 'Jl. Raya No. 12'}, Kel. ${kelurahan || '-'}, Kec. ${kecamatan || '-'}, ${kabupaten || '-'}, ${provinsi || '-'}, ${negaraPasien}`;
       const newPatient = addPatient({
         noRM,
         nik: nik || (serviceType === 'Bayi Baru Lahir' ? bblNikIbu : '3173' + Math.floor(100000000000 + Math.random() * 900000000000)),
@@ -728,14 +877,44 @@ export const PendaftaranView: React.FC = () => {
         deliveryMethod: serviceType === 'Bayi Baru Lahir' ? bblCaraPersalinan : undefined
       });
       targetPatientId = newPatient.id;
-    } else if (targetPatientId && caraPembayaran.includes('BPJS')) {
-      // Sinkronkan update status BPJS ke database pasien lama
-      updatePatient(targetPatientId, {
-        noBPJS: noAsuransi || '-',
-        bpjsStatus: currentVclaimStatus.status,
-        bpjsClass: currentVclaimStatus.hakKelas,
-        bpjsNotes: currentVclaimStatus.statusDesc
-      });
+    } else if (targetPatientId) {
+      // Sinkronkan seluruh perbaikan identitas pasien master ke database (koreksi nama, nik, alamat, telp, dll)
+      const fullAddr = alamatJalanKtp 
+        ? `${alamatJalanKtp}, Kel. ${kelurahan || '-'}, Kec. ${kecamatan || '-'}, ${kabupaten || '-'}, ${provinsi || '-'}, ${negaraPasien}`
+        : undefined;
+
+      const patientUpdates: Partial<Patient> = {
+        name: finalPatientName,
+        nik: nik || undefined,
+        dob: tanggalLahir || undefined,
+        gender: jenisKelamin || undefined,
+        phone: noTelp || undefined,
+        bloodType: golonganDarah || undefined,
+        allergy: riwayatAlergi || undefined,
+        country: negaraPasien || undefined,
+        province: provinsi || undefined,
+        regency: kabupaten || undefined,
+        district: kecamatan || undefined,
+        subDistrict: kelurahan || undefined,
+        addressStreet: alamatJalanKtp || undefined,
+        motherName: namaIbuKandung || undefined,
+      };
+
+      if (fullAddr) patientUpdates.address = fullAddr;
+
+      if (caraPembayaran.includes('BPJS')) {
+        patientUpdates.insuranceType = 'BPJS';
+        patientUpdates.noBPJS = noAsuransi || '-';
+        if (currentVclaimStatus.status) patientUpdates.bpjsStatus = currentVclaimStatus.status;
+        if (currentVclaimStatus.hakKelas) patientUpdates.bpjsClass = currentVclaimStatus.hakKelas;
+        if (currentVclaimStatus.statusDesc) patientUpdates.bpjsNotes = currentVclaimStatus.statusDesc;
+      } else if (caraPembayaran.includes('ASURANSI')) {
+        patientUpdates.insuranceType = 'Asuransi';
+      } else {
+        patientUpdates.insuranceType = 'Umum';
+      }
+
+      updatePatient(targetPatientId, patientUpdates);
     }
 
     // 2. Resolve Active Unit / Poli & Room
@@ -769,6 +948,14 @@ export const PendaftaranView: React.FC = () => {
 
     const docObj = getUser(effectiveDoctor);
 
+    const tracerLabel = serviceType === 'Rawat Jalan' 
+      ? '🖨️ Cetak Tracer Rawat Jalan'
+      : serviceType === 'Rawat Inap'
+      ? '🖨️ Cetak Tracer Rawat Inap'
+      : serviceType === 'IGD'
+      ? '🖨️ Cetak Tracer IGD'
+      : '🖨️ Cetak Tracer Neonatus / Bayi';
+
     // 3. SweetAlert Confirmation
     Swal.fire({
       icon: 'success',
@@ -791,7 +978,7 @@ export const PendaftaranView: React.FC = () => {
       showCancelButton: true,
       showDenyButton: true,
       confirmButtonText: 'Buka Rekam Medis (RME)',
-      denyButtonText: '🖨️ Cetak Tracer IGD',
+      denyButtonText: tracerLabel,
       cancelButtonText: 'Daftar Registrasi',
       confirmButtonColor: '#2563eb',
       denyButtonColor: '#e11d48',
@@ -965,6 +1152,20 @@ export const PendaftaranView: React.FC = () => {
   const detailPatient = detailReg ? getPatient(detailReg.patientId) : null;
   const detailDoctor = detailReg ? getUser(detailReg.dpjp) : null;
 
+  const kiupFilteredPatients = useMemo(() => {
+    if (!kiupSearchTerm.trim()) return patients;
+    const q = kiupSearchTerm.toLowerCase().trim();
+    return patients.filter(p => {
+      const matchRM = p.noRM.toLowerCase().includes(q);
+      const matchName = p.name.toLowerCase().includes(q);
+      const matchNik = p.nik ? p.nik.includes(q) : false;
+      const matchBpjs = p.noBPJS ? p.noBPJS.includes(q) : false;
+      const matchAddr = p.address ? p.address.toLowerCase().includes(q) : false;
+      const matchDob = p.dob ? p.dob.includes(q) : false;
+      return matchRM || matchName || matchNik || matchBpjs || matchAddr || matchDob;
+    });
+  }, [patients, kiupSearchTerm]);
+
   return (
     <div className="space-y-6">
       {/* Read-Only Mode Banner */}
@@ -1006,7 +1207,17 @@ export const PendaftaranView: React.FC = () => {
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <FileText className="w-4 h-4 text-emerald-300" /> Kunjungan Pasien
+            <FileText className="w-4 h-4 text-emerald-500" /> Kunjungan Pasien
+          </button>
+          <button
+            onClick={() => setViewMode('indeks')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              viewMode === 'indeks'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Users className="w-4 h-4 text-purple-600" /> Indeks Utama Pasien (KIUP)
           </button>
           <button
             onClick={() => navigate('bedmanagement')}
@@ -1052,8 +1263,7 @@ export const PendaftaranView: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setJenisPasien('baru');
-                      setNoRM(generateNoRM());
-                      setSelectedPasienLamaId('');
+                      resetFormToEmpty();
                     }}
                     className={`px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                       jenisPasien === 'baru' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600'
@@ -1408,36 +1618,26 @@ export const PendaftaranView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Kewarganegaraan & NIK */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 1. Nama Lengkap Pasien & 2. NIK KTP (16 Digit) - Disimpan setelah nama pasien */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Kewarganegaraan</label>
-                    <select
-                      value={kewarganegaraan}
-                      onChange={e => setKewarganegaraan(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
-                    >
-                      <option value="INDONESIA">INDONESIA</option>
-                      <option value="MALAYSIA">MALAYSIA</option>
-                      <option value="SINGAPURA">SINGAPURA</option>
-                      <option value="WNA LAINNYA">WNA LAINNYA</option>
-                    </select>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Nama Lengkap Pasien <span className="text-rose-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={namaLengkap}
+                      onChange={e => setNamaLengkap(e.target.value)}
+                      placeholder="Masukkan nama lengkap sesuai identitas"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500"
+                      required
+                    />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Status WNI / WNA</label>
-                    <select
-                      value={wniWna}
-                      onChange={e => setWniWna(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
-                    >
-                      <option value="WNI">WNI (Warga Negara Indonesia)</option>
-                      <option value="WNA">WNA (Warga Negara Asing)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">NIK KTP (16 Digit) *</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      NIK KTP (16 Digit) <span className="text-rose-600">*</span>
+                    </label>
                     <input
                       type="text"
                       value={nik}
@@ -1449,55 +1649,11 @@ export const PendaftaranView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Nama Ibu Kandung */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Nama Ibu Kandung *</label>
-                  <input
-                    type="text"
-                    value={namaIbuKandung}
-                    onChange={e => setNamaIbuKandung(e.target.value)}
-                    placeholder="Nama lengkap ibu kandung"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
-                    required
-                  />
-                </div>
-
-                {/* SatuSehat Sync Bar */}
-                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2 text-blue-950 font-medium">
-                    <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>SatuSehat Kemenkes ID: </span>
-                    <strong className="font-mono text-blue-700">{satuSehatId || 'Belum Terhubung'}</strong>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleSyncSatuSehat}
-                    disabled={satuSehatSyncing}
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[11px] shadow-2xs transition-all flex items-center gap-1 cursor-pointer shrink-0"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${satuSehatSyncing ? 'animate-spin' : ''}`} />
-                    {satuSehatSyncing ? 'SatuSehat...' : 'Cek SatuSehat'}
-                  </button>
-                </div>
-
-                {/* Nama Lengkap Pasien */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap Pasien *</label>
-                  <input
-                    type="text"
-                    value={namaLengkap}
-                    onChange={e => setNamaLengkap(e.target.value)}
-                    placeholder="Masukkan nama lengkap sesuai identitas"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500"
-                    required
-                  />
-                </div>
-
-                {/* 5 GENDER OPTIONS (KMK 1423 METADATA COMPLIANT) */}
+                {/* 3. 5 GENDER OPTIONS (KMK 1423 METADATA COMPLIANT) & Tempat Lahir */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Jenis Kelamin (5 Kategori KMK 1423) *
+                      Jenis Kelamin (5 Kategori KMK 1423) <span className="text-rose-600">*</span>
                     </label>
                     <select
                       value={jenisKelamin}
@@ -1525,10 +1681,12 @@ export const PendaftaranView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Tanggal Lahir & Usia */}
+                {/* 4. Tanggal Lahir & Usia Pasien */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Tanggal Lahir *</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Tanggal Lahir <span className="text-rose-600">*</span>
+                    </label>
                     <input
                       type="date"
                       value={tanggalLahir}
@@ -1549,7 +1707,48 @@ export const PendaftaranView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Status Pernikahan & Agama & Golongan Darah */}
+                {/* 5. Nama Ibu Kandung & Kewarganegaraan */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Nama Ibu Kandung</label>
+                    <input
+                      type="text"
+                      value={namaIbuKandung}
+                      onChange={e => setNamaIbuKandung(e.target.value)}
+                      placeholder="Nama lengkap ibu kandung"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Kewarganegaraan</label>
+                      <select
+                        value={kewarganegaraan}
+                        onChange={e => setKewarganegaraan(e.target.value)}
+                        className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
+                      >
+                        <option value="INDONESIA">INDONESIA</option>
+                        <option value="MALAYSIA">MALAYSIA</option>
+                        <option value="SINGAPURA">SINGAPURA</option>
+                        <option value="WNA LAINNYA">WNA LAINNYA</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
+                      <select
+                        value={wniWna}
+                        onChange={e => setWniWna(e.target.value as any)}
+                        className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
+                      >
+                        <option value="WNI">WNI</option>
+                        <option value="WNA">WNA</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 6. Status Pernikahan & Agama & Golongan Darah */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">Status Pernikahan</label>
@@ -1578,13 +1777,13 @@ export const PendaftaranView: React.FC = () => {
                       <option value="Hindu">4: Hindu</option>
                       <option value="Buddha">5: Buddha</option>
                       <option value="Khonghucu">6: Khonghucu</option>
-                      <option value="Penghayat">7: Penghayat Kepercayaan</option>
+                      <option value="Penghayat">7: Penghayat</option>
                       <option value="Lain-lain">8: Lain-lain</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Golongan Darah</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Gol. Darah</label>
                     <select
                       value={golonganDarah}
                       onChange={e => setGolonganDarah(e.target.value)}
@@ -1597,6 +1796,24 @@ export const PendaftaranView: React.FC = () => {
                       <option value="Tidak Tahu">Tidak Tahu</option>
                     </select>
                   </div>
+                </div>
+
+                {/* 8. SatuSehat Sync Bar */}
+                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-blue-950 font-medium">
+                    <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>SatuSehat Kemenkes ID: </span>
+                    <strong className="font-mono text-blue-700">{satuSehatId || 'Belum Terhubung'}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSyncSatuSehat}
+                    disabled={satuSehatSyncing}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[11px] shadow-2xs transition-all flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${satuSehatSyncing ? 'animate-spin' : ''}`} />
+                    {satuSehatSyncing ? 'SatuSehat...' : 'Cek SatuSehat'}
+                  </button>
                 </div>
 
                 {/* Structured Address (KMK 1423) */}
@@ -2666,6 +2883,15 @@ export const PendaftaranView: React.FC = () => {
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
 
+                            {/* 3.5 Edit / Koreksi Identitas Pasien Master */}
+                            <button
+                              onClick={() => setEditIdentitasPatientId(r.patientId)}
+                              className="p-1.5 bg-slate-100 hover:bg-sky-100 text-slate-700 hover:text-sky-700 rounded-lg transition-colors cursor-pointer"
+                              title="Edit / Koreksi Identitas Master Pasien (Nama, NIK, Tgl Lahir, dll)"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                            </button>
+
                             {/* 4. Batal Daftar */}
                             {r.status !== 'Batal' && (
                               <button
@@ -2690,6 +2916,169 @@ export const PendaftaranView: React.FC = () => {
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* VIEW MODE: INDEKS UTAMA PASIEN (KIUP - KARTU INDEKS UTAMA PASIEN) */}
+      {viewMode === 'indeks' && (
+        <div className="space-y-6">
+          {/* Header Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    Kartu Indeks Utama Pasien (KIUP)
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Master data pasien terintegrasi RMIK, Nomor Rekam Medis (6 digit), NIK SatuSehat & penjamin
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-purple-800 bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-xl">
+                Total Master Pasien: {patients.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('form');
+                  setJenisPasien('baru');
+                  resetFormToEmpty();
+                }}
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ Pasien Baru</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+              <input
+                type="text"
+                value={kiupSearchTerm}
+                onChange={e => setKiupSearchTerm(e.target.value)}
+                placeholder="Cari dalam Indeks Pasien (No. RM, NIK, Nama Lengkap, Tanggal Lahir, No. BPJS, Alamat)..."
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:border-purple-500"
+              />
+              {kiupSearchTerm && (
+                <button
+                  onClick={() => setKiupSearchTerm('')}
+                  className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Table KIUP */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-700 uppercase font-black tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="p-3">No. RM</th>
+                    <th className="p-3">Nama Lengkap Pasien</th>
+                    <th className="p-3">NIK</th>
+                    <th className="p-3">JK / Lahir (Usia)</th>
+                    <th className="p-3">Alamat</th>
+                    <th className="p-3">No. HP</th>
+                    <th className="p-3">Penjamin / BPJS</th>
+                    <th className="p-3 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {kiupFilteredPatients.length > 0 ? (
+                    kiupFilteredPatients.map(p => {
+                      const jkLabel = p.gender === 'M' || p.gender === 'L' || p.gender === '1' ? 'L' :
+                                      p.gender === 'F' || p.gender === 'P' || p.gender === '2' ? 'P' : '-';
+                      return (
+                        <tr key={p.id} className="hover:bg-purple-50/40 transition-colors">
+                          <td className="p-3 font-mono font-bold text-purple-700">
+                            <span className="px-2 py-0.5 bg-purple-50 border border-purple-200 rounded-lg">
+                              {p.noRM}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <div className="font-bold text-slate-900">{p.name}</div>
+                            {p.motherName && (
+                              <div className="text-[10px] text-slate-400">Ibu: {p.motherName}</div>
+                            )}
+                          </td>
+                          <td className="p-3 font-mono text-slate-700">{p.nik || '-'}</td>
+                          <td className="p-3 text-slate-700">
+                            <span className="font-bold">{jkLabel}</span> &bull; {p.dob || '-'}
+                            <div className="text-[10px] text-slate-500 font-medium">
+                              ({calculateAgeStr(p.dob)})
+                            </div>
+                          </td>
+                          <td className="p-3 text-slate-600 max-w-xs truncate" title={p.addressStreet || p.address}>
+                            {p.addressStreet || p.address || '-'}
+                          </td>
+                          <td className="p-3 font-mono text-slate-700">{p.phone || '-'}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                              p.insuranceType === 'BPJS' ? 'bg-emerald-100 text-emerald-800' :
+                              p.insuranceType === 'Asuransi' ? 'bg-amber-100 text-amber-800' :
+                              'bg-slate-100 text-slate-800'
+                            }`}>
+                              {p.insuranceType || 'Umum'}
+                            </span>
+                            {p.noBPJS && p.noBPJS !== '-' && (
+                              <div className="text-[10px] font-mono text-slate-500 mt-0.5">{p.noBPJS}</div>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Edit Identitas Master Pasien */}
+                              <button
+                                type="button"
+                                onClick={() => setEditIdentitasPatientId(p.id)}
+                                className="p-1.5 bg-slate-100 hover:bg-sky-100 text-slate-700 hover:text-sky-700 rounded-lg transition-colors cursor-pointer"
+                                title="Koreksi / Edit Identitas Master Pasien"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Daftarkan Pasien Ini */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  autoFillPatient(p);
+                                  setViewMode('form');
+                                }}
+                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold cursor-pointer transition-colors shadow-2xs flex items-center gap-1"
+                                title="Daftarkan Kunjungan Baru untuk Pasien Ini"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>Daftar</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-slate-400">
+                        Tidak ada pasien ditemukan dengan pencarian "{kiupSearchTerm}".
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -2785,6 +3174,14 @@ export const PendaftaranView: React.FC = () => {
                         <FileSignature className="w-3 h-3" />
                         GC
                       </button>
+                      <button
+                        onClick={() => setEditIdentitasPatientId(reg.patientId)}
+                        className="px-2 py-1 bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-lg text-[11px] font-bold cursor-pointer inline-flex items-center gap-1"
+                        title="Koreksi / Edit Identitas Master Pasien"
+                      >
+                        <UserCheck className="w-3 h-3" />
+                        Pasien
+                      </button>
                     </div>
                     <button
                       onClick={() => navigate('rekammedis', { patientId: reg.patientId, regId: reg.id })}
@@ -2861,6 +3258,12 @@ export const PendaftaranView: React.FC = () => {
           registration={registrations.find(r => r.id === editRegId) || null}
           patientName={getPatient(registrations.find(r => r.id === editRegId)?.patientId || '')?.name}
           doctors={users.filter(u => u.roleId === 'R05' || u.roleId === 'R01' || u.roleId === 'R03')}
+          onEditPatient={() => {
+            const reg = registrations.find(r => r.id === editRegId);
+            if (reg?.patientId) {
+              setEditIdentitasPatientId(reg.patientId);
+            }
+          }}
           onSave={(regId, updates) => {
             updateRegistration(regId, updates);
             Swal.fire({
@@ -2870,6 +3273,35 @@ export const PendaftaranView: React.FC = () => {
               timer: 1500,
               showConfirmButton: false
             });
+          }}
+        />
+      )}
+
+      {/* EDIT IDENTITAS PASIEN MASTER MODAL */}
+      {editIdentitasPatientId && (
+        <EditIdentitasPasienModal
+          isOpen={!!editIdentitasPatientId}
+          onClose={() => setEditIdentitasPatientId(null)}
+          patient={getPatient(editIdentitasPatientId) || null}
+          onSave={(patientId, updates) => {
+            updatePatient(patientId, updates);
+            // If the patient is currently loaded in the registration form, sync active fields
+            if (selectedPasienLamaId === patientId) {
+              if (updates.name) setNamaLengkap(updates.name);
+              if (updates.nik) setNik(updates.nik);
+              if (updates.dob) setTanggalLahir(updates.dob);
+              if (updates.gender) setJenisKelamin(updates.gender);
+              if (updates.motherName) setNamaIbuKandung(updates.motherName);
+              if (updates.phone) setNoTelp(updates.phone);
+              if (updates.bloodType) setGolonganDarah(updates.bloodType);
+              if (updates.allergy) setRiwayatAlergi(updates.allergy);
+              if (updates.addressStreet) setAlamatJalanKtp(updates.addressStreet);
+              if (updates.insuranceType === 'BPJS' && updates.noBPJS) {
+                setCaraPembayaran('BPJS KESEHATAN');
+                setNoAsuransi(updates.noBPJS);
+              }
+            }
+            setEditIdentitasPatientId(null);
           }}
         />
       )}

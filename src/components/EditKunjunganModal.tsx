@@ -11,6 +11,7 @@ interface EditKunjunganModalProps {
   patientName?: string;
   doctors: User[];
   onSave: (regId: string, updates: { poli: string; dpjp: string; status: Registration['status']; room: string | null }) => void;
+  onEditPatient?: () => void;
 }
 
 export const EditKunjunganModal: React.FC<EditKunjunganModalProps> = ({
@@ -19,7 +20,8 @@ export const EditKunjunganModal: React.FC<EditKunjunganModalProps> = ({
   registration,
   patientName,
   doctors,
-  onSave
+  onSave,
+  onEditPatient
 }) => {
   const [poli, setPoli] = useState('');
   const [dpjp, setDpjp] = useState('');
@@ -52,7 +54,21 @@ export const EditKunjunganModal: React.FC<EditKunjunganModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title={`Edit Data Kunjungan Pasien (${registration.id})`} maxWidth="max-w-md">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
-          <div className="font-bold text-slate-800">Pasien: {patientName || '-'}</div>
+          <div className="flex items-center justify-between">
+            <div className="font-bold text-slate-800">Pasien: {patientName || '-'}</div>
+            {onEditPatient && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onEditPatient();
+                }}
+                className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline cursor-pointer"
+              >
+                Koreksi Identitas Pasien
+              </button>
+            )}
+          </div>
           <div className="text-slate-500 font-mono">Tipe Kunjungan: <strong className="text-blue-700">{registration.type}</strong></div>
         </div>
 
