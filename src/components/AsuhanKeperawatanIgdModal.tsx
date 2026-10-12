@@ -16,6 +16,7 @@ interface AsuhanKeperawatanIgdModalProps {
   patient: Patient | null;
   registration: Registration | null;
   nurse?: User | null;
+  isReadOnly?: boolean;
 }
 
 export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps> = ({
@@ -23,7 +24,8 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
   onClose,
   patient,
   registration,
-  nurse
+  nurse,
+  isReadOnly = false
 }) => {
   // FORM MODE: 'view' | 'edit' | 'create'
   const [formMode, setFormMode] = useState<'view' | 'edit' | 'create'>('edit');
@@ -1285,13 +1287,19 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
                 Tutup Halaman
               </button>
 
-              <button
-                type="button"
-                onClick={handleSaveAll}
-                className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-lg flex items-center gap-2 cursor-pointer scale-100 hover:scale-[1.02]"
-              >
-                <CheckCircle2 className="w-5 h-5" /> SIMPAN SELURUH FORMULIR PENGKAJIAN KEPERAWATAN
-              </button>
+              {isReadOnly ? (
+                <div className="px-5 py-2.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl font-extrabold text-xs flex items-center gap-2">
+                  <span>🔒 Mode Lihat Saja (Coder / Read-Only)</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSaveAll}
+                  className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-lg flex items-center gap-2 cursor-pointer scale-100 hover:scale-[1.02]"
+                >
+                  <CheckCircle2 className="w-5 h-5" /> SIMPAN SELURUH FORMULIR PENGKAJIAN KEPERAWATAN
+                </button>
+              )}
             </div>
           </div>
 

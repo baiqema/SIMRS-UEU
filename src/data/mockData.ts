@@ -53,7 +53,15 @@ export const INITIAL_ROLES: Role[] = [
   { id: 'R06', name: 'Mahasiswa Perawat', access: ['dashboard', 'rekammedis', 'cppt', 'keperawatan', 'informedconsent', 'resumemedis', 'laboratorium', 'radiologi'] },
   { id: 'R07', name: 'Mahasiswa Pendaftaran', access: ['dashboard', 'pendaftaran', 'generalconsent', 'vclaim', 'sep'] },
   { id: 'R08', name: 'Petugas Rekam Medis', access: ['dashboard', 'rekammedis', 'cppt', 'resumemedis', 'coding', 'pelaporan'] },
-  { id: 'R09', name: 'Mahasiswa Coding', access: ['dashboard', 'coding', 'klaim', 'eklaim'] },
+  { 
+    id: 'R09', 
+    name: 'Mahasiswa Coding', 
+    access: [
+      'dashboard', 'coding', 'klaim', 'eklaim', 
+      'rekammedis', 'cppt', 'resumemedis', 'informedconsent', 'generalconsent', 
+      'farmasi', 'laboratorium', 'radiologi', 'pelaporan'
+    ] 
+  },
   { id: 'R10', name: 'Keuangan/Farmasi', access: ['dashboard', 'billing', 'pembayaran', 'farmasi'] },
   { id: 'R11', name: 'Petugas Klaim BPJS', access: ['dashboard', 'klaim', 'coding', 'billing'] },
   { id: 'R12', name: 'Kepala Rekam Medis', access: ['dashboard', 'rekammedis', 'coding', 'pelaporan', 'audit', 'manajemenuser'] },

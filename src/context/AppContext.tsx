@@ -1267,6 +1267,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (targetPage === 'dashboard' || targetPage === 'praktikum' || targetPage === 'audit' || targetPage === 'logaktivitas') return true;
     const role = getRole(user.roleId);
     if (!role) return false;
+
+    // RBAC: Coder / Koding can view all clinical data, but CANNOT edit clinical data!
+    const isCoder =
+      role.id === 'R09' ||
+      role.name.toLowerCase().includes('coding') ||
+      role.name.toLowerCase().includes('coder') ||
+      role.name.toLowerCase().includes('koding');
+
+    if (isCoder) {
+      // Clinical & medical recording pages are strictly View-Only for Coder
+      const clinicalPages = [
+        'rekammedis',
+        'cppt',
+        'resumemedis',
+        'informedconsent',
+        'generalconsent',
+        'laboratorium',
+        'radiologi',
+        'farmasi',
+        'pendaftaran',
+        'bedmanagement'
+      ];
+      if (clinicalPages.includes(targetPage)) {
+        return false; // Strictly View-Only for Coder!
+      }
+      if (['coding', 'klaim', 'eklaim'].includes(targetPage)) {
+        return true; // Coder can edit coding and claims
+      }
+    }
+
     if (role.access.includes('all')) return true;
     if (targetPage === 'bedmanagement') {
       return role.access.includes('all') || role.access.includes('pendaftaran') || role.access.includes('bedmanagement');

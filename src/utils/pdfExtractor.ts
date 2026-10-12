@@ -263,13 +263,15 @@ export function parseScenarioText(rawText: string): ExtractedScenarioData {
   // Auto-Suggest ICD-10 and ICD-9-CM based on text
   const fullTextLower = text.toLowerCase();
   const matchedIcd10 = EXTENDED_ICD10.filter(item => {
-    return fullTextLower.includes(item.code.toLowerCase()) ||
-      item.desc.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 4).some(w => fullTextLower.includes(w));
+    const descText = item.desc || item.name || '';
+    return (item.code && fullTextLower.includes(item.code.toLowerCase())) ||
+      descText.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 4).some(w => fullTextLower.includes(w));
   }).map(i => i.code).slice(0, 3);
 
   const matchedIcd9 = EXTENDED_ICD9CM.filter(item => {
-    return fullTextLower.includes(item.code.toLowerCase()) ||
-      item.desc.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 4).some(w => fullTextLower.includes(w));
+    const descText = item.desc || item.name || '';
+    return (item.code && fullTextLower.includes(item.code.toLowerCase())) ||
+      descText.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 4).some(w => fullTextLower.includes(w));
   }).map(i => i.code).slice(0, 3);
 
   return {

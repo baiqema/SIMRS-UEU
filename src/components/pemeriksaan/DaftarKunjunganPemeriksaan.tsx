@@ -27,7 +27,8 @@ interface DaftarKunjunganPemeriksaanProps {
 export const DaftarKunjunganPemeriksaan: React.FC<DaftarKunjunganPemeriksaanProps> = ({
   onSelectPatient
 }) => {
-  const { registrations, patients, medicalRecords, getUser, navigate } = useApp();
+  const { registrations, patients, medicalRecords, getUser, navigate, canEditPage } = useApp();
+  const isEditable = canEditPage('rekammedis');
 
   // Filter States
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -625,7 +626,7 @@ export const DaftarKunjunganPemeriksaan: React.FC<DaftarKunjunganPemeriksaanProp
                             type="button"
                             onClick={() => handleExamineClick(r)}
                             className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 group-hover:shadow-md"
-                            title={`Buka formulir pemeriksaan ${r.type}`}
+                            title={isEditable ? `Buka formulir pemeriksaan ${r.type}` : `Buka dan telaah data klinis pemeriksaan ${r.type} (View-Only Coder)`}
                           >
                             <Stethoscope className="w-3.5 h-3.5" />
                             <span>Periksa</span>
@@ -635,7 +636,7 @@ export const DaftarKunjunganPemeriksaan: React.FC<DaftarKunjunganPemeriksaanProp
                             type="button"
                             onClick={() => handleExamineClick(r)}
                             className="w-full px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
-                            title={`Lihat atau edit rekam medis pemeriksaan ${r.type}`}
+                            title={`Lihat rekam medis pemeriksaan ${r.type}`}
                           >
                             <Eye className="w-3.5 h-3.5 text-emerald-700" />
                             <span>Lihat</span>

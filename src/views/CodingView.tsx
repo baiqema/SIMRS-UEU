@@ -251,16 +251,18 @@ export const CodingView: React.FC = () => {
 
     // Match ICD-10
     const matchedIcd10 = EXTENDED_ICD10.filter(item => {
-      const codeMatch = textToAnalyze.includes(item.code.toLowerCase());
-      const words = item.desc.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
+      const descText = item.desc || item.name || '';
+      const codeMatch = Boolean(item.code && textToAnalyze.includes(item.code.toLowerCase()));
+      const words = descText.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
       const descMatch = words.some(w => textToAnalyze.includes(w));
       return codeMatch || descMatch;
     }).map(i => i.code).slice(0, 3);
 
     // Match ICD-9-CM
     const matchedIcd9 = EXTENDED_ICD9CM.filter(item => {
-      const codeMatch = textToAnalyze.includes(item.code.toLowerCase());
-      const words = item.desc.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
+      const descText = item.desc || item.name || '';
+      const codeMatch = Boolean(item.code && textToAnalyze.includes(item.code.toLowerCase()));
+      const words = descText.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
       const descMatch = words.some(w => textToAnalyze.includes(w));
       return codeMatch || descMatch;
     }).map(i => i.code).slice(0, 2);
