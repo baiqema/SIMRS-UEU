@@ -37,7 +37,7 @@ const AppContent: React.FC = () => {
   const access = role?.access || [];
 
   const hasPageAccess = (pageId: string) => {
-    if (pageId === 'kunjungan') return access.includes('all') || access.includes('pendaftaran') || access.includes('kunjungan');
+    if (pageId === 'kunjungan' || pageId === 'indekspasien') return access.includes('all') || access.includes('pendaftaran') || access.includes('kunjungan');
     if (pageId === 'bedmanagement') return access.includes('all') || access.includes('pendaftaran') || access.includes('bedmanagement');
     if (pageId === 'audit') return user.roleId === 'R01';
     return access.includes('all') || access.includes(pageId);
@@ -65,6 +65,7 @@ const AppContent: React.FC = () => {
         return <DashboardView />;
       case 'pendaftaran':
       case 'kunjungan':
+      case 'indekspasien':
         return <PendaftaranView />;
       case 'bedmanagement':
         return <BedManagementView />;

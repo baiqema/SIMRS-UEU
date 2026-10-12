@@ -84,11 +84,13 @@ export const Sidebar: React.FC = () => {
 
   const handleNavClick = (itemId: string) => {
     if (itemId === 'kunjungan') {
-      navigate('rekammedis', { viewMode: 'kunjungan' });
+      navigate('pendaftaran', { tab: 'kunjungan', viewMode: 'laporan' });
     } else if (itemId === 'indekspasien') {
       navigate('pendaftaran', { viewMode: 'indeks' });
     } else if (itemId === 'bedmanagement') {
       navigate('bedmanagement');
+    } else if (itemId === 'pendaftaran') {
+      navigate('pendaftaran', { viewMode: 'form' });
     } else {
       navigate(itemId);
     }
@@ -166,11 +168,33 @@ export const Sidebar: React.FC = () => {
               )}
               {visibleItems.map(item => {
                 const Icon = item.icon;
-                const isKunjunganActive = item.id === 'kunjungan' && activePage === 'pendaftaran' && params?.tab === 'kunjungan';
-                const isBedManagementActive = item.id === 'bedmanagement' && (activePage === 'bedmanagement' || (activePage === 'pendaftaran' && params?.viewMode === 'bedmanagement'));
-                const isPendaftaranActive = item.id === 'pendaftaran' && activePage === 'pendaftaran' && params?.tab !== 'kunjungan' && params?.viewMode !== 'bedmanagement';
-                const isActive = item.id === 'kunjungan' ? isKunjunganActive : item.id === 'bedmanagement' ? isBedManagementActive : item.id === 'pendaftaran' ? isPendaftaranActive : activePage === item.id;
-                const isEditable = canEditPage(item.id === 'kunjungan' ? 'pendaftaran' : item.id);
+                const isKunjunganActive = item.id === 'kunjungan' && (
+                  activePage === 'kunjungan' || 
+                  (activePage === 'pendaftaran' && (params?.tab === 'kunjungan' || params?.viewMode === 'laporan'))
+                );
+                const isIndeksActive = item.id === 'indekspasien' && (
+                  activePage === 'indekspasien' ||
+                  (activePage === 'pendaftaran' && params?.viewMode === 'indeks')
+                );
+                const isBedManagementActive = item.id === 'bedmanagement' && (
+                  activePage === 'bedmanagement' || 
+                  (activePage === 'pendaftaran' && params?.viewMode === 'bedmanagement')
+                );
+                const isPendaftaranActive = item.id === 'pendaftaran' && activePage === 'pendaftaran' && 
+                  params?.tab !== 'kunjungan' && 
+                  params?.viewMode !== 'bedmanagement' && 
+                  params?.viewMode !== 'indeks' && 
+                  params?.viewMode !== 'laporan';
+                const isActive = item.id === 'kunjungan' 
+                  ? isKunjunganActive 
+                  : item.id === 'indekspasien'
+                  ? isIndeksActive
+                  : item.id === 'bedmanagement' 
+                  ? isBedManagementActive 
+                  : item.id === 'pendaftaran' 
+                  ? isPendaftaranActive 
+                  : activePage === item.id;
+                const isEditable = canEditPage(item.id === 'kunjungan' || item.id === 'indekspasien' ? 'pendaftaran' : item.id);
 
                 return (
                   <button

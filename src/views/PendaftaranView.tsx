@@ -47,6 +47,8 @@ export const PendaftaranView: React.FC = () => {
       setViewMode('bedmanagement');
     } else if (params?.tab === 'kunjungan' || params?.viewMode === 'laporan' || activePage === 'kunjungan') {
       setViewMode('laporan');
+    } else if (params?.viewMode === 'form' || (activePage === 'pendaftaran' && !params?.tab && !params?.viewMode)) {
+      setViewMode('form');
     }
 
     if (params?.regType === 'Rawat Inap') {
@@ -67,7 +69,7 @@ export const PendaftaranView: React.FC = () => {
     if (params?.kelas) {
       setKelasRawatInap(params.kelas);
     }
-  }, [params, beds]);
+  }, [params, activePage, beds]);
 
   const [profilModalRegId, setProfilModalRegId] = useState<string | null>(null);
 
