@@ -92,9 +92,21 @@ export interface Registration {
   bedId?: string;
   naikKelas?: { isNaik: boolean; dari?: string; ke?: string };
   triageLevel?: 'Merah (Resusitasi)' | 'Kuning (Emergensi)' | 'Hijau (Non-Emergensi)' | 'Hitam (Meninggal)';
-  admissionSource?: string;
   reasonForVisit?: string;
   gcs?: string;
+  // Validasi Alur Pelayanan, Potensi Fragmentasi & Batasan Waktu
+  potensiFragmentasi?: boolean;
+  fragmentasiReason?: string;
+  rujukanDate?: string; // Tanggal surat rujukan / jadwal kontrol (maks 7 hari)
+  durasiHari?: number; // Durasi hari rawat inap / umur episode
+  batasWaktuTerlampaui?: boolean; // True jika Rawat Jalan > 7 hari atau Rawat Inap > 30 hari
+  batasWaktuKeterangan?: string;
+  overrideBatasWaktu?: {
+    approved: boolean;
+    approvedBy?: string;
+    approvedAt?: string;
+    reason?: string;
+  };
 }
 
 export interface GeneralConsent {

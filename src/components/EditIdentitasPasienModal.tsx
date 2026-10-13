@@ -34,10 +34,11 @@ export const EditIdentitasPasienModal: React.FC<EditIdentitasPasienModalProps> =
       setName(patient.name || '');
       setNik(patient.nik || '');
       setDob(patient.dob || '');
+      const g = (patient.gender || '').toLowerCase();
       setGender(
-        patient.gender === 'M' || patient.gender === 'L' || patient.gender === '1' ? '1' :
-        patient.gender === 'F' || patient.gender === 'P' || patient.gender === '2' ? '2' :
-        patient.gender || '1'
+        g === 'm' || g === 'l' || g === '1' || g.startsWith('laki') ? '1' :
+        g === 'f' || g === 'p' || g === '2' || g.startsWith('perempuan') ? '2' :
+        '1'
       );
       setMotherName(patient.motherName || '');
       setPhone(patient.phone || '');

@@ -21,6 +21,9 @@ export const Header: React.FC = () => {
     const map: Record<string, string> = {
       dashboard: 'Dashboard Eksekutif',
       pendaftaran: 'Pelayanan / Pendaftaran Pasien',
+      kunjungan: 'Pelayanan / Laporan & Riwayat Kunjungan Pasien',
+      indekspasien: 'Pelayanan / IUP (Indeks Utama Pasien)',
+      bedmanagement: 'Rawat Inap / Manajemen Bed & Ruangan',
       generalconsent: 'Pelayanan / General Consent',
       rekammedis: 'Rekam Medis / Rekam Medis Elektronik',
       cppt: 'Rekam Medis / CPPT',
@@ -48,8 +51,11 @@ export const Header: React.FC = () => {
     if (!searchTerm.trim()) return;
     const term = searchTerm.toLowerCase();
     const modules = [
+      { key: 'kunjungan', keywords: ['kunjungan', 'kunjungan pasien', 'riwayat kunjungan', 'laporan kunjungan', 'history kunjungan'] },
+      { key: 'indekspasien', keywords: ['kiup', 'indeks pasien', 'indeks utama', 'master pasien'] },
+      { key: 'bedmanagement', keywords: ['bed', 'tempat tidur', 'kamar ranap', 'bangsal', 'bed management'] },
       { key: 'pendaftaran', keywords: ['pendaftaran', 'pasien', 'daftar', 'register', 'igd', 'rawat inap', 'bayi'] },
-      { key: 'rekammedis', keywords: ['rekam', 'medis', 'rme', 'diagnosis', 'anamnesis', 'soap', 'tracer'] },
+      { key: 'rekammedis', keywords: ['rekam', 'medis', 'rme', 'diagnosis', 'anamnesis', 'soap', 'tracer', 'pemeriksaan'] },
       { key: 'cppt', keywords: ['cppt', 'soap', 'dokter', 'perawat', 'ppa'] },
       { key: 'coding', keywords: ['coding', 'icd', 'koding', 'diagnosa', 'icd 10', 'icd 9'] },
       { key: 'klaim', keywords: ['klaim', 'bpjs', 'ina-cbg', 'cbg'] },
@@ -65,7 +71,13 @@ export const Header: React.FC = () => {
 
     const match = modules.find(m => m.keywords.some(k => k.includes(term) || term.includes(k)));
     if (match) {
-      navigate(match.key);
+      if (match.key === 'kunjungan') {
+        navigate('pendaftaran', { tab: 'kunjungan', viewMode: 'laporan' });
+      } else if (match.key === 'indekspasien') {
+        navigate('pendaftaran', { viewMode: 'indeks' });
+      } else {
+        navigate(match.key);
+      }
       setSearchTerm('');
     }
   };

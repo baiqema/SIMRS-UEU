@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Modal } from './Modal';
 import { Patient, Registration, User } from '../types';
 import { Printer, ShieldCheck, CheckCircle2, QrCode, FileText, Activity } from 'lucide-react';
@@ -18,9 +18,22 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
   registration,
   doctor
 }) => {
+  // Tambahkan class ke body saat modal SEP terbuka agar cetakan printer murni lembar dokumen SEP saja
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('sep-modal-open');
+    } else {
+      document.body.classList.remove('sep-modal-open');
+    }
+    return () => {
+      document.body.classList.remove('sep-modal-open');
+    };
+  }, [isOpen]);
+
   if (!patient || !registration) return null;
 
   const handlePrint = () => {
+    document.body.classList.add('sep-modal-open');
     window.print();
   };
 
@@ -30,9 +43,22 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
 
   const noBpjs = patient.noBPJS && patient.noBPJS !== '-' ? patient.noBPJS : '0001829384912';
 
+  // Format jenis kelamin yang akurat
+  const formatGender = (gender?: string) => {
+    if (!gender) return '-';
+    const g = gender.trim().toUpperCase();
+    if (g === 'M' || g === 'L' || g === '1' || g.startsWith('LAKI')) {
+      return 'Laki-Laki';
+    }
+    if (g === 'F' || g === 'P' || g === '2' || g.startsWith('PEREMPUAN')) {
+      return 'Perempuan';
+    }
+    return gender;
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="" maxWidth="max-w-3xl">
-      {/* Action Buttons Header */}
+      {/* Action Buttons Header (Hidden in print) */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4 print:hidden">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-black text-xs shadow-xs">
@@ -54,8 +80,8 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
         </button>
       </div>
 
-      {/* Official BPJS SEP Printable Document Container */}
-      <div id="printable-sep-card" className="p-6 bg-white border border-slate-300 rounded-xl font-sans text-slate-900 text-[11px] leading-tight space-y-4 shadow-xs">
+      {/* Official BPJS SEP Printable Document Container (Murni dokumen SEP) */}
+      <div id="printable-sep-card" className="p-6 bg-white border border-slate-300 rounded-xl font-sans text-slate-900 text-[11px] leading-tight space-y-4 shadow-xs print:border print:border-slate-400 print:shadow-none print:p-4">
         {/* Header SEP */}
         <div className="flex items-start justify-between border-b-2 border-emerald-700 pb-3">
           <div className="flex items-center gap-3">
@@ -65,7 +91,7 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
             <div>
               <h2 className="font-black text-sm uppercase text-emerald-900 tracking-wide">BPJS KESEHATAN</h2>
               <p className="font-extrabold text-[12px] text-slate-800">SURAT ELIGIBILITAS PESERTA (SEP)</p>
-              <p className="text-[10px] text-slate-600">RSUD DR. SOETOMO / RS SEHAT SEJAHTERA UTAMA</p>
+              <p className="text-[10px] text-slate-600">RS UNIVERSITAS ESA UNGGUL / RS SEHAT SEJAHTERA UTAMA</p>
             </div>
           </div>
           <div className="text-right">
@@ -89,7 +115,7 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
             </div>
             <div className="flex">
               <span className="w-28 text-slate-500 shrink-0">No. Kartu BPJS</span>
-              <span className="font-mono font-bold text-emerald-800">: {noBpjs} ( NIK: {patient.nik} )</span>
+              <span className="font-mono font-bold text-emerald-800">: {noBpjs} ( NIK: {patient.nik || '-'} )</span>
             </div>
             <div className="flex">
               <span className="w-28 text-slate-500 shrink-0">Nama Peserta</span>
@@ -97,11 +123,11 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
             </div>
             <div className="flex">
               <span className="w-28 text-slate-500 shrink-0">Tgl. Lahir / JKel</span>
-              <span className="font-medium text-slate-800">: {patient.dob} / {patient.gender === 'M' ? 'Laki-Laki' : 'Perempuan'}</span>
+              <span className="font-medium text-slate-800">: {patient.dob} / {formatGender(patient.gender)}</span>
             </div>
             <div className="flex">
               <span className="w-28 text-slate-500 shrink-0">No. Telepon Pasien</span>
-              <span className="font-medium text-slate-800">: {patient.phone}</span>
+              <span className="font-medium text-slate-800">: {patient.phone || '-'}</span>
             </div>
             <div className="flex">
               <span className="w-28 text-slate-500 shrink-0">Sub/Spesialis</span>
@@ -109,7 +135,7 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
             </div>
             <div className="flex">
               <span className="w-28 text-slate-500 shrink-0">Dokter DPJP</span>
-              <span className="font-medium text-slate-800">: {doctor?.name || 'dr. Sari Dewi, Sp.PD'}</span>
+              <span className="font-medium text-slate-800">: {doctor?.name || 'Dokter Spesialis DPJP'}</span>
             </div>
           </div>
 
@@ -178,7 +204,7 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
             <p className="text-slate-500">Petugas BPJS Kesehatan / RS</p>
             <div className="h-12 flex items-end justify-center">
               <span className="font-bold text-slate-800 uppercase border-b border-slate-400 pb-0.5 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-600" /> ( Petugas VClaim Admisim )
+                <ShieldCheck className="w-3 h-3 text-emerald-600" /> ( Petugas VClaim Admisi )
               </span>
             </div>
           </div>

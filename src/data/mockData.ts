@@ -264,7 +264,9 @@ export const INITIAL_REGISTRATIONS: Registration[] = [
     status: 'Siap Diperiksa',
     examinationStatus: 'Siap Diperiksa',
     sepNo: '0010R0010826V000001',
-    room: null
+    room: null,
+    potensiFragmentasi: true,
+    fragmentasiReason: 'Kunjungan ulang ke Poli Penyakit Dalam dalam selang 30 hari sejak riwayat pengobatan sebelumnya (REG006).'
   },
   {
     id: 'REG002',
@@ -620,7 +622,7 @@ export const INITIAL_ICD9CM: ICD9CM[] = [
 
 export const INITIAL_BEDS: Bed[] = [
   // Bangsal Mawar (Penyakit Dalam)
-  { id: 'MWR-101-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000001', roomName: 'Kamar 101', bedNumber: 'Bed A', occupiedSince: '2026-09-20' },
+  { id: 'MWR-101-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000001', roomName: 'Kamar 101', bedNumber: 'Bed A', occupiedSince: '2026-08-20' },
   { id: 'MWR-101-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 101', bedNumber: 'Bed B' },
   { id: 'MWR-102-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 102', bedNumber: 'Bed A' },
   { id: 'MWR-102-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Maintenance', patientId: null, roomName: 'Kamar 102', bedNumber: 'Bed B', maintenanceReason: 'Sterilisasi kamar & pembersihan menyeluruh pasca discharge' },

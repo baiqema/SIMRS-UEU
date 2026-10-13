@@ -2,8 +2,8 @@ import React, { useRef } from 'react';
 import { Modal } from './Modal';
 import { Patient, Registration, User } from '../types';
 import {
-  Printer, ShieldAlert, FileText, CheckCircle2, Clock, UserCheck,
-  Building2, MapPin, QrCode, HeartPulse, Tag, ArrowRight
+  Printer, ShieldAlert, CheckCircle2, Clock,
+  Building2, MapPin, QrCode, ArrowRight, UserCheck, Tag
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 
@@ -33,8 +33,8 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
   const handleConfirmReceived = () => {
     Swal.fire({
       icon: 'success',
-      title: 'Berkas RM IGD Diterima!',
-      text: `Tracer berkas No. RM ${patient.noRM} terkonfirmasi diterima oleh Perawat Jaga IGD.`,
+      title: 'Berkas RM Diterima di Poliklinik/Ruangan!',
+      text: `Tracer berkas No. RM ${patient.noRM} terkonfirmasi diterima oleh Petugas di ${registration.poli || registration.room || registration.type}.`,
       timer: 1800,
       showConfirmButton: false
     });
@@ -42,6 +42,19 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
   };
 
   const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+  // Helper mapping jenis kelamin yang akurat dan konsisten
+  const formatGender = (gender?: string) => {
+    if (!gender) return '-';
+    const g = gender.trim().toUpperCase();
+    if (g === 'M' || g === 'L' || g === '1' || g.startsWith('LAKI')) {
+      return 'Laki-Laki (L)';
+    }
+    if (g === 'F' || g === 'P' || g === '2' || g.startsWith('PEREMPUAN')) {
+      return 'Perempuan (P)';
+    }
+    return gender;
+  };
 
   const unitTypeUpper = (registration.type || 'RAWAT JALAN').toUpperCase();
   const isIgd = registration.type === 'IGD';
@@ -54,7 +67,7 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
       title={`Tracer Rekam Medis ${registration.type} (Outguide Pelacakan Berkas)`}
     >
       <div className="space-y-4 text-slate-800">
-        {/* Printable Tracer Area */}
+        {/* Printable Tracer Area - Murni Lembar Pelacakan Berkas (Outguide) Tanpa SOAP */}
         <div
           ref={printRef}
           className="p-5 bg-white border-2 border-sky-300 rounded-2xl space-y-4 shadow-sm text-slate-800 font-sans print:border-sky-300 print:p-0"
@@ -106,7 +119,7 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
             </div>
           </div>
 
-          {/* Patient Details Grid */}
+          {/* Patient Details Grid (Mapping Jenis Kelamin Akurat & Bebas Bug) */}
           <div className="grid grid-cols-2 gap-3 text-xs border-b border-slate-200 pb-3">
             <div>
               <span className="text-[10px] text-slate-500 font-bold block">NAMA PASIEN:</span>
@@ -114,82 +127,40 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
             </div>
 
             <div>
-              <span className="text-[10px] text-slate-500 font-bold block">JENIS KELAMIN / UMUR:</span>
+              <span className="text-[10px] text-slate-500 font-bold block">JENIS KELAMIN / TGL LAHIR:</span>
               <strong className="font-bold text-slate-800">
-                {patient.gender === 'M' ? 'Laki-Laki (L)' : 'Perempuan (P)'} &bull; {patient.dob}
+                {formatGender(patient.gender)} &bull; {patient.dob}
               </strong>
             </div>
 
             <div>
               <span className="text-[10px] text-slate-500 font-bold block">NIK / NO. KTP:</span>
-              <span className="font-mono font-bold text-slate-800">{patient.nik}</span>
+              <span className="font-mono font-bold text-slate-800">{patient.nik || '-'}</span>
             </div>
 
             <div>
               <span className="text-[10px] text-slate-500 font-bold block">PENJAMIN / PEMBAYARAN:</span>
               <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block">
-                {patient.insuranceType} {patient.noBPJS !== '-' ? `(${patient.noBPJS})` : ''}
+                {patient.insuranceType} {patient.noBPJS && patient.noBPJS !== '-' ? `(${patient.noBPJS})` : ''}
               </span>
             </div>
           </div>
 
-          {/* RINGKASAN REKAM MEDIS SOAP (IGD EMERGENCY ASSESSMENT) */}
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-300 space-y-2 text-xs">
-            <div className="flex items-center justify-between font-extrabold text-blue-900 border-b border-slate-200 pb-1.5">
-              <span className="flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-blue-600" /> RINGKASAN PENGKAJIAN REKAM MEDIS (SOAP) IGD
-              </span>
-              <span className="text-[10px] font-mono text-blue-700 bg-blue-100 px-2 py-0.5 rounded border border-blue-200">
-                Format SOAP Murni
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-slate-800">
-              <div className="bg-white p-2 rounded-lg border border-slate-200 space-y-0.5">
-                <span className="text-[10px] font-extrabold text-blue-800 block">S - SUBJEKTIF (Anamnesis / Keluhan Utama):</span>
-                <p className="text-[11px] leading-snug font-medium text-slate-700">
-                  Pasien datang ke IGD dengan keluhan nyeri dada kiri terasa tertindih beban berat, pusing, dan lemas sejak 2 jam SBRS.
-                </p>
-              </div>
-
-              <div className="bg-white p-2 rounded-lg border border-slate-200 space-y-0.5">
-                <span className="text-[10px] font-extrabold text-blue-800 block">O - OBJEKTIF (Pemeriksaan Fisik & Tanda Vital):</span>
-                <p className="text-[11px] leading-snug font-medium text-slate-700">
-                  GCS E4V5M6 (Compos Mentis). TD: 140/90 mmHg, HR: 88x/mnt, RR: 20x/mnt, Suhu: 36.7°C, SpO2: 98% room air.
-                </p>
-              </div>
-
-              <div className="bg-white p-2 rounded-lg border border-slate-200 space-y-0.5">
-                <span className="text-[10px] font-extrabold text-blue-800 block">A - ASESMEN (Diagnosa Kerja / Masalah Medis):</span>
-                <p className="text-[11px] leading-snug font-semibold text-rose-900">
-                  Observation Chest Pain e.c. Suspect Suspect ACS / Angina Pektoris Unstable + Hipertensi Grade I
-                </p>
-              </div>
-
-              <div className="bg-white p-2 rounded-lg border border-slate-200 space-y-0.5">
-                <span className="text-[10px] font-extrabold text-blue-800 block">P - PLAN (Penatalaksanaan & Instruksi DPJP):</span>
-                <p className="text-[11px] leading-snug font-medium text-slate-700">
-                  O2 nasal kanul 3 Lpm, IVFD RL 20 tpm, Cek EKG 12 Lead, Cek Lab Troponin I & Rutin, Inj. Ranitidin 1 amp IV.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Routing & DPJP Info */}
-          <div className="bg-rose-50/70 p-3 rounded-xl border border-rose-200 space-y-2 text-xs">
-            <div className="flex items-center justify-between font-bold text-rose-900 border-b border-rose-200 pb-1">
+          {/* Routing & DPJP Info - Murni Pelacakan Berkas Outguide */}
+          <div className="bg-sky-50/60 p-3.5 rounded-xl border border-sky-200 space-y-2 text-xs">
+            <div className="flex items-center justify-between font-bold text-blue-900 border-b border-sky-200 pb-1">
               <span className="flex items-center gap-1">
-                <MapPin className="w-4 h-4 text-rose-600" /> ALUR TRACER BERKAS REKAM MEDIS
+                <MapPin className="w-4 h-4 text-blue-600" /> ALUR TRACER BERKAS REKAM MEDIS
               </span>
-              <span className="text-[10px] font-mono text-rose-700 bg-white px-2 py-0.5 rounded border border-rose-200">
-                EMERGENCY ROUTE
+              <span className="text-[10px] font-mono text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200">
+                PELACAKAN BERKAS (OUTGUIDE)
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-white p-2 rounded-lg border border-rose-200">
-                <div className="text-[10px] font-bold text-slate-500">RUANG ASAL (FILLING):</div>
-                <div className="font-extrabold text-slate-800">Storage Depo Rekam Medis Utama</div>
+              <div className="bg-white p-2 rounded-lg border border-sky-200">
+                <div className="text-[10px] font-bold text-slate-500">RUANG ASAL (FILING):</div>
+                <div className="font-extrabold text-slate-800">Storage Depo Rekam Medis Utama (Rak Filing)</div>
               </div>
 
               <div className="bg-white p-2 rounded-lg border border-sky-200">
@@ -200,14 +171,14 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
 
             <div className="grid grid-cols-2 gap-2 text-slate-700 pt-1">
               <div>
-                <span className="text-[10px] font-bold text-slate-500 block">DOKTER DPJP / TRIAGE:</span>
-                <strong className="text-slate-800">{doctor?.name || 'dr. Sari Dewi, Sp.PD'}</strong>
+                <span className="text-[10px] font-bold text-slate-500 block">DOKTER DPJP PELAYANAN:</span>
+                <strong className="text-slate-800">{doctor?.name || 'Dokter Spesialis DPJP'}</strong>
               </div>
 
               <div>
-                <span className="text-[10px] font-bold text-slate-500 block">PENANGGUNG JAWAB:</span>
+                <span className="text-[10px] font-bold text-slate-500 block">PENANGGUNG JAWAB PASIEN:</span>
                 <strong className="text-slate-800">
-                  {patient.guarantor?.name || 'Keluarga Pasien'} ({patient.guarantor?.relation || 'Kerabat'})
+                  {patient.guarantor?.name || 'Keluarga Pasien'} ({patient.guarantor?.relation || 'Wali/Kerabat'})
                 </strong>
               </div>
             </div>
@@ -218,28 +189,27 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
             <div className="space-y-8">
               <div className="text-[10px] font-bold text-slate-500 uppercase">Petugas Filing / Kurir RM</div>
               <div className="border-b border-slate-400 w-3/4 mx-auto"></div>
-              <div className="text-[10px] font-bold text-slate-700">( Staff Unit Rekam Medis )</div>
+              <div className="text-[10px] text-slate-600">Bagian Pengelolaan Rekam Medis</div>
             </div>
 
             <div className="space-y-8">
-              <div className="text-[10px] font-bold text-slate-500 uppercase">Perawat Penerima IGD</div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase">Penerima Berkas di Poliklinik/Ruangan</div>
               <div className="border-b border-slate-400 w-3/4 mx-auto"></div>
-              <div className="text-[10px] font-bold text-slate-700">( Perawat Jaga Triase IGD )</div>
+              <div className="text-[10px] text-slate-600">Perawat / Petugas Admisi Poliklinik</div>
             </div>
           </div>
 
-          {/* System Footer Note */}
-          <div className="text-[9px] text-center text-slate-400 font-mono">
+          <div className="text-center text-[9px] text-slate-400 italic pt-1">
             Formulir Tracer ini dihasilkan otomatis oleh SIMRS 3.0 UEU &bull; Harap segera diselipkan di Rak Filing sebagai Outguide
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between pt-2 print:hidden">
+        {/* Modal Action Buttons */}
+        <div className="flex items-center justify-between gap-3 pt-2 print:hidden">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold cursor-pointer transition-colors"
           >
             Tutup
           </button>
@@ -248,17 +218,17 @@ export const TracerIgdModal: React.FC<TracerIgdModalProps> = ({
             <button
               type="button"
               onClick={handleConfirmReceived}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
             >
-              <CheckCircle2 className="w-4 h-4" /> Konfirmasi Diterima IGD
+              <CheckCircle2 className="w-4 h-4" /> Konfirmasi Berkas Diterima
             </button>
 
             <button
               type="button"
               onClick={handlePrint}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
             >
-              <Printer className="w-4 h-4" /> Cetak Tracer IGD
+              <Printer className="w-4 h-4" /> Cetak Tracer Berkas (Outguide)
             </button>
           </div>
         </div>

@@ -115,4 +115,23 @@ input, select, textarea, button, table, td, th {
     width: 100% !important;
     max-width: 100% !important;
   }
+
+  /* Khusus Cetak SEP: Sembunyikan seluruh tabel log, tabel riwayat, dan elemen background */
+  body.sep-modal-open > div:not(.fixed),
+  body.sep-modal-open main,
+  body.sep-modal-open aside,
+  body.sep-modal-open header {
+    display: none !important;
+  }
+
+  body.sep-modal-open #printable-sep-card {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: 1px solid #94a3b8 !important;
+    background: #ffffff !important;
+    page-break-inside: avoid !important;
+  }
 }

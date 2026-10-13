@@ -78,8 +78,8 @@ export const CodingView: React.FC = () => {
   // Selected Encounter / Visit ID (Encounter-Based Coding)
   const [selectedRegId, setSelectedRegId] = useState<string>('');
 
-  // Active Form Coding State
-  const [formIcd10List, setFormIcd10List] = useState<string[]>(['I10']);
+  // Active Form Coding State (Kosong secara default)
+  const [formIcd10List, setFormIcd10List] = useState<string[]>([]);
   const [formIcd9List, setFormIcd9List] = useState<string[]>([]);
   const [formNote, setFormNote] = useState<string>('');
   const [formStatus, setFormStatus] = useState<'Draft' | 'Locked'>('Draft');
@@ -170,18 +170,18 @@ export const CodingView: React.FC = () => {
     if (currentEncounterCoding) {
       const rawIcd10 = Array.isArray(currentEncounterCoding.icd10)
         ? currentEncounterCoding.icd10
-        : (currentEncounterCoding.icd10 ? [currentEncounterCoding.icd10] : ['I10']);
+        : (currentEncounterCoding.icd10 ? [currentEncounterCoding.icd10] : []);
       const rawIcd9 = Array.isArray(currentEncounterCoding.icd9cm)
         ? currentEncounterCoding.icd9cm
         : (currentEncounterCoding.icd9cm ? [currentEncounterCoding.icd9cm] : []);
 
-      setFormIcd10List(rawIcd10.length > 0 ? rawIcd10 : ['I10']);
+      setFormIcd10List(rawIcd10);
       setFormIcd9List(rawIcd9);
       setFormNote(currentEncounterCoding.note || '');
       setFormStatus(currentEncounterCoding.status || 'Draft');
     } else {
-      // If no coding yet for this encounter, initialize clean state
-      setFormIcd10List(['I10']);
+      // If no coding yet for this encounter, initialize clean state (kosong secara default)
+      setFormIcd10List([]);
       setFormIcd9List([]);
       setFormNote('');
       setFormStatus('Draft');

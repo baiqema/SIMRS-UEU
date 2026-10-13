@@ -3,11 +3,13 @@ import {
   Bed as BedIcon, CheckCircle2, AlertCircle, Wrench, Sparkles, User,
   FileText, Activity, Clock, ShieldCheck, ArrowRight, X, Filter,
   Building2, DoorOpen, Plus, RefreshCw, Stethoscope, Check, AlertTriangle,
-  ChevronRight, LogOut, Search, Info
+  ChevronRight, LogOut, Search, Info, ShieldAlert
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useApp } from '../../context/AppContext';
 import { Bed, Patient, Registration } from '../../types';
+import { checkRawatInapLimit } from '../../utils/visitValidation';
+import { EvaluasiRawatInapModal } from '../EvaluasiRawatInapModal';
 
 interface BedManagementViewProps {
   onSelectBed?: (bed: Bed) => void;
@@ -36,6 +38,13 @@ export const BedManagementView: React.FC<BedManagementViewProps> = ({
     bed: Bed;
     patient: Patient | null;
     registration: Registration | null;
+  } | null>(null);
+
+  const [evaluasiModalData, setEvaluasiModalData] = useState<{
+    bed: Bed;
+    patient: Patient | null;
+    registration: Registration | null;
+    losDays: number;
   } | null>(null);
 
   const [maintenanceModal, setMaintenanceModal] = useState<Bed | null>(null);
@@ -374,6 +383,39 @@ export const BedManagementView: React.FC<BedManagementViewProps> = ({
               <div className="text-[10px] text-rose-700 font-medium">Sterilisasi / belum siap huni</div>
             </div>
           </div>
+
+          {/* PERINGATAN BATAS WAKTU PELAYANAN RAWAT INAP (MAKS. 30 HARI) */}
+          {(() => {
+            const longStayCount = beds.filter(b => {
+              if (b.status !== 'Occupied') return false;
+              const { registration } = getBedPatientInfo(b);
+              const admissionDate = b.occupiedSince || registration?.date || '';
+              return checkRawatInapLimit(admissionDate).isExceeded;
+            }).length;
+
+            if (longStayCount === 0) return null;
+
+            return (
+              <div className="bg-rose-50 border-2 border-rose-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-950 shadow-xs animate-in fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 font-bold shadow-xs mt-0.5">
+                    <ShieldAlert className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-rose-950 flex items-center gap-2">
+                      <span>Peringatan Regulasi Batas Waktu Pelayanan Rawat Inap (&gt; 30 Hari)</span>
+                      <span className="bg-rose-200 text-rose-900 text-[10px] font-black px-2 py-0.5 rounded-full">
+                        {longStayCount} Pasien Terdeteksi
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-rose-800 leading-relaxed font-medium mt-0.5">
+                      Sesuai ketentuan kendali mutu dan biaya rumah sakit, batas waktu perawatan rawat inap ditetapkan maksimal selama 30 hari. Pasien yang melebihi 30 hari memerlukan evaluasi komite medik dan persetujuan perpanjangan untuk membuka kunci transaksi input.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -846,6 +888,72 @@ export const BedManagementView: React.FC<BedManagementViewProps> = ({
                 </div>
               </div>
 
+              {/* LOS DURATION & BATAS WAKTU 30 HARI STATUS */}
+              {(() => {
+                const admissionDate = patientDetailModal.bed.occupiedSince || patientDetailModal.registration?.date || '';
+                const losCheck = checkRawatInapLimit(admissionDate);
+                const isOverridden = patientDetailModal.registration?.overrideBatasWaktu?.approved;
+
+                return (
+                  <div className={`p-3.5 rounded-2xl border space-y-2 ${
+                    losCheck.isExceeded
+                      ? 'bg-rose-50 border-rose-300 text-rose-950'
+                      : 'bg-blue-50/60 border-blue-200 text-blue-950'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock className={`w-4 h-4 ${losCheck.isExceeded ? 'text-rose-600' : 'text-blue-600'}`} />
+                        <span className="text-xs font-black">
+                          Durasi Perawatan (LOS): {losCheck.losDays} Hari
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                        losCheck.isExceeded
+                          ? 'bg-rose-200 text-rose-900'
+                          : 'bg-blue-200 text-blue-900'
+                      }`}>
+                        Batas Maks: 30 Hari
+                      </span>
+                    </div>
+
+                    {losCheck.isExceeded && (
+                      <div className="space-y-2 pt-1 border-t border-rose-200 text-xs">
+                        <p className="text-rose-900 leading-relaxed font-medium">
+                          🚨 <strong>Ketentuan Waktu Perawatan Terlampaui (&gt; 30 Hari):</strong> Batas waktu perawatan untuk pasien rawat inap ditetapkan maksimal selama 30 hari. Input transaksi tambahan dan admisi lanjutan dibatasi hingga verifikasi tim medis disetujui.
+                        </p>
+                        {isOverridden ? (
+                          <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl text-emerald-950 flex items-start gap-2 text-[11px]">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold block text-emerald-900">Perpanjangan Rawat Inap Terverifikasi</span>
+                              <span className="text-emerald-800">
+                                Disetujui oleh: {patientDetailModal.registration?.overrideBatasWaktu?.approvedBy}. Catatan: {patientDetailModal.registration?.overrideBatasWaktu?.reason}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEvaluasiModalData({
+                                bed: patientDetailModal.bed,
+                                patient: patientDetailModal.patient,
+                                registration: patientDetailModal.registration,
+                                losDays: losCheck.losDays
+                              });
+                            }}
+                            className="w-full py-2.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                          >
+                            <ShieldAlert className="w-4 h-4" />
+                            <span>Buka Form Evaluasi & Verifikasi Perpanjangan (&gt; 30 Hari)</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Diagnosis info if any */}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                 <span className="text-slate-400 block text-[10px] uppercase font-bold">Diagnosa Masuk Awal</span>
@@ -893,6 +1001,43 @@ export const BedManagementView: React.FC<BedManagementViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* EVALUASI RAWAT INAP MODAL (> 30 HARI) */}
+      {evaluasiModalData && (
+        <EvaluasiRawatInapModal
+          isOpen={!!evaluasiModalData}
+          onClose={() => setEvaluasiModalData(null)}
+          patient={evaluasiModalData.patient || undefined}
+          registration={evaluasiModalData.registration || undefined}
+          losDays={evaluasiModalData.losDays}
+          onApproveOverride={(data) => {
+            if (evaluasiModalData.registration) {
+              updateRegistration(evaluasiModalData.registration.id, {
+                overrideBatasWaktu: {
+                  approved: true,
+                  approvedBy: data.doctorName,
+                  approvedAt: new Date().toISOString(),
+                  reason: `${data.reason} (Target Pulang: ${data.targetDischargeDate})`
+                }
+              });
+            }
+            Swal.fire({
+              icon: 'success',
+              title: 'Evaluasi & Perpanjangan Disetujui',
+              html: `
+                <div class="text-left text-xs space-y-1.5 mt-1">
+                  <p><strong>Verifikator:</strong> ${data.doctorName}</p>
+                  <p><strong>Justifikasi Klinis:</strong> ${data.reason}</p>
+                  <p><strong>Target Pemulangan:</strong> ${data.targetDischargeDate}</p>
+                  <p class="text-emerald-700 font-bold mt-2">Persetujuan perpanjangan berhasil disimpan dan kunci transaksi input dibuka.</p>
+                </div>
+              `,
+              confirmButtonColor: '#2563eb'
+            });
+            setEvaluasiModalData(null);
+          }}
+        />
       )}
 
       {/* MODAL: INPUT REASON FOR MAINTENANCE (STERILISASI / PERBAIKAN) */}

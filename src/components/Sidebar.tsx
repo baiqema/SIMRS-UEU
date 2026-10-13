@@ -29,7 +29,7 @@ export const Sidebar: React.FC = () => {
       items: [
         { id: 'pendaftaran', label: 'Pendaftaran & IGD', icon: ClipboardList },
         { id: 'kunjungan', label: 'Kunjungan Pasien', icon: Users },
-        { id: 'indekspasien', label: 'Indeks Utama Pasien (KIUP)', icon: Contact },
+        { id: 'indekspasien', label: 'IUP (Indeks Utama Pasien)', icon: Contact },
         { id: 'bedmanagement', label: 'Bed Management (Ranap)', icon: Bed },
         { id: 'generalconsent', label: 'General Consent', icon: FileSignature }
       ]

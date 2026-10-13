@@ -441,7 +441,7 @@ export const ExamDualPaneWorkspace: React.FC<Props> = ({ scenario, onBack }) => 
               {/* Section 1: Patient Demographics Card */}
               <div className="mb-5 bg-slate-50 border border-slate-200 rounded-xl p-4">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-blue-900 mb-2.5 pb-1 border-b border-slate-200 flex items-center justify-between">
-                  <span>I. Data Demografi & Registrasi Pasien</span>
+                  <span>Data Demografi & Registrasi Pasien</span>
                   <span className="text-[10px] text-slate-500 font-mono">No. RM: {scenario.extractedPatient.noRM}</span>
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-2 gap-x-4 text-xs">
@@ -483,7 +483,7 @@ export const ExamDualPaneWorkspace: React.FC<Props> = ({ scenario, onBack }) => 
               {/* Section 2: Clinical SOAP / CPPT */}
               <div className="mb-5 bg-white border border-slate-200 rounded-xl p-4 shadow-2xs">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-900 mb-3 pb-1 border-b border-slate-200">
-                  II. Catatan Klinis DPJP / SOAP Terintegrasi
+                  Catatan Klinis DPJP / SOAP Terintegrasi
                 </h3>
 
                 <div className="space-y-3 text-xs leading-relaxed">
@@ -553,7 +553,7 @@ export const ExamDualPaneWorkspace: React.FC<Props> = ({ scenario, onBack }) => 
               {scenario.extractedEncounter.penunjang && (
                 <div className="mb-5 bg-slate-50 border border-slate-200 rounded-xl p-4">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 mb-2.5 pb-1 border-b border-slate-200">
-                    III. Hasil Pemeriksaan Penunjang & Prosedur Medis
+                    Hasil Pemeriksaan Penunjang & Prosedur Medis
                   </h3>
                   <div className="space-y-2 text-xs">
                     {scenario.extractedEncounter.penunjang.lab && (

@@ -154,7 +154,7 @@ export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps>
           {/* TABEL PEMBERIAN INFORMASI TINDAKAN (SESUAI PERMENKES & KARS) */}
           <div className="mb-4">
             <div className="text-[11px] font-black uppercase text-slate-900 mb-1.5 flex items-center justify-between">
-              <span>I. PEMBERIAN INFORMASI TINDAKAN KEDOKTERAN</span>
+              <span>PEMBERIAN INFORMASI TINDAKAN KEDOKTERAN</span>
               <span className="text-[10px] font-normal text-slate-500 italic">Standar Permenkes No. 290/2008 & KARS</span>
             </div>
 
@@ -240,7 +240,7 @@ export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps>
           <div className="border border-slate-300 rounded-xl p-3.5 mb-4 text-xs bg-white space-y-2">
             <div className="font-black text-slate-900 uppercase text-[11px] flex items-center gap-1.5 border-b border-slate-200 pb-1">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              II. PERNYATAAN PERSETUJUAN TINDAKAN KEDOKTERAN
+              PERNYATAAN PERSETUJUAN TINDAKAN KEDOKTERAN
             </div>
             <p className="text-[11.5px] leading-relaxed text-slate-700">
               Yang bertanda tangan di bawah ini, saya menyatakan bahwa saya telah memahami penjelasan yang diberikan oleh dokter sebagaimana tercantum pada tabel di atas. Saya menyetujui dilakukannya tindakan medis berupa <strong>{consent.action}</strong> terhadap diri saya / pasien bernama <strong>{patient.name}</strong> (No. RM: <strong>{patient.noRM}</strong>).

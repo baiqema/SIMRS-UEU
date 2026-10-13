@@ -17,6 +17,7 @@ import { EXTENDED_ICD10, EXTENDED_ICD9CM } from '../data/icdDatabase';
 import { INITIAL_EXAM_SCENARIOS } from '../data/examScenariosData';
 import { buildSimulationRecords } from '../utils/pdfExtractor';
 import { checkResumeMedisCompleteness, validateDiagnosisMatching, buildAutoResumeFromEncounter } from '../utils/resumeMedisHelper';
+import { MASTER_POLIKLINIK } from '../data/poliklinikData';
 
 interface AppContextType {
   user: User | null;
@@ -462,7 +463,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getPatient = (id: string) => patients.find(p => p.id === id);
   const getReg = (id: string) => registrations.find(r => r.id === id);
   const getMR = (id: string) => medicalRecords.find(m => m.id === id);
-  const getUser = (id: string) => users.find(u => u.id === id);
+  const getUser = (id: string) => {
+    const found = users.find(u => u.id === id || u.name === id);
+    if (found) return found;
+    for (const p of MASTER_POLIKLINIK) {
+      const doc = p.doctors.find(d => d.id === id || d.name === id);
+      if (doc) {
+        return {
+          id: doc.id,
+          username: doc.id.toLowerCase(),
+          name: doc.name,
+          roleId: 'R05' as RoleId,
+          active: true
+        };
+      }
+    }
+    return undefined;
+  };
   const getRole = (id: string) => roles.find(r => r.id === id) || INITIAL_ROLES.find(r => r.id === id);
 
   const generateNoRM = (): string => {

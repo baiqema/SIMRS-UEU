@@ -765,7 +765,7 @@ export const RekamMedisView: React.FC = () => {
                   {selectedPatient?.name || 'Pilih Pasien'}
                 </span>
                 <span className="text-xs text-slate-500 font-medium">
-                  ({selectedPatient?.gender === 'M' ? 'Laki-laki' : 'Perempuan'}, {selectedPatient?.dob ? new Date().getFullYear() - new Date(selectedPatient.dob).getFullYear() : 30} thn)
+                  ({(selectedPatient?.gender === 'M' || selectedPatient?.gender === 'L' || selectedPatient?.gender?.toLowerCase()?.startsWith('laki')) ? 'Laki-laki' : 'Perempuan'}, {selectedPatient?.dob ? new Date().getFullYear() - new Date(selectedPatient.dob).getFullYear() : 30} thn)
                 </span>
                 <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded border border-emerald-200">
                   {selectedPatient?.insuranceType || 'BPJS'}
