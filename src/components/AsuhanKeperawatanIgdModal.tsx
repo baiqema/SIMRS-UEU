@@ -490,7 +490,7 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
             <div className="grid grid-cols-2 gap-2 mt-2 p-2 border border-slate-300 rounded text-[11px]">
               <div>
                 <div><strong>No. Rekam Medis:</strong> {patient.noRM}</div>
-                <div><strong>Nama Pasien:</strong> {patient.name} ({patient.gender === 'M' ? 'Laki-laki' : 'Perempuan'})</div>
+                <div><strong>Nama Pasien:</strong> {patient.name} ({patient.gender === 'M' || patient.gender === '1' || patient.gender === 'L' || (patient.gender || '').toUpperCase().startsWith('LAKI') ? 'Laki-laki' : 'Perempuan'})</div>
                 <div><strong>Tanggal Lahir / Usia:</strong> {patient.dob}</div>
                 <div><strong>Penjamin / Asuransi:</strong> {patient.insuranceType || 'BPJS'} ({pembiayaan})</div>
               </div>
@@ -584,7 +584,7 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
                   </span>
                 </div>
                 <p className="text-xs text-sky-100/90 font-medium mt-1">
-                  {patient.gender === 'M' ? 'Laki-Laki' : 'Perempuan'} &bull; Lahir: {patient.dob} &bull; No Reg: <strong className="font-mono text-amber-300">{registration.id}</strong> &bull; Ruang: <strong className="text-white">{ruangan}</strong>
+                  {patient.gender === 'M' || patient.gender === '1' || patient.gender === 'L' || (patient.gender || '').toUpperCase().startsWith('LAKI') ? 'Laki-Laki' : 'Perempuan'} &bull; Lahir: {patient.dob} &bull; No Reg: <strong className="font-mono text-amber-300">{registration.id}</strong> &bull; Ruang: <strong className="text-white">{ruangan}</strong>
                 </p>
               </div>
             </div>

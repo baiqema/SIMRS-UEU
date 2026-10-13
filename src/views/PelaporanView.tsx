@@ -864,7 +864,7 @@ export const PelaporanView: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <div className="text-[10px] font-black opacity-80">II</div>
+            <div className="text-[10px] font-black opacity-80">Bab 2</div>
             <div className="font-extrabold text-xs truncate">Data Identitas RS</div>
             <div className="text-[10px] opacity-90 mt-0.5">RL 1.1 s/d RL 1.4</div>
           </button>
@@ -878,7 +878,7 @@ export const PelaporanView: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <div className="text-[10px] font-black opacity-80">III</div>
+            <div className="text-[10px] font-black opacity-80">Bab 3</div>
             <div className="font-extrabold text-xs truncate">Data Ketenagaan</div>
             <div className="text-[10px] opacity-90 mt-0.5">Formulir RL 2 (SISDMK)</div>
           </button>
@@ -892,7 +892,7 @@ export const PelaporanView: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <div className="text-[10px] font-black opacity-80">IV</div>
+            <div className="text-[10px] font-black opacity-80">Bab 4</div>
             <div className="font-extrabold text-xs truncate">Rekapitulasi Pelayanan</div>
             <div className="text-[10px] opacity-90 mt-0.5">RL 3.1 s/d RL 3.19</div>
           </button>
@@ -906,7 +906,7 @@ export const PelaporanView: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <div className="text-[10px] font-black opacity-80">V</div>
+            <div className="text-[10px] font-black opacity-80">Bab 5</div>
             <div className="font-extrabold text-xs truncate">Morbiditas Rawat Inap</div>
             <div className="text-[10px] opacity-90 mt-0.5">RL 4.1 s/d RL 4.3</div>
           </button>
@@ -920,7 +920,7 @@ export const PelaporanView: React.FC = () => {
                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
             }`}
           >
-            <div className="text-[10px] font-black opacity-80">VI</div>
+            <div className="text-[10px] font-black opacity-80">Bab 6</div>
             <div className="font-extrabold text-xs truncate">Morbiditas Rawat Jalan</div>
             <div className="text-[10px] opacity-90 mt-0.5">RL 5.1 s/d RL 5.3</div>
           </button>

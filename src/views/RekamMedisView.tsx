@@ -239,7 +239,7 @@ export const RekamMedisView: React.FC = () => {
         if (matched) {
           setSelectedIcd10([{ code: matched.code, desc: matched.desc || matched.name || matched.code }]);
         } else {
-          setSelectedIcd10([{ code: 'I10', desc: 'Hipertensi Esensial (Primer)' }]);
+          setSelectedIcd10([]);
         }
       } else {
         setSelectedIcd10([]);
@@ -563,13 +563,6 @@ export const RekamMedisView: React.FC = () => {
         }
       }
     });
-
-    if (matchedIcd10.length === 0) {
-      matchedIcd10.push({ code: 'I10', desc: 'Hipertensi Esensial (Primer)' });
-    }
-    if (matchedIcd9.length === 0) {
-      matchedIcd9.push({ code: '89.13', desc: 'Elektrokardiogram (EKG)' });
-    }
 
     setSelectedIcd10(matchedIcd10);
     setSelectedIcd9(matchedIcd9);

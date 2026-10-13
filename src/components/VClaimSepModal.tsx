@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Modal } from './Modal';
 import { Patient, Registration, User } from '../types';
+import { useApp } from '../context/AppContext';
 import { Printer, ShieldCheck, CheckCircle2, QrCode, FileText, Activity } from 'lucide-react';
 
 interface VClaimSepModalProps {
@@ -18,6 +19,8 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
   registration,
   doctor
 }) => {
+  const { coding, medicalRecords, cppt } = useApp();
+
   // Tambahkan class ke body saat modal SEP terbuka agar cetakan printer murni lembar dokumen SEP saja
   useEffect(() => {
     if (isOpen) {
@@ -47,14 +50,39 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
   const formatGender = (gender?: string) => {
     if (!gender) return '-';
     const g = gender.trim().toUpperCase();
-    if (g === 'M' || g === 'L' || g === '1' || g.startsWith('LAKI')) {
+    if (g === 'M' || g === 'L' || g === '1' || g.startsWith('LAKI') || g === 'PRIA') {
       return 'Laki-Laki';
     }
-    if (g === 'F' || g === 'P' || g === '2' || g.startsWith('PEREMPUAN')) {
+    if (g === 'F' || g === 'P' || g === '2' || g.startsWith('PEREMPUAN') || g === 'WANITA') {
       return 'Perempuan';
     }
     return gender;
   };
+
+  // Dynamic Diagnosis resolution (Bebas lock, tidak dipaksakan I10)
+  const resolvedDiagnosis = useMemo(() => {
+    // 1. Dari data pengkodean klinis (Coding / Casemix)
+    const c = coding.find(x => x.regId === registration.id);
+    if (c) {
+      if (Array.isArray(c.icd10) && c.icd10.length > 0) {
+        const desc = Array.isArray(c.icd10Desc) && c.icd10Desc[0] ? ` - ${c.icd10Desc[0]}` : '';
+        return `${c.icd10[0]}${desc}`;
+      } else if (typeof c.icd10 === 'string' && c.icd10) {
+        return c.icd10;
+      }
+    }
+    // 2. Dari Rekam Medis DPJP
+    const mr = medicalRecords.find(m => m.regId === registration.id || m.noRM === patient.noRM);
+    if (mr?.diagnosis) {
+      return mr.diagnosis;
+    }
+    // 3. Dari Asesmen CPPT
+    const cp = cppt.find(x => x.regId === registration.id || (mr && x.mrId === mr.id));
+    if (cp?.assessment) {
+      return cp.assessment;
+    }
+    return 'Belum Ditentukan (Observasi Klinis Awal)';
+  }, [coding, medicalRecords, cppt, registration.id, patient.noRM]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="" maxWidth="max-w-3xl">
@@ -150,7 +178,7 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
             </div>
             <div className="flex">
               <span className="w-28 text-slate-500 shrink-0">Diagnosa Awal</span>
-              <span className="font-bold text-slate-900">: I10 - Hipertensi Esensial (Primer)</span>
+              <span className="font-bold text-slate-900">: {resolvedDiagnosis}</span>
             </div>
             <div className="flex">
               <span className="w-28 text-slate-500 shrink-0">Jenis Peserta</span>

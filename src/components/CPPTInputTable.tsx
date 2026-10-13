@@ -1007,8 +1007,8 @@ export const CPPTInputTable: React.FC<CPPTInputTableProps> = ({
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Diagnosa Sekunder 2:</label>
                   <div className="flex gap-2">
-                    <input list="icd10-datalist-cppt" type="text" defaultValue="I10" className="w-24 p-2 font-mono font-bold border rounded bg-white text-blue-900" placeholder="Kode..." />
-                    <input list="icd10-desc-datalist-cppt" type="text" defaultValue="Essential (primary) hypertension" className="flex-1 p-2 font-semibold border rounded bg-white text-slate-800" placeholder="Deskripsi diagnosa..." />
+                    <input list="icd10-datalist-cppt" type="text" defaultValue="" className="w-24 p-2 font-mono font-bold border rounded bg-white text-blue-900" placeholder="Kode..." />
+                    <input list="icd10-desc-datalist-cppt" type="text" defaultValue="" className="flex-1 p-2 font-semibold border rounded bg-white text-slate-800" placeholder="Deskripsi diagnosa..." />
                   </div>
                 </div>
 

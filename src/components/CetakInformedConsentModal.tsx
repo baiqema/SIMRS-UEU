@@ -138,7 +138,7 @@ export const CetakInformedConsentModal: React.FC<CetakInformedConsentModalProps>
               </div>
               <div>
                 <span className="text-[10px] text-slate-500 block uppercase font-semibold">Jenis Kelamin:</span>
-                <span className="font-medium text-slate-800">{patient.gender === 'L' ? 'Laki-laki' : 'Perempuan'}</span>
+                <span className="font-medium text-slate-800">{patient.gender === 'L' || patient.gender === 'M' || patient.gender === '1' || (patient.gender || '').toUpperCase().startsWith('LAKI') ? 'Laki-laki' : 'Perempuan'}</span>
               </div>
               <div className="sm:col-span-2">
                 <span className="text-[10px] text-slate-500 block uppercase font-semibold">Unit / Ruang Pelayanan:</span>

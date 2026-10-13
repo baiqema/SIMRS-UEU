@@ -212,15 +212,6 @@ export const CodingView: React.FC = () => {
   };
 
   const handleRemoveIcd10 = (code: string) => {
-    if (formIcd10List.length <= 1) {
-      Swal.fire({
-        icon: 'info',
-        title: 'Minimal 1 Kode ICD-10',
-        text: 'Setiap berkas koding wajib memiliki setidaknya 1 Kode Diagnosis Utama (Primer).',
-        confirmButtonColor: '#1e3a8a'
-      });
-      return;
-    }
     setFormIcd10List(prev => prev.filter(c => c !== code));
   };
 

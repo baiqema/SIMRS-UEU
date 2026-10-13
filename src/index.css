@@ -116,19 +116,23 @@ input, select, textarea, button, table, td, th {
     max-width: 100% !important;
   }
 
-  /* Khusus Cetak SEP: Sembunyikan seluruh tabel log, tabel riwayat, dan elemen background */
-  body.sep-modal-open > div:not(.fixed),
-  body.sep-modal-open main,
-  body.sep-modal-open aside,
-  body.sep-modal-open header {
-    display: none !important;
+  /* Khusus Cetak SEP: Sembunyikan seluruh tabel log, tabel riwayat, dan elemen background - cetak murni lembar SEP saja */
+  body.sep-modal-open * {
+    visibility: hidden !important;
+  }
+
+  body.sep-modal-open #printable-sep-card,
+  body.sep-modal-open #printable-sep-card * {
+    visibility: visible !important;
   }
 
   body.sep-modal-open #printable-sep-card {
-    display: block !important;
-    position: static !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 100% !important;
     margin: 0 !important;
+    padding: 16px !important;
     box-shadow: none !important;
     border: 1px solid #94a3b8 !important;
     background: #ffffff !important;
