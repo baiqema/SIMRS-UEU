@@ -34,9 +34,8 @@ describe('create_class', () => {
 
   it('replaces date placeholders with today', async () => {
     const today = new Date().toISOString().slice(0, 10);
-    const { data } = await admin().from('registrations').select('data').eq('class_id', cls).eq('id', 'REG-TODAY-IGD').single();
+    const { data } = await admin().from('registrations').select('data').eq('class_id', cls).eq('id', 'REG001').single();
     expect(data!.data.date).toBe(today);
-    expect(data!.data.sepNo).toBe(`0010R001${today.replace(/-/g, '')}V001`);
   });
 
   it('makes the creating dosen a dosen member', async () => {

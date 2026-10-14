@@ -6,6 +6,8 @@ import { FormIgd } from '../components/forms/FormIgd';
 import { FormRawatInap } from '../components/forms/FormRawatInap';
 import { TracerIgdModal } from '../components/TracerIgdModal';
 import { AsuhanKeperawatanIgdModal } from '../components/AsuhanKeperawatanIgdModal';
+import { DaftarKunjunganPemeriksaan } from '../components/pemeriksaan/DaftarKunjunganPemeriksaan';
+import { ReadOnlyBanner } from '../components/ReadOnlyBanner';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM, ExtendedICD10, ExtendedICD9CM } from '../data/icdDatabase';
 import { DigitalSignaturePad } from '../components/DigitalSignaturePad';
 import Swal from 'sweetalert2';
@@ -16,7 +18,8 @@ import {
   Check, FileCheck, ClipboardList, Thermometer, Droplets, ShieldAlert,
   Flame, Utensils, Beaker, Radio, FileDigit, Scissors, Heart, FileSpreadsheet,
   ArrowRight, Download, Printer, Barcode, Lock, Unlock, Sparkles, Tag,
-  Layers, QrCode, BookmarkCheck, XCircle, Info, Edit3, PenTool, RotateCcw
+  Layers, QrCode, BookmarkCheck, XCircle, Info, Edit3, PenTool, RotateCcw,
+  ArrowLeft
 } from 'lucide-react';
 import { Patient, Registration, CPPT, MedicalRecord, Coding } from '../types';
 
@@ -54,10 +57,16 @@ export const RekamMedisView: React.FC = () => {
   const {
     patients, registrations, medicalRecords, cppt, coding, user, params, navigate,
     addMedicalRecord, updateMedicalRecord, addCPPT, addCoding, updateCoding, lockCoding,
-    getPatient, getReg, getUser, canEditPage
+    getPatient, getReg, getUser, canEditPage, updateRegistration
   } = useApp();
 
   const isEditable = canEditPage('rekammedis');
+
+  // Mode Halaman: 'kunjungan' (daftar pasien terdaftar) atau 'pemeriksaan' (formulir pemeriksaan)
+  const [viewMode, setViewMode] = useState<'kunjungan' | 'pemeriksaan'>(() => {
+    if (params?.patientId && params?.regId) return 'pemeriksaan';
+    return 'kunjungan';
+  });
 
   // Search & Master Pasien State
   const [searchQuery, setSearchQuery] = useState('');
@@ -173,12 +182,19 @@ export const RekamMedisView: React.FC = () => {
   useEffect(() => {
     if (params?.patientId) {
       setSelectedPatientId(params.patientId);
+      setViewMode('pemeriksaan');
     }
     if (params?.regId) {
       setSelectedRegId(params.regId);
+      setViewMode('pemeriksaan');
     }
     if (params?.initialTab) {
       setActiveTab(params.initialTab as any);
+    }
+    if (params?.viewMode === 'kunjungan') {
+      setViewMode('kunjungan');
+    } else if (params?.viewMode === 'pemeriksaan') {
+      setViewMode('pemeriksaan');
     }
   }, [params]);
 
@@ -214,12 +230,16 @@ export const RekamMedisView: React.FC = () => {
     } else if (activeMR) {
       // Auto pre-populate initial diagnosis if present
       if (activeMR.diagnosis) {
-        const diagStr = activeMR.diagnosis;
-        const matched = EXTENDED_ICD10.find(i => diagStr.toLowerCase().includes(i.code.toLowerCase()) || diagStr.toLowerCase().includes(i.desc.toLowerCase()));
+        const diagStr = activeMR.diagnosis.toLowerCase();
+        const matched = EXTENDED_ICD10.find(i => 
+          (i.code && diagStr.includes(i.code.toLowerCase())) || 
+          (i.desc && diagStr.includes(i.desc.toLowerCase())) ||
+          (i.name && diagStr.includes(i.name.toLowerCase()))
+        );
         if (matched) {
-          setSelectedIcd10([{ code: matched.code, desc: matched.desc }]);
+          setSelectedIcd10([{ code: matched.code, desc: matched.desc || matched.name || matched.code }]);
         } else {
-          setSelectedIcd10([{ code: 'I10', desc: 'Hipertensi Esensial (Primer)' }]);
+          setSelectedIcd10([]);
         }
       } else {
         setSelectedIcd10([]);
@@ -299,6 +319,15 @@ export const RekamMedisView: React.FC = () => {
 
   // Handle Start New SOAP
   const handleStartNewSoap = () => {
+    if (!isEditable) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Akses Terbatas (View-Only)',
+        text: 'Role Koding/Coder hanya dapat melihat data klinis dan tidak diizinkan membuat catatan SOAP baru.',
+        confirmButtonColor: '#2563eb'
+      });
+      return;
+    }
     setEditingMRId(null);
     setAnamnesis('');
     setPhysicalExam('');
@@ -318,6 +347,15 @@ export const RekamMedisView: React.FC = () => {
 
   // Handle Start Editing Existing SOAP
   const handleStartEditSoap = (mr: MedicalRecord) => {
+    if (!isEditable) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Akses Terbatas (View-Only)',
+        text: 'Role Koding/Coder hanya dapat melihat data klinis dan tidak diizinkan mengubah catatan SOAP dokter.',
+        confirmButtonColor: '#2563eb'
+      });
+      return;
+    }
     setEditingMRId(mr.id);
     setAnamnesis(mr.anamnesis || '');
     setDiagnosis(mr.diagnosis || '');
@@ -361,6 +399,15 @@ export const RekamMedisView: React.FC = () => {
   // Handle Medical Record Save
   const handleSaveMedicalRecord = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isEditable) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Akses Ditolak (View-Only)',
+        text: 'Role Koding/Coder hanya memiliki izin untuk melihat/menelaah data klinis dan tidak diizinkan mengubah catatan medis.',
+        confirmButtonColor: '#2563eb'
+      });
+      return;
+    }
     if (!activeReg) {
       Swal.fire('Peringatan', 'Silakan pilih registrasi pasien terlebih dahulu', 'warning');
       return;
@@ -383,10 +430,17 @@ export const RekamMedisView: React.FC = () => {
         updatedAt: new Date().toISOString()
       });
 
+      if (activeReg) {
+        updateRegistration(activeReg.id, {
+          status: 'Selesai Diperiksa',
+          examinationStatus: 'Selesai Diperiksa'
+        });
+      }
+
       Swal.fire({
         icon: 'success',
         title: 'Pemeriksaan SOAP Berhasil Diperbarui!',
-        text: `Data SOAP, Rencana Terapi (Plan), dan Tanda Tangan No. RM ${selectedPatient.noRM} berhasil diperbarui.`,
+        text: `Data SOAP, Rencana Terapi (Plan), dan Tanda Tangan No. RM ${selectedPatient.noRM} berhasil diperbarui. Status pasien: Selesai Diperiksa.`,
         timer: 1800,
         showConfirmButton: false
       });
@@ -413,16 +467,64 @@ export const RekamMedisView: React.FC = () => {
 
       addMedicalRecord(newMR);
 
+      if (activeReg) {
+        updateRegistration(activeReg.id, {
+          status: 'Selesai Diperiksa',
+          examinationStatus: 'Selesai Diperiksa'
+        });
+      }
+
       Swal.fire({
         icon: 'success',
         title: 'Pemeriksaan SOAP Berhasil Disimpan',
-        text: `Data SOAP, Rencana Terapi (Plan), dan Tanda Tangan No. RM ${selectedPatient.noRM} tersimpan ke Rekam Medis Elektronik.`,
+        text: `Data SOAP, Rencana Terapi (Plan), dan Tanda Tangan No. RM ${selectedPatient.noRM} tersimpan ke Rekam Medis Elektronik. Status: Selesai Diperiksa.`,
         timer: 1800,
         showConfirmButton: false
       });
     }
 
     setActiveTab('identitas');
+  };
+
+  // Simpan & Selesaikan Pemeriksaan (Otomatis ubah status menjadi Selesai Diperiksa)
+  const handleCompleteExamination = () => {
+    if (!isEditable) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Akses Ditolak (View-Only)',
+        text: 'Role Koding/Coder hanya memiliki izin telaah klinis dan tidak diizinkan menyelesaikan pemeriksaan.',
+        confirmButtonColor: '#2563eb'
+      });
+      return;
+    }
+    if (!activeReg) return;
+    updateRegistration(activeReg.id, {
+      status: 'Selesai Diperiksa',
+      examinationStatus: 'Selesai Diperiksa'
+    });
+    Swal.fire({
+      icon: 'success',
+      title: 'Pemeriksaan Selesai!',
+      html: `
+        <div class="text-left text-xs space-y-2 mt-2 bg-emerald-50 p-3.5 rounded-xl border border-emerald-200 text-slate-800">
+          <div><strong>No. Rekam Medis:</strong> <span class="font-mono text-blue-700 font-bold">${selectedPatient?.noRM}</span></div>
+          <div><strong>Nama Pasien:</strong> <strong>${selectedPatient?.name}</strong></div>
+          <div><strong>Unit Pelayanan:</strong> ${activeReg.type} (${activeReg.poli})</div>
+          <div class="text-emerald-700 font-bold pt-2 border-t border-emerald-200 flex items-center gap-1.5">
+            <span>✓ Status kunjungan pasien otomatis diperbarui menjadi: <strong>Selesai Diperiksa</strong></span>
+          </div>
+        </div>
+      `,
+      confirmButtonText: 'Kembali ke Daftar Kunjungan',
+      showCancelButton: true,
+      cancelButtonText: 'Tetap di Formulir',
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#64748b'
+    }).then((res) => {
+      if (res.isConfirmed) {
+        setViewMode('kunjungan');
+      }
+    });
   };
 
   // Auto-Detect ICD-10 and ICD-9-CM from Medical Record notes
@@ -437,12 +539,13 @@ export const RekamMedisView: React.FC = () => {
     // Scan ICD-10
     const matchedIcd10: { code: string; desc: string }[] = [];
     EXTENDED_ICD10.forEach(item => {
-      const codeMatch = textToAnalyze.includes(item.code.toLowerCase());
-      const descWords = item.desc.toLowerCase().split(' ').filter(w => w.length > 4);
+      const descText = item.desc || item.name || '';
+      const codeMatch = Boolean(item.code && textToAnalyze.includes(item.code.toLowerCase()));
+      const descWords = descText.toLowerCase().split(' ').filter(w => w.length > 4);
       const descMatch = descWords.some(word => textToAnalyze.includes(word));
       if (codeMatch || descMatch) {
         if (!matchedIcd10.some(m => m.code === item.code)) {
-          matchedIcd10.push({ code: item.code, desc: item.desc });
+          matchedIcd10.push({ code: item.code, desc: descText || item.code });
         }
       }
     });
@@ -450,22 +553,16 @@ export const RekamMedisView: React.FC = () => {
     // Scan ICD-9-CM
     const matchedIcd9: { code: string; desc: string }[] = [];
     EXTENDED_ICD9CM.forEach(item => {
-      const codeMatch = textToAnalyze.includes(item.code.toLowerCase());
-      const descWords = item.desc.toLowerCase().split(' ').filter(w => w.length > 4);
+      const descText = item.desc || item.name || '';
+      const codeMatch = Boolean(item.code && textToAnalyze.includes(item.code.toLowerCase()));
+      const descWords = descText.toLowerCase().split(' ').filter(w => w.length > 4);
       const descMatch = descWords.some(word => textToAnalyze.includes(word));
       if (codeMatch || descMatch) {
         if (!matchedIcd9.some(m => m.code === item.code)) {
-          matchedIcd9.push({ code: item.code, desc: item.desc });
+          matchedIcd9.push({ code: item.code, desc: descText || item.code });
         }
       }
     });
-
-    if (matchedIcd10.length === 0) {
-      matchedIcd10.push({ code: 'I10', desc: 'Hipertensi Esensial (Primer)' });
-    }
-    if (matchedIcd9.length === 0) {
-      matchedIcd9.push({ code: '89.13', desc: 'Elektrokardiogram (EKG)' });
-    }
 
     setSelectedIcd10(matchedIcd10);
     setSelectedIcd9(matchedIcd9);
@@ -558,8 +655,93 @@ export const RekamMedisView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 p-3 sm:p-6 space-y-5">
-      {/* Top Patient Bar & Quick Selector */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+      {viewMode === 'kunjungan' ? (
+        <DaftarKunjunganPemeriksaan
+          onSelectPatient={(patientId, regId, targetTab) => {
+            setSelectedPatientId(patientId);
+            setSelectedRegId(regId);
+            setActiveTab(targetTab);
+            setViewMode('pemeriksaan');
+          }}
+        />
+      ) : (
+        <>
+          {/* HEADER NAVIGASI PENGHUBUNG: KEMBALI KE DAFTAR KUNJUNGAN & STATUS PEMERIKSAAN */}
+          <div className="bg-white border-2 border-blue-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setViewMode('kunjungan')}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 border border-slate-300 shadow-2xs active:scale-95 shrink-0"
+                title="Kembali ke Halaman Depan Kunjungan & Antrean Pasien"
+              >
+                <ArrowLeft className="w-4 h-4 text-blue-700" />
+                <span>← Kembali ke Daftar Kunjungan</span>
+              </button>
+
+              <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
+
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="font-bold text-slate-500">Pasien Diperiksa:</span>
+                <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 font-mono font-black border border-blue-200">
+                  {selectedPatient?.noRM || '000001'}
+                </span>
+                <span className="font-extrabold text-slate-900 text-sm">
+                  {selectedPatient?.name}
+                </span>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                  {activeReg?.type || 'Rawat Jalan'} ({activeReg?.poli || 'Umum'})
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* STATUS PASIEN (SIAP DIPERIKSA / SELESAI DIPERIKSA) */}
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black shadow-2xs ${
+                activeReg?.status === 'Selesai Diperiksa' || activeReg?.examinationStatus === 'Selesai Diperiksa'
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  : 'bg-amber-50 text-amber-800 border-amber-300'
+              }`}>
+                {activeReg?.status === 'Selesai Diperiksa' || activeReg?.examinationStatus === 'Selesai Diperiksa' ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Status: 🟢 Selesai Diperiksa</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span>Status: 🟡 Siap Diperiksa</span>
+                  </>
+                )}
+              </div>
+
+              {/* TOMBOL SIMPAN / SELESAI PEMERIKSAAN */}
+              {isEditable ? (
+                <button
+                  type="button"
+                  onClick={handleCompleteExamination}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                  title="Tandai pemeriksaan selesai dan ubah status pasien menjadi Selesai Diperiksa"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Simpan/Selesai Pemeriksaan</span>
+                </button>
+              ) : (
+                <div className="px-3.5 py-2 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 font-extrabold text-xs flex items-center gap-1.5 shadow-2xs">
+                  <Lock className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Mode Telaah Klinis (Coder View-Only)</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* READ-ONLY BANNER KHUSUS CODER */}
+          {!isEditable && (
+            <ReadOnlyBanner moduleName="Pemeriksaan Pasien / RME" />
+          )}
+
+          {/* Top Patient Bar & Quick Selector */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Patient Search & Dropdown */}
           <div className="flex items-center gap-3 flex-1">
@@ -576,7 +758,7 @@ export const RekamMedisView: React.FC = () => {
                   {selectedPatient?.name || 'Pilih Pasien'}
                 </span>
                 <span className="text-xs text-slate-500 font-medium">
-                  ({selectedPatient?.gender === 'M' ? 'Laki-laki' : 'Perempuan'}, {selectedPatient?.dob ? new Date().getFullYear() - new Date(selectedPatient.dob).getFullYear() : 30} thn)
+                  ({(selectedPatient?.gender === 'M' || selectedPatient?.gender === 'L' || selectedPatient?.gender?.toLowerCase()?.startsWith('laki')) ? 'Laki-laki' : 'Perempuan'}, {selectedPatient?.dob ? new Date().getFullYear() - new Date(selectedPatient.dob).getFullYear() : 30} thn)
                 </span>
                 <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded border border-emerald-200">
                   {selectedPatient?.insuranceType || 'BPJS'}
@@ -951,24 +1133,33 @@ export const RekamMedisView: React.FC = () => {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {activeMR && (
-                          <button
-                            type="button"
-                            onClick={() => handleStartEditSoap(activeMR)}
-                            className="px-3 py-1.5 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                            <span>Edit SOAP Ini</span>
-                          </button>
+                        {isEditable ? (
+                          <>
+                            {activeMR && (
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditSoap(activeMR)}
+                                className="px-3 py-1.5 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Edit SOAP Ini</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={handleStartNewSoap}
+                              className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                            >
+                              <FilePlus className="w-3.5 h-3.5" />
+                              <span>Input SOAP Baru</span>
+                            </button>
+                          </>
+                        ) : (
+                          <div className="px-3 py-1 bg-amber-50 border border-amber-300 rounded-xl text-[11px] font-bold text-amber-900 flex items-center gap-1.5 shadow-2xs">
+                            <Lock className="w-3.5 h-3.5 text-amber-700" />
+                            <span>Telaah Klinis (Coder View-Only)</span>
+                          </div>
                         )}
-                        <button
-                          type="button"
-                          onClick={handleStartNewSoap}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-                        >
-                          <FilePlus className="w-3.5 h-3.5" />
-                          <span>Input SOAP Baru</span>
-                        </button>
                       </div>
                     </div>
 
@@ -1059,13 +1250,19 @@ export const RekamMedisView: React.FC = () => {
                         <p className="text-xs text-slate-400 max-w-sm mx-auto">
                           Silakan lakukan pemeriksaan medis dan pengisian SOAP untuk pasien ini.
                         </p>
-                        <button
-                          onClick={() => setActiveTab('soap')}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors inline-flex items-center gap-1.5"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>Mulai Pemeriksaan SOAP</span>
-                        </button>
+                        {isEditable ? (
+                          <button
+                            onClick={() => setActiveTab('soap')}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors inline-flex items-center gap-1.5"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Mulai Pemeriksaan SOAP</span>
+                          </button>
+                        ) : (
+                          <div className="text-xs text-amber-800 font-bold bg-amber-50 border border-amber-300 px-3 py-1.5 rounded-xl inline-block">
+                            🔒 Akun Coder/Koding (Hanya Telaah Data Klinis)
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1116,7 +1313,14 @@ export const RekamMedisView: React.FC = () => {
               patient={selectedPatient}
               registration={activeReg}
               user={user}
+              isReadOnly={!isEditable}
               onSaveSuccess={() => {
+                if (activeReg) {
+                  updateRegistration(activeReg.id, {
+                    status: 'Selesai Diperiksa',
+                    examinationStatus: 'Selesai Diperiksa'
+                  });
+                }
                 setActiveTab('identitas');
               }}
             />
@@ -1128,7 +1332,14 @@ export const RekamMedisView: React.FC = () => {
               patient={selectedPatient}
               registration={activeReg}
               user={user}
+              isReadOnly={!isEditable}
               onSaveSuccess={() => {
+                if (activeReg) {
+                  updateRegistration(activeReg.id, {
+                    status: 'Selesai Diperiksa',
+                    examinationStatus: 'Selesai Diperiksa'
+                  });
+                }
                 setActiveTab('identitas');
               }}
             />
@@ -1140,7 +1351,14 @@ export const RekamMedisView: React.FC = () => {
               patient={selectedPatient}
               registration={activeReg}
               user={user}
+              isReadOnly={!isEditable}
               onSaveSuccess={() => {
+                if (activeReg) {
+                  updateRegistration(activeReg.id, {
+                    status: 'Selesai Diperiksa',
+                    examinationStatus: 'Selesai Diperiksa'
+                  });
+                }
                 setActiveTab('identitas');
               }}
             />
@@ -1149,6 +1367,13 @@ export const RekamMedisView: React.FC = () => {
           {/* TAB 2: SOAP MEDIS PEMERIKSAAN DOKTER */}
           {activeTab === 'soap' && (
             <div className="max-w-4xl mx-auto space-y-6">
+              {!isEditable && (
+                <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs font-bold flex items-center gap-2">
+                  <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>Mode Telaah SOAP (View-Only) — Petugas Coder dapat membaca seluruh data klinis pasien untuk keperluan penetapan kode ICD-10 & ICD-9-CM. Penginputan dan modifikasi SOAP hanya dapat dilakukan oleh Dokter DPJP & Perawat.</span>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-3 gap-3">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1173,7 +1398,7 @@ export const RekamMedisView: React.FC = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {editingMRId && (
+                  {editingMRId && isEditable && (
                     <button
                       type="button"
                       onClick={handleStartNewSoap}
@@ -1183,26 +1408,28 @@ export const RekamMedisView: React.FC = () => {
                       <span>Batal Edit / Input Baru</span>
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAnamnesis('Pasien mengeluh pusing berputar dan tengkuk terasa kaku sejak 2 hari SMRS. Mual (+), muntah (-), pandangan kabur disangkal. Riwayat hipertensi tidak terkontrol sejak 1 tahun lalu.');
-                      setPhysicalExam('KU: Sedang, Kesadaran: Compos Mentis (GCS E4V5M6). Mata: CA (-/-), SI (-/-). Thorax: Cor BJ I-II regular murni, murmur (-). Pulmo vesikuler (+/+), rhonki (-/-), wheezing (-/-). Abdomen supel, BU (+) normal. Ekstremitas akral hangat, CRT < 2s, edema (-/-).');
-                      setDiagnosis('I10 - Hipertensi Esensial (Primer) Stadium II');
-                      setPlan('1. Farmakoterapi:\n   - Amlodipine 10 mg 1x1 tab PO (pagi hari)\n   - Candesartan 8 mg 1x1 tab PO (malam hari)\n   - Paracetamol 500 mg 3x1 tab PO (bila nyeri kepala / prn)\n2. Penunjang:\n   - Cek EKG 12 lead, Profil Lipid Lengkap, Ureum, Kreatinin\n3. Non-Farmakologi & Edukasi:\n   - Modifikasi gaya hidup: Diet rendah garam (< 2 gram / 1 sdt garam dapur per hari)\n   - Batasi makanan berlemak dan tinggi kolesterol, hindari kafein & merokok\n   - Olahraga aerobik ringan teratur 30 menit/hari\n   - Monitoring tekanan darah mandiri di rumah dan kontrol ulang Poli Penyakit Dalam 1 minggu lagi');
-                      setNurseNotes('Pasien telah diistirahatkan di tempat tidur posisi semi-fowler, edukasi pembatasan garam telah disampaikan kepada keluarga.');
-                      setSystolic('150');
-                      setDiastolic('95');
-                      setHeartRate('84');
-                      setRespRate('20');
-                      setTemperature('36.6');
-                      setSpo2('98');
-                    }}
-                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Isi Sampel Klinis Lengkap (S-O-A-P)</span>
-                  </button>
+                  {isEditable && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAnamnesis('Pasien mengeluh pusing berputar dan tengkuk terasa kaku sejak 2 hari SMRS. Mual (+), muntah (-), pandangan kabur disangkal. Riwayat hipertensi tidak terkontrol sejak 1 tahun lalu.');
+                        setPhysicalExam('KU: Sedang, Kesadaran: Compos Mentis (GCS E4V5M6). Mata: CA (-/-), SI (-/-). Thorax: Cor BJ I-II regular murni, murmur (-). Pulmo vesikuler (+/+), rhonki (-/-), wheezing (-/-). Abdomen supel, BU (+) normal. Ekstremitas akral hangat, CRT < 2s, edema (-/-).');
+                        setDiagnosis('I10 - Hipertensi Esensial (Primer) Stadium II');
+                        setPlan('1. Farmakoterapi:\n   - Amlodipine 10 mg 1x1 tab PO (pagi hari)\n   - Candesartan 8 mg 1x1 tab PO (malam hari)\n   - Paracetamol 500 mg 3x1 tab PO (bila nyeri kepala / prn)\n2. Penunjang:\n   - Cek EKG 12 lead, Profil Lipid Lengkap, Ureum, Kreatinin\n3. Non-Farmakologi & Edukasi:\n   - Modifikasi gaya hidup: Diet rendah garam (< 2 gram / 1 sdt garam dapur per hari)\n   - Batasi makanan berlemak dan tinggi kolesterol, hindari kafein & merokok\n   - Olahraga aerobik ringan teratur 30 menit/hari\n   - Monitoring tekanan darah mandiri di rumah dan kontrol ulang Poli Penyakit Dalam 1 minggu lagi');
+                        setNurseNotes('Pasien telah diistirahatkan di tempat tidur posisi semi-fowler, edukasi pembatasan garam telah disampaikan kepada keluarga.');
+                        setSystolic('150');
+                        setDiastolic('95');
+                        setHeartRate('84');
+                        setRespRate('20');
+                        setTemperature('36.6');
+                        setSpo2('98');
+                      }}
+                      className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Isi Sampel Klinis Lengkap (S-O-A-P)</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1221,7 +1448,8 @@ export const RekamMedisView: React.FC = () => {
                         type="text"
                         value={systolic}
                         onChange={(e) => setSystolic(e.target.value)}
-                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                        disabled={!isEditable}
+                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
                         required
                       />
                     </div>
@@ -1231,7 +1459,8 @@ export const RekamMedisView: React.FC = () => {
                         type="text"
                         value={diastolic}
                         onChange={(e) => setDiastolic(e.target.value)}
-                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                        disabled={!isEditable}
+                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
                         required
                       />
                     </div>
@@ -1241,7 +1470,8 @@ export const RekamMedisView: React.FC = () => {
                         type="text"
                         value={heartRate}
                         onChange={(e) => setHeartRate(e.target.value)}
-                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                        disabled={!isEditable}
+                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
                         required
                       />
                     </div>
@@ -1251,7 +1481,8 @@ export const RekamMedisView: React.FC = () => {
                         type="text"
                         value={respRate}
                         onChange={(e) => setRespRate(e.target.value)}
-                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                        disabled={!isEditable}
+                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
                         required
                       />
                     </div>
@@ -1261,7 +1492,8 @@ export const RekamMedisView: React.FC = () => {
                         type="text"
                         value={temperature}
                         onChange={(e) => setTemperature(e.target.value)}
-                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                        disabled={!isEditable}
+                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
                         required
                       />
                     </div>
@@ -1271,7 +1503,8 @@ export const RekamMedisView: React.FC = () => {
                         type="text"
                         value={spo2}
                         onChange={(e) => setSpo2(e.target.value)}
-                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500"
+                        disabled={!isEditable}
+                        className="w-full mt-1 p-2 bg-white rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
                         required
                       />
                     </div>
@@ -1287,9 +1520,10 @@ export const RekamMedisView: React.FC = () => {
                   <textarea
                     value={anamnesis}
                     onChange={(e) => setAnamnesis(e.target.value)}
+                    disabled={!isEditable}
                     rows={3}
                     placeholder="Tuliskan keluhan utama, riwayat penyakit sekarang, riwayat penyakit dahulu, riwayat obat..."
-                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:bg-white focus:border-blue-500 transition-all"
+                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:bg-white focus:border-blue-500 transition-all disabled:bg-slate-100 disabled:text-slate-700"
                     required
                   />
                 </div>
@@ -1303,9 +1537,10 @@ export const RekamMedisView: React.FC = () => {
                   <textarea
                     value={physicalExam}
                     onChange={(e) => setPhysicalExam(e.target.value)}
+                    disabled={!isEditable}
                     rows={3}
                     placeholder="Keadaan umum, kesadaran, kepala, thorax, abdomen, ekstremitas, hasil lab/penunjang..."
-                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:bg-white focus:border-blue-500 transition-all"
+                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 focus:outline-none focus:bg-white focus:border-blue-500 transition-all disabled:bg-slate-100 disabled:text-slate-700"
                     required
                   />
                 </div>
@@ -1320,8 +1555,9 @@ export const RekamMedisView: React.FC = () => {
                     type="text"
                     value={diagnosis}
                     onChange={(e) => setDiagnosis(e.target.value)}
+                    disabled={!isEditable}
                     placeholder="Contoh: I10 - Hipertensi Esensial (Primer)"
-                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-blue-900 focus:outline-none focus:bg-white focus:border-blue-500 transition-all"
+                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs font-bold text-blue-900 focus:outline-none focus:bg-white focus:border-blue-500 transition-all disabled:bg-slate-100 disabled:text-blue-950"
                     required
                   />
                 </div>
@@ -1333,29 +1569,32 @@ export const RekamMedisView: React.FC = () => {
                       <span className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px]">P</span>
                       <span>Rencana Penatalaksanaan & Instruksi Medis (Plan)</span>
                     </label>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => setPlan(prev => prev ? `${prev}\n- Amlodipine 5mg tab 1x1 tab PO pagi\n- Candesartan 8mg tab 1x1 tab PO malam` : '- Amlodipine 5mg tab 1x1 tab PO pagi\n- Candesartan 8mg tab 1x1 tab PO malam')}
-                        className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md border border-indigo-200 cursor-pointer"
-                      >
-                        + Resep HT
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPlan(prev => prev ? `${prev}\n- Diet rendah garam < 2g/hari\n- Cek profil lipid dan fungsi ginjal\n- Kontrol poli 1 minggu lagi` : '- Diet rendah garam < 2g/hari\n- Cek profil lipid dan fungsi ginjal\n- Kontrol poli 1 minggu lagi')}
-                        className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md border border-indigo-200 cursor-pointer"
-                      >
-                        + Edukasi & Lab
-                      </button>
-                    </div>
+                    {isEditable && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setPlan(prev => prev ? `${prev}\n- Amlodipine 5mg tab 1x1 tab PO pagi\n- Candesartan 8mg tab 1x1 tab PO malam` : '- Amlodipine 5mg tab 1x1 tab PO pagi\n- Candesartan 8mg tab 1x1 tab PO malam')}
+                          className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md border border-indigo-200 cursor-pointer"
+                        >
+                          + Resep HT
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPlan(prev => prev ? `${prev}\n- Diet rendah garam < 2g/hari\n- Cek profil lipid dan fungsi ginjal\n- Kontrol poli 1 minggu lagi` : '- Diet rendah garam < 2g/hari\n- Cek profil lipid dan fungsi ginjal\n- Kontrol poli 1 minggu lagi')}
+                          className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md border border-indigo-200 cursor-pointer"
+                        >
+                          + Edukasi & Lab
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <textarea
                     value={plan}
                     onChange={(e) => setPlan(e.target.value)}
+                    disabled={!isEditable}
                     rows={4}
                     placeholder="Tuliskan rencana penatalaksanaan, terapi obat / resep dokter, tindakan medis klinis, instruksi monitoring perawat, rencana pemeriksaan penunjang (lab/radiologi), edukasi pasien, dan tanggal rencana kontrol..."
-                    className="w-full p-3 bg-indigo-50/40 rounded-xl border border-indigo-200 text-xs font-medium text-slate-800 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all"
+                    className="w-full p-3 bg-indigo-50/40 rounded-xl border border-indigo-200 text-xs font-medium text-slate-800 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all disabled:bg-slate-100 disabled:text-slate-700"
                     required
                   />
                 </div>
@@ -1370,8 +1609,9 @@ export const RekamMedisView: React.FC = () => {
                     type="text"
                     value={nurseNotes}
                     onChange={(e) => setNurseNotes(e.target.value)}
+                    disabled={!isEditable}
                     placeholder="Contoh: Pasien telah diistirahatkan semi-fowler, obat oral dosis pertama telah diberikan, keluhan pusing berkurang..."
-                    className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-blue-500 transition-all"
+                    className="w-full p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:bg-white focus:border-blue-500 transition-all disabled:bg-slate-100 disabled:text-slate-600"
                   />
                 </div>
 
@@ -1400,6 +1640,7 @@ export const RekamMedisView: React.FC = () => {
                         signatureValue={nurseSignature}
                         onSignatureChange={setNurseSignature}
                         signedDate={new Date().toLocaleDateString('id-ID', { dateStyle: 'long' })}
+                        readOnly={!isEditable}
                       />
                     </div>
 
@@ -1415,6 +1656,7 @@ export const RekamMedisView: React.FC = () => {
                         signatureValue={doctorSignature}
                         onSignatureChange={setDoctorSignature}
                         signedDate={new Date().toLocaleDateString('id-ID', { dateStyle: 'long' })}
+                        readOnly={!isEditable}
                       />
                     </div>
                   </div>
@@ -1427,15 +1669,22 @@ export const RekamMedisView: React.FC = () => {
                     onClick={() => setActiveTab('identitas')}
                     className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                   >
-                    Batal
+                    {isEditable ? 'Batal' : 'Kembali ke Ringkasan'}
                   </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>{editingMRId ? 'Perbarui Catatan SOAP & TTD' : 'Simpan SOAP ke Rekam Medis'}</span>
-                  </button>
+                  {isEditable ? (
+                    <button
+                      type="submit"
+                      className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{editingMRId ? 'Perbarui Catatan SOAP & TTD' : 'Simpan SOAP ke Rekam Medis'}</span>
+                    </button>
+                  ) : (
+                    <div className="px-4 py-2.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl text-xs font-extrabold flex items-center gap-2 shadow-2xs">
+                      <Lock className="w-4 h-4 text-amber-700" />
+                      <span>Mode Telaah SOAP (Coder View-Only)</span>
+                    </div>
+                  )}
                 </div>
               </form>
             </div>
@@ -1685,8 +1934,8 @@ export const RekamMedisView: React.FC = () => {
                     {icd10Search.trim().length > 0 && (
                       <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto z-30 divide-y divide-slate-100">
                         {EXTENDED_ICD10.filter(item =>
-                          item.code.toLowerCase().includes(icd10Search.toLowerCase()) ||
-                          item.desc.toLowerCase().includes(icd10Search.toLowerCase())
+                          (item.code && item.code.toLowerCase().includes(icd10Search.toLowerCase())) ||
+                          ((item.desc || item.name) && (item.desc || item.name || '').toLowerCase().includes(icd10Search.toLowerCase()))
                         ).slice(0, 10).map(item => (
                           <div
                             key={item.code}
@@ -2174,6 +2423,8 @@ export const RekamMedisView: React.FC = () => {
           )}
         </div>
       </div>
+        </>
+      )}
 
       {/* MODAL TRACER IGD */}
       <TracerIgdModal
@@ -2191,6 +2442,7 @@ export const RekamMedisView: React.FC = () => {
         patient={selectedPatient}
         registration={activeReg}
         nurse={user}
+        isReadOnly={!isEditable}
       />
     </div>
   );

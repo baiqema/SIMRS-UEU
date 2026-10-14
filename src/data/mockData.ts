@@ -22,6 +22,16 @@ export const INITIAL_USERS: User[] = [
   { id: 'U007B', username: 'mhs.john', password: 'mhs123', name: 'Mahasiswa RMIK Esa Unggul', roleId: 'R04', active: true },
 
   { id: 'U002', username: 'dr.sari', password: 'dokter123', name: 'dr. Sari Dewi, Sp.PD', roleId: 'R05', active: true },
+  { id: 'U002_BEDAH', username: 'dr.ahmad', password: 'dokter123', name: 'dr. Ahmad Fauzi, Sp.B', roleId: 'R05', active: true },
+  { id: 'U002_ANAK', username: 'dr.maya', password: 'dokter123', name: 'dr. Maya Indriani, Sp.A', roleId: 'R05', active: true },
+  { id: 'U002_OBGYN', username: 'dr.rizky', password: 'dokter123', name: 'dr. Rizky Pratama, Sp.OG', roleId: 'R05', active: true },
+  { id: 'U002_JANTUNG', username: 'dr.bambang', password: 'dokter123', name: 'dr. Bambang Sutrisno, Sp.JP', roleId: 'R05', active: true },
+  { id: 'U002_SARAF', username: 'dr.hendra', password: 'dokter123', name: 'dr. Hendra Setiawan, Sp.S', roleId: 'R05', active: true },
+  { id: 'U002_MATA', username: 'dr.anita', password: 'dokter123', name: 'dr. Anita Wijaya, Sp.M', roleId: 'R05', active: true },
+  { id: 'U002_THT', username: 'dr.farida', password: 'dokter123', name: 'dr. Farida Rahmawati, Sp.THT-KL', roleId: 'R05', active: true },
+  { id: 'U002_GIGI', username: 'drg.silvia', password: 'dokter123', name: 'drg. Silvia Anggraini, Sp.KG', roleId: 'R05', active: true },
+  { id: 'U002_IGD', username: 'dr.tri', password: 'dokter123', name: 'dr. Tri Wahyuni (Dokter Umum IGD)', roleId: 'R05', active: true },
+  { id: 'U002_UMUM', username: 'dr.denny', password: 'dokter123', name: 'dr. Denny Chandra (Dokter Umum Ralan)', roleId: 'R05', active: true },
   { id: 'U003', username: 'ns.budi', password: 'perawat123', name: 'Ns. Budi Hartono, S.Kep', roleId: 'R06', active: true },
   { id: 'U004', username: 'reg.rina', password: 'reg123', name: 'Rina Wulandari, A.Md', roleId: 'R07', active: true },
   { id: 'U005', username: 'rm.ana', password: 'rm123', name: 'Ana Ratnasari, S.IKM', roleId: 'R08', active: true },
@@ -51,9 +61,17 @@ export const INITIAL_ROLES: Role[] = [
   { id: 'R04', name: 'Mahasiswa (All Modul)', access: ['all'] },
   { id: 'R05', name: 'Dokter', access: ['dashboard', 'rekammedis', 'cppt', 'informedconsent', 'resumemedis', 'laboratorium', 'radiologi'] },
   { id: 'R06', name: 'Mahasiswa Perawat', access: ['dashboard', 'rekammedis', 'cppt', 'keperawatan', 'informedconsent', 'resumemedis', 'laboratorium', 'radiologi'] },
-  { id: 'R07', name: 'Mahasiswa Pendaftaran', access: ['dashboard', 'pendaftaran', 'generalconsent', 'vclaim', 'sep'] },
+  { id: 'R07', name: 'Mahasiswa Pendaftaran', access: ['dashboard', 'pendaftaran', 'kunjungan', 'indekspasien', 'generalconsent', 'vclaim', 'sep', 'rekammedis'] },
   { id: 'R08', name: 'Petugas Rekam Medis', access: ['dashboard', 'rekammedis', 'cppt', 'resumemedis', 'coding', 'pelaporan'] },
-  { id: 'R09', name: 'Mahasiswa Coding', access: ['dashboard', 'coding', 'klaim', 'eklaim'] },
+  { 
+    id: 'R09', 
+    name: 'Mahasiswa Coding', 
+    access: [
+      'dashboard', 'coding', 'klaim', 'eklaim', 
+      'rekammedis', 'cppt', 'resumemedis', 'informedconsent', 'generalconsent', 
+      'farmasi', 'laboratorium', 'radiologi', 'pelaporan'
+    ] 
+  },
   { id: 'R10', name: 'Keuangan/Farmasi', access: ['dashboard', 'billing', 'pembayaran', 'farmasi'] },
   { id: 'R11', name: 'Petugas Klaim BPJS', access: ['dashboard', 'klaim', 'coding', 'billing'] },
   { id: 'R12', name: 'Kepala Rekam Medis', access: ['dashboard', 'rekammedis', 'coding', 'pelaporan', 'audit', 'manajemenuser'] },
@@ -232,70 +250,86 @@ export const INITIAL_PATIENTS: Patient[] = [
   }
 ];
 
+const getTodayDateStr = () => new Date().toISOString().split('T')[0];
+
 export const INITIAL_REGISTRATIONS: Registration[] = [
   {
     id: 'REG001',
     patientId: 'P001',
-    date: '2026-08-28',
-    type: 'IGD',
-    poli: 'IGD',
+    date: getTodayDateStr(),
+    registrationTime: '08.15',
+    type: 'Rawat Jalan',
+    poli: 'Poli Penyakit Dalam',
     dpjp: 'U002',
-    status: 'Dirawat',
+    status: 'Siap Diperiksa',
+    examinationStatus: 'Siap Diperiksa',
     sepNo: '0010R0010826V000001',
-    room: 'IGD-01'
+    room: null,
+    potensiFragmentasi: true,
+    fragmentasiReason: 'Kunjungan ulang ke Poli Penyakit Dalam dalam selang 30 hari sejak riwayat pengobatan sebelumnya (REG006).'
   },
   {
     id: 'REG002',
     patientId: 'P002',
-    date: '2026-08-29',
-    type: 'Rawat Inap',
-    poli: 'Penyakit Dalam',
-    dpjp: 'U002',
-    status: 'Dirawat',
-    sepNo: '0010R0010826V000002',
-    room: 'VVIP-201'
-  },
-  {
-    id: 'REG003',
-    patientId: 'P003',
-    date: '2026-08-30',
-    type: 'Rawat Jalan',
-    poli: 'Poli Jantung',
-    dpjp: 'U002',
-    status: 'Selesai',
-    sepNo: '-',
-    room: null
-  },
-  {
-    id: 'REG004',
-    patientId: 'P004',
-    date: '2026-08-30',
+    date: getTodayDateStr(),
+    registrationTime: '08.30',
     type: 'IGD',
     poli: 'IGD',
     dpjp: 'U002',
-    status: 'Selesai',
+    status: 'Siap Diperiksa',
+    examinationStatus: 'Siap Diperiksa',
+    sepNo: '0010R0010826V000002',
+    room: 'IGD-01'
+  },
+  {
+    id: 'REG003',
+    patientId: 'P005',
+    date: getTodayDateStr(),
+    registrationTime: '09.00',
+    type: 'Rawat Inap',
+    poli: 'Rawat Inap Melati',
+    dpjp: 'U002',
+    status: 'Selesai Diperiksa',
+    examinationStatus: 'Selesai Diperiksa',
+    sepNo: '0010R0010826V000003',
+    room: 'VVIP-201'
+  },
+  {
+    id: 'REG004',
+    patientId: 'P003',
+    date: getTodayDateStr(),
+    registrationTime: '09.15',
+    type: 'Rawat Jalan',
+    poli: 'Poli Jantung & Pembuluh Darah',
+    dpjp: 'U002',
+    status: 'Siap Diperiksa',
+    examinationStatus: 'Siap Diperiksa',
     sepNo: '0010R0010826V000004',
     room: null
   },
   {
     id: 'REG005',
-    patientId: 'P005',
-    date: '2026-08-30',
-    type: 'Rawat Jalan',
-    poli: 'Poli Penyakit Dalam',
+    patientId: 'P004',
+    date: getTodayDateStr(),
+    registrationTime: '09.30',
+    type: 'IGD',
+    poli: 'IGD',
     dpjp: 'U002',
-    status: 'Selesai',
+    status: 'Selesai Diperiksa',
+    examinationStatus: 'Selesai Diperiksa',
     sepNo: '0010R0010826V000005',
-    room: null
+    room: 'IGD-02'
   },
   {
     id: 'REG006',
     patientId: 'P001',
     date: '2026-09-11',
+    registrationTime: '10.00',
     type: 'Rawat Jalan',
     poli: 'Poli Penyakit Dalam',
     dpjp: 'U002',
-    status: 'Selesai',
+    status: 'Selesai Diperiksa',
+    examinationStatus: 'Selesai Diperiksa',
     sepNo: '0010R0010826V000006',
     room: null
   },
@@ -303,10 +337,12 @@ export const INITIAL_REGISTRATIONS: Registration[] = [
     id: 'REG007',
     patientId: 'P002',
     date: '2026-09-11',
+    registrationTime: '10.30',
     type: 'Rawat Jalan',
     poli: 'Poli Jantung & Pembuluh Darah',
     dpjp: 'U002',
-    status: 'Selesai',
+    status: 'Selesai Diperiksa',
+    examinationStatus: 'Selesai Diperiksa',
     sepNo: '0010R0010826V000007',
     room: null
   }
@@ -586,7 +622,7 @@ export const INITIAL_ICD9CM: ICD9CM[] = [
 
 export const INITIAL_BEDS: Bed[] = [
   // Bangsal Mawar (Penyakit Dalam)
-  { id: 'MWR-101-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000001', roomName: 'Kamar 101', bedNumber: 'Bed A', occupiedSince: '2026-09-20' },
+  { id: 'MWR-101-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000001', roomName: 'Kamar 101', bedNumber: 'Bed A', occupiedSince: '2026-08-20' },
   { id: 'MWR-101-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 101', bedNumber: 'Bed B' },
   { id: 'MWR-102-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 102', bedNumber: 'Bed A' },
   { id: 'MWR-102-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Maintenance', patientId: null, roomName: 'Kamar 102', bedNumber: 'Bed B', maintenanceReason: 'Sterilisasi kamar & pembersihan menyeluruh pasca discharge' },

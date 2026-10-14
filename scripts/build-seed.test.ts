@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSeedSql, sqlLiteral, TEMPLATE_CLASS_ID } from './build-seed';
+import { buildSeedSql, placeholderTodayRegistrations, sqlLiteral, TEMPLATE_CLASS_ID } from './build-seed';
 
 describe('sqlLiteral', () => {
   it('doubles single quotes', () => {
@@ -17,13 +17,20 @@ describe('buildSeedSql', () => {
     expect(sql).toContain('insert into public.staff_directory');
     expect(sql).not.toMatch(/"password"/);
   });
-  it('seeds today registrations with placeholders', () => {
-    expect(sql).toContain('__TODAY__');
-    expect(sql).toContain('__TODAYCOMPACT__');
+  it('seeds today registrations with the date placeholder', () => {
+    expect(sql).toContain('insert into public.registrations');
+    expect(sql).toContain('"date":"__TODAY__"');
   });
   it('gives R03 the manajemenuser module and no praktikum', () => {
     const r03 = sql.split('\n').find(l => l.includes("'R03'"))!;
     expect(r03).toContain('manajemenuser');
     expect(r03).not.toContain('praktikum');
+  });
+});
+
+describe('placeholderTodayRegistrations', () => {
+  it('replaces only dates equal to today', () => {
+    const out = placeholderTodayRegistrations([{ date: '2026-10-14' }, { date: '2026-08-01' }], '2026-10-14');
+    expect(out.map(r => r.date)).toEqual(['__TODAY__', '2026-08-01']);
   });
 });

@@ -13,7 +13,7 @@ import {
   INITIAL_AUDIT_TRAIL, INITIAL_ICD10, INITIAL_ICD9CM,
   INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS
 } from '../data/mockData';
-import { sanitizePatientList, sanitizeMedicalRecords, ensureTodayRegistrations } from '../data/seedNormalizers';
+import { sanitizePatientList, sanitizeMedicalRecords } from '../data/seedNormalizers';
 import { useSlice } from '../data-layer/useSlice';
 import { getBackendMode } from '../data-layer/config';
 import { useSupabaseSession } from '../data-layer/useSupabaseSession';
@@ -24,6 +24,7 @@ import type { BackendMode } from '../data-layer/config';
 import type { AccountType, ClassInfo } from '../data-layer/session';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM } from '../data/icdDatabase';
 import { checkResumeMedisCompleteness, validateDiagnosisMatching, buildAutoResumeFromEncounter } from '../utils/resumeMedisHelper';
+import { MASTER_POLIKLINIK } from '../data/poliklinikData';
 
 interface AppContextType {
   user: User | null;
@@ -193,12 +194,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [registrations, setRegistrations] = useSlice<Registration>('registrations', () => {
-    const todayStr = new Date().toISOString().split('T')[0];
     const saved = localStorage.getItem('simrs_registrations');
-    const base: Registration[] = saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
-    const list = ensureTodayRegistrations(base, todayStr);
-    if (list !== base) localStorage.setItem('simrs_registrations', JSON.stringify(list));
-    return list;
+    return saved ? JSON.parse(saved) : INITIAL_REGISTRATIONS;
   });
 
   const [generalConsents, setGeneralConsents] = useSlice<GeneralConsent>('generalConsents', () => {
@@ -392,7 +389,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getPatient = (id: string) => patients.find(p => p.id === id);
   const getReg = (id: string) => registrations.find(r => r.id === id);
   const getMR = (id: string) => medicalRecords.find(m => m.id === id);
-  const getUser = (id: string) => exposedUsers.find(u => u.id === id);
+  const getUser = (id: string) => {
+    const found = exposedUsers.find(u => u.id === id || u.name === id);
+    if (found) return found;
+    for (const p of MASTER_POLIKLINIK) {
+      const doc = p.doctors.find(d => d.id === id || d.name === id);
+      if (doc) {
+        return {
+          id: doc.id,
+          username: doc.id.toLowerCase(),
+          name: doc.name,
+          roleId: 'R05' as RoleId,
+          active: true
+        };
+      }
+    }
+    return undefined;
+  };
   const getRole = (id: string) => roles.find(r => r.id === id) || INITIAL_ROLES.find(r => r.id === id);
 
   const generateNoRM = (): string => {
@@ -439,27 +452,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updatePatient = (patientId: string, updates: Partial<Patient>) => {
+    let oldName = '';
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
-        audit('UPDATE', 'Pasien', patientId, { field_name: 'bpjs_vclaim_update', new_value: JSON.stringify(updates) });
+        oldName = p.name;
+        audit('UPDATE', 'Pasien', patientId, { 
+          field_name: updates.name && updates.name !== p.name ? 'name' : 'patient_identity_update', 
+          old_value: p.name,
+          new_value: JSON.stringify(updates) 
+        });
         return { ...p, ...updates };
       }
       return p;
     }));
+
+    if (updates.name && oldName && updates.name !== oldName) {
+      setGeneralConsents(prev => prev.map(gc => {
+        const reg = registrations.find(r => r.id === gc.regId);
+        if (reg?.patientId === patientId && (gc.patientSign === oldName || gc.patientSign === 'Pasien / Wali')) {
+          return { ...gc, patientSign: updates.name };
+        }
+        return gc;
+      }));
+    }
   };
 
   const addRegistration = (regData: { patientId: string; type: Registration['type']; poli: string; dpjp: string; sepNo?: string; room?: string; bedId?: string; naikKelas?: { isNaik: boolean; dari?: string; ke?: string } }) => {
     const today = new Date().toISOString().split('T')[0];
+    const nowTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(':', '.');
     const newReg: Registration = {
       id: genId('REG'),
       patientId: regData.patientId,
       date: today,
+      registrationTime: nowTime,
       type: regData.type,
       poli: regData.poli,
       dpjp: regData.dpjp,
-      status: regData.type === 'Rawat Inap' ? 'Dirawat' : 'Selesai',
+      status: 'Siap Diperiksa',
+      examinationStatus: 'Siap Diperiksa',
       sepNo: regData.sepNo || '-',
-      room: regData.room || null
+      room: regData.room || null,
+      bedId: regData.bedId,
+      naikKelas: regData.naikKelas
     };
 
     setRegistrations(prev => [newReg, ...prev]);
@@ -550,16 +584,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       anamnesis: mrData.anamnesis,
       physicalExam: mrData.physicalExam,
       diagnosis: mrData.diagnosis || (icd ? `${icd.code} - ${icd.desc}` : '-'),
-      diagnosisSecondary: mrData.diagnosisSecondary || '',
-      actions: mrData.actions || '',
-      therapy: mrData.therapy || '',
-      vitalSigns: mrData.vitalSigns || undefined,
-      condition: mrData.condition || '',
-      education: mrData.education || '',
-      cpptNotes: mrData.cpptNotes || '',
-      otherNotes: mrData.otherNotes || '',
-      triageLevel: mrData.triageLevel || (r?.triageLevel || ''),
-      room: mrData.room || (r?.room || ''),
       plan: mrData.plan || '',
       nurseNotes: mrData.nurseNotes || '',
       diagnosisStatus: mrData.diagnosisStatus || (icd ? 'Verified' : 'Pending'),
@@ -1128,6 +1152,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (targetPage === 'dashboard' || targetPage === 'audit' || targetPage === 'logaktivitas') return true;
     const role = getRole(user.roleId);
     if (!role) return false;
+
+    // RBAC: Coder / Koding can view all clinical data, but CANNOT edit clinical data!
+    const isCoder =
+      role.id === 'R09' ||
+      role.name.toLowerCase().includes('coding') ||
+      role.name.toLowerCase().includes('coder') ||
+      role.name.toLowerCase().includes('koding');
+
+    if (isCoder) {
+      // Clinical & medical recording pages are strictly View-Only for Coder
+      const clinicalPages = [
+        'rekammedis',
+        'cppt',
+        'resumemedis',
+        'informedconsent',
+        'generalconsent',
+        'laboratorium',
+        'radiologi',
+        'farmasi',
+        'pendaftaran',
+        'bedmanagement'
+      ];
+      if (clinicalPages.includes(targetPage)) {
+        return false; // Strictly View-Only for Coder!
+      }
+      if (['coding', 'klaim', 'eklaim'].includes(targetPage)) {
+        return true; // Coder can edit coding and claims
+      }
+    }
+
     if (role.access.includes('all')) return true;
     if (targetPage === 'bedmanagement') {
       return role.access.includes('all') || role.access.includes('pendaftaran') || role.access.includes('bedmanagement');

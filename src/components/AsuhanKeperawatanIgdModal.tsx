@@ -17,6 +17,7 @@ interface AsuhanKeperawatanIgdModalProps {
   patient: Patient | null;
   registration: Registration | null;
   nurse?: User | null;
+  isReadOnly?: boolean;
 }
 
 export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps> = ({
@@ -24,7 +25,8 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
   onClose,
   patient,
   registration,
-  nurse
+  nurse,
+  isReadOnly = false
 }) => {
   const { asuhanKeperawatan, addAsuhanKeperawatan, updateAsuhanKeperawatan } = useApp();
 
@@ -493,7 +495,7 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
             <div className="grid grid-cols-2 gap-2 mt-2 p-2 border border-slate-300 rounded text-[11px]">
               <div>
                 <div><strong>No. Rekam Medis:</strong> {patient.noRM}</div>
-                <div><strong>Nama Pasien:</strong> {patient.name} ({patient.gender === 'M' ? 'Laki-laki' : 'Perempuan'})</div>
+                <div><strong>Nama Pasien:</strong> {patient.name} ({patient.gender === 'M' || patient.gender === '1' || patient.gender === 'L' || (patient.gender || '').toUpperCase().startsWith('LAKI') ? 'Laki-laki' : 'Perempuan'})</div>
                 <div><strong>Tanggal Lahir / Usia:</strong> {patient.dob}</div>
                 <div><strong>Penjamin / Asuransi:</strong> {patient.insuranceType || 'BPJS'} ({pembiayaan})</div>
               </div>
@@ -587,7 +589,7 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
                   </span>
                 </div>
                 <p className="text-xs text-sky-100/90 font-medium mt-1">
-                  {patient.gender === 'M' ? 'Laki-Laki' : 'Perempuan'} &bull; Lahir: {patient.dob} &bull; No Reg: <strong className="font-mono text-amber-300">{registration.id}</strong> &bull; Ruang: <strong className="text-white">{ruangan}</strong>
+                  {patient.gender === 'M' || patient.gender === '1' || patient.gender === 'L' || (patient.gender || '').toUpperCase().startsWith('LAKI') ? 'Laki-Laki' : 'Perempuan'} &bull; Lahir: {patient.dob} &bull; No Reg: <strong className="font-mono text-amber-300">{registration.id}</strong> &bull; Ruang: <strong className="text-white">{ruangan}</strong>
                 </p>
               </div>
             </div>
@@ -1290,13 +1292,19 @@ export const AsuhanKeperawatanIgdModal: React.FC<AsuhanKeperawatanIgdModalProps>
                 Tutup Halaman
               </button>
 
-              <button
-                type="button"
-                onClick={handleSaveAll}
-                className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-lg flex items-center gap-2 cursor-pointer scale-100 hover:scale-[1.02]"
-              >
-                <CheckCircle2 className="w-5 h-5" /> SIMPAN SELURUH FORMULIR PENGKAJIAN KEPERAWATAN
-              </button>
+              {isReadOnly ? (
+                <div className="px-5 py-2.5 bg-amber-50 border border-amber-300 text-amber-900 rounded-xl font-extrabold text-xs flex items-center gap-2">
+                  <span>🔒 Mode Lihat Saja (Coder / Read-Only)</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSaveAll}
+                  className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-lg flex items-center gap-2 cursor-pointer scale-100 hover:scale-[1.02]"
+                >
+                  <CheckCircle2 className="w-5 h-5" /> SIMPAN SELURUH FORMULIR PENGKAJIAN KEPERAWATAN
+                </button>
+              )}
             </div>
           </div>
 

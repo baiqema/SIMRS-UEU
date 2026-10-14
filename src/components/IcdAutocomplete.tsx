@@ -55,8 +55,9 @@ export const IcdAutocomplete: React.FC<IcdAutocompleteProps> = ({
     const q = inputValue.toLowerCase().trim();
     return database
       .filter(item => {
-        const matchCode = item.code.toLowerCase().includes(q);
-        const matchDesc = item.desc.toLowerCase().includes(q);
+        const textDesc = item.desc || item.name || '';
+        const matchCode = Boolean(item.code && item.code.toLowerCase().includes(q));
+        const matchDesc = textDesc.toLowerCase().includes(q);
         const matchCategory = (item.category || '').toLowerCase().includes(q);
         return matchCode || matchDesc || matchCategory;
       })
@@ -68,7 +69,8 @@ export const IcdAutocomplete: React.FC<IcdAutocompleteProps> = ({
     if (!medicalRecordContextText.trim()) return [];
     const text = medicalRecordContextText.toLowerCase();
     return database.filter(item => {
-      const descWords = item.desc.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
+      const textDesc = item.desc || item.name || '';
+      const descWords = textDesc.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
       return descWords.some(word => text.includes(word));
     }).slice(0, 4);
   }, [medicalRecordContextText, database]);

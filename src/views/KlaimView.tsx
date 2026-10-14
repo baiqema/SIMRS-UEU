@@ -281,7 +281,7 @@ export const KlaimView: React.FC = () => {
       )}
 
       {/* Main Header & Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-slate-900">Modul Coding & BPJS: Klaim & VClaim Health</h1>
@@ -321,7 +321,7 @@ export const KlaimView: React.FC = () => {
       </div>
 
       {/* Navigation Tab Bar */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
+      <div className="flex items-center gap-2 border-b border-slate-200 print:hidden">
         <button
           type="button"
           onClick={() => setActiveTab('vclaim')}
@@ -357,7 +357,7 @@ export const KlaimView: React.FC = () => {
 
       {/* TAB CONTENT 1: VCLAIM BRIDGING & LOG PEMANTAUAN SINKRONISASI */}
       {activeTab === 'vclaim' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in print:hidden">
           {/* KPI Statistics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
@@ -450,7 +450,7 @@ export const KlaimView: React.FC = () => {
           </div>
 
           {/* LOG PEMANTAUAN SINKRONISASI VCLAIM BPJS & DATABASE PASIEN LOKAL */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden print:hidden">
             <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
@@ -667,7 +667,7 @@ export const KlaimView: React.FC = () => {
 
       {/* TAB CONTENT 2: PENGAJUAN E-KLAIM INA-CBGS */}
       {activeTab === 'eklaim' && (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in print:hidden">
           <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 flex items-center gap-3">
             <ShieldAlert className="w-5 h-5 text-blue-600 shrink-0" />
             <div>

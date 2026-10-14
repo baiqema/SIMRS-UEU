@@ -5,7 +5,7 @@ import {
   INITIAL_MEDICAL_RECORDS, INITIAL_CPPT, INITIAL_INFORMED_CONSENTS, INITIAL_CODING, INITIAL_CLAIMS,
   INITIAL_BILLING, INITIAL_BEDS, INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS,
 } from '../src/data/mockData';
-import { buildTodayRegistrations, sanitizeMedicalRecords, sanitizePatientList } from '../src/data/seedNormalizers';
+import { sanitizeMedicalRecords, sanitizePatientList } from '../src/data/seedNormalizers';
 
 export const TEMPLATE_CLASS_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -17,6 +17,12 @@ function rolesForSeed() {
   return INITIAL_ROLES.map(r => r.id === 'R03'
     ? { ...r, access: Array.from(new Set([...r.access.filter(a => a !== 'praktikum'), 'manajemenuser'])) }
     : r);
+}
+
+// mockData stamps today's registrations with the build-time date; the template stores a
+// placeholder instead so private.copy_template rewrites it to the class-creation day.
+export function placeholderTodayRegistrations<T extends { date?: string }>(rows: T[], today = new Date().toISOString().split('T')[0]): T[] {
+  return rows.map(r => (r.date === today ? { ...r, date: '__TODAY__' } : r));
 }
 
 function insertRows(table: string, rows: { id: string }[]): string {
@@ -32,7 +38,7 @@ export function buildSeedSql(): string {
   const tables: [string, { id: string }[]][] = [
     ['staff_directory', staff],
     ['patients', sanitizePatientList(INITIAL_PATIENTS)],
-    ['registrations', [...buildTodayRegistrations('__TODAY__', '__TODAYCOMPACT__'), ...INITIAL_REGISTRATIONS]],
+    ['registrations', placeholderTodayRegistrations(INITIAL_REGISTRATIONS)],
     ['general_consents', INITIAL_GENERAL_CONSENTS],
     ['medical_records', sanitizeMedicalRecords(INITIAL_MEDICAL_RECORDS)],
     ['cppt', INITIAL_CPPT],

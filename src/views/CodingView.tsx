@@ -78,8 +78,8 @@ export const CodingView: React.FC = () => {
   // Selected Encounter / Visit ID (Encounter-Based Coding)
   const [selectedRegId, setSelectedRegId] = useState<string>('');
 
-  // Active Form Coding State
-  const [formIcd10List, setFormIcd10List] = useState<string[]>(['I10']);
+  // Active Form Coding State (Kosong secara default)
+  const [formIcd10List, setFormIcd10List] = useState<string[]>([]);
   const [formIcd9List, setFormIcd9List] = useState<string[]>([]);
   const [formNote, setFormNote] = useState<string>('');
   const [formStatus, setFormStatus] = useState<'Draft' | 'Locked'>('Draft');
@@ -170,18 +170,18 @@ export const CodingView: React.FC = () => {
     if (currentEncounterCoding) {
       const rawIcd10 = Array.isArray(currentEncounterCoding.icd10)
         ? currentEncounterCoding.icd10
-        : (currentEncounterCoding.icd10 ? [currentEncounterCoding.icd10] : ['I10']);
+        : (currentEncounterCoding.icd10 ? [currentEncounterCoding.icd10] : []);
       const rawIcd9 = Array.isArray(currentEncounterCoding.icd9cm)
         ? currentEncounterCoding.icd9cm
         : (currentEncounterCoding.icd9cm ? [currentEncounterCoding.icd9cm] : []);
 
-      setFormIcd10List(rawIcd10.length > 0 ? rawIcd10 : ['I10']);
+      setFormIcd10List(rawIcd10);
       setFormIcd9List(rawIcd9);
       setFormNote(currentEncounterCoding.note || '');
       setFormStatus(currentEncounterCoding.status || 'Draft');
     } else {
-      // If no coding yet for this encounter, initialize clean state
-      setFormIcd10List(['I10']);
+      // If no coding yet for this encounter, initialize clean state (kosong secara default)
+      setFormIcd10List([]);
       setFormIcd9List([]);
       setFormNote('');
       setFormStatus('Draft');
@@ -212,15 +212,6 @@ export const CodingView: React.FC = () => {
   };
 
   const handleRemoveIcd10 = (code: string) => {
-    if (formIcd10List.length <= 1) {
-      Swal.fire({
-        icon: 'info',
-        title: 'Minimal 1 Kode ICD-10',
-        text: 'Setiap berkas koding wajib memiliki setidaknya 1 Kode Diagnosis Utama (Primer).',
-        confirmButtonColor: '#1e3a8a'
-      });
-      return;
-    }
     setFormIcd10List(prev => prev.filter(c => c !== code));
   };
 
@@ -251,16 +242,18 @@ export const CodingView: React.FC = () => {
 
     // Match ICD-10
     const matchedIcd10 = EXTENDED_ICD10.filter(item => {
-      const codeMatch = textToAnalyze.includes(item.code.toLowerCase());
-      const words = item.desc.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
+      const descText = item.desc || item.name || '';
+      const codeMatch = Boolean(item.code && textToAnalyze.includes(item.code.toLowerCase()));
+      const words = descText.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
       const descMatch = words.some(w => textToAnalyze.includes(w));
       return codeMatch || descMatch;
     }).map(i => i.code).slice(0, 3);
 
     // Match ICD-9-CM
     const matchedIcd9 = EXTENDED_ICD9CM.filter(item => {
-      const codeMatch = textToAnalyze.includes(item.code.toLowerCase());
-      const words = item.desc.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
+      const descText = item.desc || item.name || '';
+      const codeMatch = Boolean(item.code && textToAnalyze.includes(item.code.toLowerCase()));
+      const words = descText.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
       const descMatch = words.some(w => textToAnalyze.includes(w));
       return codeMatch || descMatch;
     }).map(i => i.code).slice(0, 2);

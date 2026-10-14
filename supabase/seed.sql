@@ -8,9 +8,9 @@ insert into public.practice_roles (id, name, access) values
   ('R04', 'Mahasiswa (All Modul)', array['all']::text[]),
   ('R05', 'Dokter', array['dashboard','rekammedis','cppt','informedconsent','resumemedis','laboratorium','radiologi']::text[]),
   ('R06', 'Mahasiswa Perawat', array['dashboard','rekammedis','cppt','keperawatan','informedconsent','resumemedis','laboratorium','radiologi']::text[]),
-  ('R07', 'Mahasiswa Pendaftaran', array['dashboard','pendaftaran','generalconsent','vclaim','sep']::text[]),
+  ('R07', 'Mahasiswa Pendaftaran', array['dashboard','pendaftaran','kunjungan','indekspasien','generalconsent','vclaim','sep','rekammedis']::text[]),
   ('R08', 'Petugas Rekam Medis', array['dashboard','rekammedis','cppt','resumemedis','coding','pelaporan']::text[]),
-  ('R09', 'Mahasiswa Coding', array['dashboard','coding','klaim','eklaim']::text[]),
+  ('R09', 'Mahasiswa Coding', array['dashboard','coding','klaim','eklaim','rekammedis','cppt','resumemedis','informedconsent','generalconsent','farmasi','laboratorium','radiologi','pelaporan']::text[]),
   ('R10', 'Keuangan/Farmasi', array['dashboard','billing','pembayaran','farmasi']::text[]),
   ('R11', 'Petugas Klaim BPJS', array['dashboard','klaim','coding','billing']::text[]),
   ('R12', 'Kepala Rekam Medis', array['dashboard','rekammedis','coding','pelaporan','audit','manajemenuser']::text[]),
@@ -46,6 +46,16 @@ insert into public.staff_directory (class_id, id, data) values
   ('00000000-0000-0000-0000-000000000001', 'U007', '{"id":"U007","username":"mahasiswa","name":"Mahasiswa SIMRS (All Modul)","roleId":"R04","active":true}'::jsonb),
   ('00000000-0000-0000-0000-000000000001', 'U007B', '{"id":"U007B","username":"mhs.john","name":"Mahasiswa RMIK Esa Unggul","roleId":"R04","active":true}'::jsonb),
   ('00000000-0000-0000-0000-000000000001', 'U002', '{"id":"U002","username":"dr.sari","name":"dr. Sari Dewi, Sp.PD","roleId":"R05","active":true}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'U002_BEDAH', '{"id":"U002_BEDAH","username":"dr.ahmad","name":"dr. Ahmad Fauzi, Sp.B","roleId":"R05","active":true}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'U002_ANAK', '{"id":"U002_ANAK","username":"dr.maya","name":"dr. Maya Indriani, Sp.A","roleId":"R05","active":true}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'U002_OBGYN', '{"id":"U002_OBGYN","username":"dr.rizky","name":"dr. Rizky Pratama, Sp.OG","roleId":"R05","active":true}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'U002_JANTUNG', '{"id":"U002_JANTUNG","username":"dr.bambang","name":"dr. Bambang Sutrisno, Sp.JP","roleId":"R05","active":true}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'U002_SARAF', '{"id":"U002_SARAF","username":"dr.hendra","name":"dr. Hendra Setiawan, Sp.S","roleId":"R05","active":true}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'U002_MATA', '{"id":"U002_MATA","username":"dr.anita","name":"dr. Anita Wijaya, Sp.M","roleId":"R05","active":true}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'U002_THT', '{"id":"U002_THT","username":"dr.farida","name":"dr. Farida Rahmawati, Sp.THT-KL","roleId":"R05","active":true}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'U002_GIGI', '{"id":"U002_GIGI","username":"drg.silvia","name":"drg. Silvia Anggraini, Sp.KG","roleId":"R05","active":true}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'U002_IGD', '{"id":"U002_IGD","username":"dr.tri","name":"dr. Tri Wahyuni (Dokter Umum IGD)","roleId":"R05","active":true}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'U002_UMUM', '{"id":"U002_UMUM","username":"dr.denny","name":"dr. Denny Chandra (Dokter Umum Ralan)","roleId":"R05","active":true}'::jsonb),
   ('00000000-0000-0000-0000-000000000001', 'U003', '{"id":"U003","username":"ns.budi","name":"Ns. Budi Hartono, S.Kep","roleId":"R06","active":true}'::jsonb),
   ('00000000-0000-0000-0000-000000000001', 'U004', '{"id":"U004","username":"reg.rina","name":"Rina Wulandari, A.Md","roleId":"R07","active":true}'::jsonb),
   ('00000000-0000-0000-0000-000000000001', 'U005', '{"id":"U005","username":"rm.ana","name":"Ana Ratnasari, S.IKM","roleId":"R08","active":true}'::jsonb),
@@ -66,16 +76,13 @@ insert into public.patients (class_id, id, data) values
   ('00000000-0000-0000-0000-000000000001', 'P005', '{"id":"P005","noRM":"000005","nik":"3174052506950005","name":"Ny. Dewi Lestari","dob":"1995-06-25","gender":"F","address":"Jl. Tomang Raya No. 18, Jakarta Barat","phone":"087812345678","bloodType":"O","allergy":"Debu","insuranceType":"BPJS","noBPJS":"0001234567895","bpjsStatus":"Aktif","bpjsClass":"Kelas 1","country":"INDONESIA","province":"DKI JAKARTA","regency":"KOTA JAKARTA BARAT","district":"GROGOL PETAMBURAN","subDistrict":"TOMANG","addressStreet":"Jl. Tomang Raya No. 18"}'::jsonb);
 
 insert into public.registrations (class_id, id, data) values
-  ('00000000-0000-0000-0000-000000000001', 'REG-TODAY-IGD', '{"id":"REG-TODAY-IGD","patientId":"P001","date":"__TODAY__","type":"IGD","poli":"Instalasi Gawat Darurat (IGD)","dpjp":"U002","status":"Dirawat","sepNo":"0010R001__TODAYCOMPACT__V001","room":"Bed Resusitasi 01","triageLevel":"Kuning (Emergensi)","reasonForVisit":"Nyeri dada kiri menjalar & sesak napas akut"}'::jsonb),
-  ('00000000-0000-0000-0000-000000000001', 'REG-TODAY-RALAN', '{"id":"REG-TODAY-RALAN","patientId":"P002","date":"__TODAY__","type":"Rawat Jalan","poli":"Poli Penyakit Dalam","dpjp":"U002","status":"Dirawat","sepNo":"0010R001__TODAYCOMPACT__V002","room":null,"reasonForVisit":"Kontrol rutin hipertensi dan keluhan lemas"}'::jsonb),
-  ('00000000-0000-0000-0000-000000000001', 'REG-TODAY-RANAP', '{"id":"REG-TODAY-RANAP","patientId":"P003","date":"__TODAY__","type":"Rawat Inap","poli":"Bangsal Perawatan Melati","dpjp":"U002","status":"Dirawat","sepNo":"0010R001__TODAYCOMPACT__V003","room":"Kamar Melati 204 (Bed A)","reasonForVisit":"Demam tifoid hari ke-5 & dehidrasi sedang"}'::jsonb),
-  ('00000000-0000-0000-0000-000000000001', 'REG001', '{"id":"REG001","patientId":"P001","date":"2026-08-28","type":"IGD","poli":"IGD","dpjp":"U002","status":"Dirawat","sepNo":"0010R0010826V000001","room":"IGD-01"}'::jsonb),
-  ('00000000-0000-0000-0000-000000000001', 'REG002', '{"id":"REG002","patientId":"P002","date":"2026-08-29","type":"Rawat Inap","poli":"Penyakit Dalam","dpjp":"U002","status":"Dirawat","sepNo":"0010R0010826V000002","room":"VVIP-201"}'::jsonb),
-  ('00000000-0000-0000-0000-000000000001', 'REG003', '{"id":"REG003","patientId":"P003","date":"2026-08-30","type":"Rawat Jalan","poli":"Poli Jantung","dpjp":"U002","status":"Selesai","sepNo":"-","room":null}'::jsonb),
-  ('00000000-0000-0000-0000-000000000001', 'REG004', '{"id":"REG004","patientId":"P004","date":"2026-08-30","type":"IGD","poli":"IGD","dpjp":"U002","status":"Selesai","sepNo":"0010R0010826V000004","room":null}'::jsonb),
-  ('00000000-0000-0000-0000-000000000001', 'REG005', '{"id":"REG005","patientId":"P005","date":"2026-08-30","type":"Rawat Jalan","poli":"Poli Penyakit Dalam","dpjp":"U002","status":"Selesai","sepNo":"0010R0010826V000005","room":null}'::jsonb),
-  ('00000000-0000-0000-0000-000000000001', 'REG006', '{"id":"REG006","patientId":"P001","date":"2026-09-11","type":"Rawat Jalan","poli":"Poli Penyakit Dalam","dpjp":"U002","status":"Selesai","sepNo":"0010R0010826V000006","room":null}'::jsonb),
-  ('00000000-0000-0000-0000-000000000001', 'REG007', '{"id":"REG007","patientId":"P002","date":"2026-09-11","type":"Rawat Jalan","poli":"Poli Jantung & Pembuluh Darah","dpjp":"U002","status":"Selesai","sepNo":"0010R0010826V000007","room":null}'::jsonb);
+  ('00000000-0000-0000-0000-000000000001', 'REG001', '{"id":"REG001","patientId":"P001","date":"__TODAY__","registrationTime":"08.15","type":"Rawat Jalan","poli":"Poli Penyakit Dalam","dpjp":"U002","status":"Siap Diperiksa","examinationStatus":"Siap Diperiksa","sepNo":"0010R0010826V000001","room":null,"potensiFragmentasi":true,"fragmentasiReason":"Kunjungan ulang ke Poli Penyakit Dalam dalam selang 30 hari sejak riwayat pengobatan sebelumnya (REG006)."}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'REG002', '{"id":"REG002","patientId":"P002","date":"__TODAY__","registrationTime":"08.30","type":"IGD","poli":"IGD","dpjp":"U002","status":"Siap Diperiksa","examinationStatus":"Siap Diperiksa","sepNo":"0010R0010826V000002","room":"IGD-01"}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'REG003', '{"id":"REG003","patientId":"P005","date":"__TODAY__","registrationTime":"09.00","type":"Rawat Inap","poli":"Rawat Inap Melati","dpjp":"U002","status":"Selesai Diperiksa","examinationStatus":"Selesai Diperiksa","sepNo":"0010R0010826V000003","room":"VVIP-201"}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'REG004', '{"id":"REG004","patientId":"P003","date":"__TODAY__","registrationTime":"09.15","type":"Rawat Jalan","poli":"Poli Jantung & Pembuluh Darah","dpjp":"U002","status":"Siap Diperiksa","examinationStatus":"Siap Diperiksa","sepNo":"0010R0010826V000004","room":null}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'REG005', '{"id":"REG005","patientId":"P004","date":"__TODAY__","registrationTime":"09.30","type":"IGD","poli":"IGD","dpjp":"U002","status":"Selesai Diperiksa","examinationStatus":"Selesai Diperiksa","sepNo":"0010R0010826V000005","room":"IGD-02"}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'REG006', '{"id":"REG006","patientId":"P001","date":"2026-09-11","registrationTime":"10.00","type":"Rawat Jalan","poli":"Poli Penyakit Dalam","dpjp":"U002","status":"Selesai Diperiksa","examinationStatus":"Selesai Diperiksa","sepNo":"0010R0010826V000006","room":null}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'REG007', '{"id":"REG007","patientId":"P002","date":"2026-09-11","registrationTime":"10.30","type":"Rawat Jalan","poli":"Poli Jantung & Pembuluh Darah","dpjp":"U002","status":"Selesai Diperiksa","examinationStatus":"Selesai Diperiksa","sepNo":"0010R0010826V000007","room":null}'::jsonb);
 
 insert into public.general_consents (class_id, id, data) values
   ('00000000-0000-0000-0000-000000000001', 'GC001', '{"id":"GC001","regId":"REG001","date":"2026-08-28","patientSign":"Tn. Ahmad Fauzi","witnessSign":"Rina Wulandari","status":"Signed"}'::jsonb),
@@ -110,7 +117,7 @@ insert into public.billing (class_id, id, data) values
   ('00000000-0000-0000-0000-000000000001', 'BIL001', '{"id":"BIL001","regId":"REG001","services":[{"name":"Konsultasi Dokter Spesialis IGD","qty":1,"price":150000},{"name":"Pemeriksaan EKG 12 Lead","qty":1,"price":120000},{"name":"Obat & Farmasi","qty":1,"price":180000}],"total":450000,"paid":450000,"status":"Paid"}'::jsonb);
 
 insert into public.beds (class_id, id, data) values
-  ('00000000-0000-0000-0000-000000000001', 'MWR-101-A', '{"id":"MWR-101-A","room":"Bangsal Mawar - Penyakit Dalam","floor":"2","class":"Kelas 1","status":"Occupied","patientId":"000001","roomName":"Kamar 101","bedNumber":"Bed A","occupiedSince":"2026-09-20"}'::jsonb),
+  ('00000000-0000-0000-0000-000000000001', 'MWR-101-A', '{"id":"MWR-101-A","room":"Bangsal Mawar - Penyakit Dalam","floor":"2","class":"Kelas 1","status":"Occupied","patientId":"000001","roomName":"Kamar 101","bedNumber":"Bed A","occupiedSince":"2026-08-20"}'::jsonb),
   ('00000000-0000-0000-0000-000000000001', 'MWR-101-B', '{"id":"MWR-101-B","room":"Bangsal Mawar - Penyakit Dalam","floor":"2","class":"Kelas 1","status":"Available","patientId":null,"roomName":"Kamar 101","bedNumber":"Bed B"}'::jsonb),
   ('00000000-0000-0000-0000-000000000001', 'MWR-102-A', '{"id":"MWR-102-A","room":"Bangsal Mawar - Penyakit Dalam","floor":"2","class":"Kelas 1","status":"Available","patientId":null,"roomName":"Kamar 102","bedNumber":"Bed A"}'::jsonb),
   ('00000000-0000-0000-0000-000000000001', 'MWR-102-B', '{"id":"MWR-102-B","room":"Bangsal Mawar - Penyakit Dalam","floor":"2","class":"Kelas 1","status":"Maintenance","patientId":null,"roomName":"Kamar 102","bedNumber":"Bed B","maintenanceReason":"Sterilisasi kamar & pembersihan menyeluruh pasca discharge"}'::jsonb),

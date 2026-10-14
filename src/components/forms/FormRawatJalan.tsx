@@ -21,13 +21,15 @@ interface FormRawatJalanProps {
   registration?: Registration;
   user?: UserType | null;
   onSaveSuccess?: () => void;
+  isReadOnly?: boolean;
 }
 
 export const FormRawatJalan: React.FC<FormRawatJalanProps> = ({
   patient,
   registration,
   user,
-  onSaveSuccess
+  onSaveSuccess,
+  isReadOnly = false
 }) => {
   // State Pembayaran & Consent
   const [caraBayar, setCaraBayar] = useState<'JKN' | 'Mandiri' | 'Asuransi lainnya'>('JKN');
@@ -147,6 +149,16 @@ export const FormRawatJalan: React.FC<FormRawatJalanProps> = ({
   };
 
   const handleSaveForm = (isFinal = false) => {
+    if (isReadOnly) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Akses Terbatas (Mode Lihat)',
+        text: 'Akun Coder/Koding hanya memiliki hak akses melihat data klinis (View-Only). Anda tidak dapat mengubah data rekam medis dokter.',
+        confirmButtonColor: '#d97706'
+      });
+      return;
+    }
+
     Swal.fire({
       icon: 'success',
       title: isFinal ? 'Formulir Rawat Jalan Terverifikasi!' : 'Draft Formulir Tersimpan',
@@ -165,7 +177,29 @@ export const FormRawatJalan: React.FC<FormRawatJalanProps> = ({
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12 font-sans text-slate-800">
+    <div className={`space-y-6 max-w-5xl mx-auto pb-12 font-sans text-slate-800 ${isReadOnly ? 'select-text' : ''}`}>
+      {/* BANNER MODE LIHAT KHUSUS CODER */}
+      {isReadOnly && (
+        <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl flex items-center justify-between text-xs text-amber-900 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
+              🔒
+            </div>
+            <div>
+              <p className="font-extrabold text-amber-950 flex items-center gap-2 text-sm">
+                <span>Mode Telaah Klinis (View-Only) — Coder / Perekam Medis</span>
+                <span className="text-[10px] px-2.5 py-0.5 bg-amber-200/90 text-amber-950 rounded-full font-black uppercase">
+                  Hanya Melihat
+                </span>
+              </p>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Anda dapat melihat seluruh riwayat keluhan, hasil pemeriksaan fisik, TTV, dan diagnosis untuk kepentingan pengkodean ICD-10 & ICD-9-CM. Pengubahan berkas klinis dinonaktifkan.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HEADER KOP RESMI FORMULIR MEDIS RAWAT JALAN */}
       <div className="bg-white border-2 border-slate-300 rounded-3xl p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <SequentialHospitalLogos size="md" showSubtitle={true} />
@@ -914,22 +948,30 @@ export const FormRawatJalan: React.FC<FormRawatJalanProps> = ({
               <Printer className="w-4 h-4" />
               <span>Cetak Formulir</span>
             </button>
-            <button
-              type="button"
-              onClick={() => handleSaveForm(false)}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Save className="w-4 h-4" />
-              <span>Simpan Draft</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSaveForm(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Finalisasi & TTE Asesmen</span>
-            </button>
+            {isReadOnly ? (
+              <div className="px-3.5 py-2 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 font-extrabold text-xs flex items-center gap-1.5 shadow-2xs">
+                <span>🔒 Mode Lihat Saja (Coder / Read-Only)</span>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleSaveForm(false)}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Simpan Draft</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveForm(true)}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Finalisasi & TTE Asesmen</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
