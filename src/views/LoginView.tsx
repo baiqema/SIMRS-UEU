@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { RoleId } from '../types';
+import { DEMO_ACCOUNTS } from '../data/demoAccounts';
+import { getBackendMode, isDemoMode } from '../data-layer/config';
 import { Building2, Eye, EyeOff, LogIn, ShieldAlert, FileText, Activity, GraduationCap, HelpCircle, CheckCircle2, UserCheck, Lock } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
@@ -12,25 +14,39 @@ export const LoginView: React.FC = () => {
   const [showPass, setShowPass] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
       setErrorMsg('Username/NIM dan password wajib diisi');
       return;
     }
-    const res = login(username.trim(), password.trim(), selectedRole);
-    if (!res.success) {
-      setErrorMsg(res.error || 'Login gagal. Periksa kembali Username/NIM & password');
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await login(username.trim(), password.trim(), selectedRole);
+      if (!res.success) {
+        setErrorMsg(res.error || 'Login gagal. Periksa kembali Username/NIM & password');
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handlePresetFill = (u: string, p: string, r: RoleId) => {
+  const handlePresetFill = async (u: string, p: string, r: RoleId) => {
+    if (submitting) return;
     setUsername(u);
     setPassword(p);
     setSelectedRole(r);
     setErrorMsg('');
-    login(u, p, r);
+    setSubmitting(true);
+    try {
+      const res = await login(u, p, r);
+      if (!res.success) setErrorMsg(res.error || 'Login gagal');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const roleOptions: { id: RoleId; label: string; desc: string }[] = [
@@ -43,14 +59,8 @@ export const LoginView: React.FC = () => {
     { id: 'R04', label: 'Mahasiswa (All Modul)', desc: 'Akses Penuh Seluruh Modul untuk Latihan Bebas' },
   ];
 
-  const demoAccounts = [
-    { label: 'Mahasiswa Coding (NIM 20240306044)', u: '20240306044', p: 'mhs123', roleId: 'R09' as RoleId },
-    { label: 'Mahasiswa Pendaftaran', u: 'mhs.pendaftaran', p: 'pendaftaran123', roleId: 'R07' as RoleId },
-    { label: 'Mahasiswa Perawat', u: 'mhs.perawat', p: 'perawat123', roleId: 'R06' as RoleId },
-    { label: 'Mahasiswa Pelaporan', u: 'mhs.pelaporan', p: 'pelaporan123', roleId: 'R13' as RoleId },
-    { label: 'Dosen Pengampu (Dr. Wati)', u: 'dsn.dr.wati', p: 'dosen123', roleId: 'R03' as RoleId },
-    { label: 'Super Administrator', u: 'admin', p: 'admin123', roleId: 'R01' as RoleId },
-  ];
+  // The Supabase admin account is real; never advertise it as a preset.
+  const demoAccounts = getBackendMode() === 'supabase' ? DEMO_ACCOUNTS.filter(a => a.accountType !== 'admin') : DEMO_ACCOUNTS;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 text-slate-800 flex items-center justify-center p-4 relative overflow-hidden font-sans">
@@ -96,7 +106,8 @@ export const LoginView: React.FC = () => {
             <button
               type="button"
               onClick={() => handlePresetFill('20240306044', 'mhs123', 'R09')}
-              className="w-full py-2.5 px-3 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-xl font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              disabled={submitting}
+              className="w-full py-2.5 px-3 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-xl font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
             >
               <LogIn className="w-4 h-4" /> Masuk NIM 20240306044 (Role Coding)
             </button>
@@ -229,13 +240,15 @@ export const LoginView: React.FC = () => {
               {/* Submit Button */}
               <button
                 type="submit"
-                className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+                disabled={submitting}
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 disabled:opacity-60"
               >
                 <LogIn className="w-4 h-4" /> Masuk ke SIMRS
               </button>
             </form>
 
             {/* Quick Demo Login */}
+            {isDemoMode() && (
             <div className="mt-5 pt-4 border-t border-slate-100">
               <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-2">
                 Preset Akun Demo Praktikum (Klik Langsung Masuk):
@@ -246,7 +259,8 @@ export const LoginView: React.FC = () => {
                     key={i}
                     type="button"
                     onClick={() => handlePresetFill(acc.u, acc.p, acc.roleId)}
-                    className="text-left p-2.5 bg-slate-50 hover:bg-blue-50/90 hover:border-blue-300 border border-slate-200/80 rounded-xl transition-all text-[11px] cursor-pointer group shadow-2xs"
+                    disabled={submitting}
+                    className="text-left p-2.5 bg-slate-50 hover:bg-blue-50/90 hover:border-blue-300 border border-slate-200/80 rounded-xl transition-all text-[11px] cursor-pointer group shadow-2xs disabled:opacity-60"
                   >
                     <div className="font-bold text-slate-800 group-hover:text-blue-900 truncate flex items-center justify-between">
                       <span>{acc.label}</span>
@@ -261,6 +275,7 @@ export const LoginView: React.FC = () => {
                 ))}
               </div>
             </div>
+            )}
           </div>
         </div>
       </div>
