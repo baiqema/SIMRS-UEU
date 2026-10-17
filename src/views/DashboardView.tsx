@@ -41,12 +41,13 @@ export const DashboardView: React.FC = () => {
   };
 
   // Real-time calculated Bed metrics from AppContext
-  const totalBeds = beds?.length || 20;
-  const realOccupiedBeds = beds?.filter(b => b.status === 'Occupied').length || 0;
+  const totalBeds = beds?.length || 25;
+  const realOccupiedBeds = beds?.filter(b => b.status === 'Occupied').length ?? 0;
   const rawatInapAktif = registrations.filter(r => r.type === 'Rawat Inap' && r.status === 'Dirawat').length;
-  const occupiedBeds = realOccupiedBeds > 0 ? realOccupiedBeds : (rawatInapAktif > 0 ? rawatInapAktif : 14);
+  const occupiedBeds = realOccupiedBeds > 0 ? realOccupiedBeds : (rawatInapAktif > 0 ? rawatInapAktif : 18);
   const availableBeds = Math.max(0, totalBeds - occupiedBeds);
   const borPercentage = ((occupiedBeds / totalBeds) * 100).toFixed(1);
+  const borNum = parseFloat(borPercentage);
 
   // Dynamic metrics based on selected period
   const periodData = useMemo(() => {
@@ -568,11 +569,19 @@ export const DashboardView: React.FC = () => {
           </div>
           <div className="text-xl font-bold text-slate-900 tracking-tight flex items-baseline gap-1.5">
             <span>{borPercentage}%</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">Ideal</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              borNum >= 60 && borNum <= 85 
+                ? 'bg-emerald-100 text-emerald-800' 
+                : borNum < 60 
+                ? 'bg-amber-100 text-amber-800' 
+                : 'bg-rose-100 text-rose-800'
+            }`}>
+              {borNum >= 60 && borNum <= 85 ? 'Ideal (60-85%)' : borNum < 60 ? 'Di Bawah Ideal (<60%)' : 'Di Atas Ideal (>85%)'}
+            </span>
           </div>
           <div className="flex items-center justify-between text-[11px] mt-2 pt-2 border-t border-slate-100">
-            <span className="text-slate-500 font-medium">Tempat Tidur</span>
-            <span className="text-slate-700 font-bold">{occupiedBeds} / {totalBeds} Terisi</span>
+            <span className="text-slate-500 font-medium">Standar Kemenkes RI</span>
+            <span className="text-slate-700 font-bold">{occupiedBeds} / {totalBeds} Bed Terisi</span>
           </div>
         </div>
 

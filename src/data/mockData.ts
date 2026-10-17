@@ -621,43 +621,43 @@ export const INITIAL_ICD9CM: ICD9CM[] = [
 ];
 
 export const INITIAL_BEDS: Bed[] = [
-  // Bangsal Mawar (Penyakit Dalam)
+  // Bangsal Mawar (Penyakit Dalam) - 8 Beds
   { id: 'MWR-101-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000001', roomName: 'Kamar 101', bedNumber: 'Bed A', occupiedSince: '2026-08-20' },
-  { id: 'MWR-101-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 101', bedNumber: 'Bed B' },
+  { id: 'MWR-101-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000007', roomName: 'Kamar 101', bedNumber: 'Bed B', occupiedSince: '2026-09-20' },
   { id: 'MWR-102-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 102', bedNumber: 'Bed A' },
   { id: 'MWR-102-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Maintenance', patientId: null, roomName: 'Kamar 102', bedNumber: 'Bed B', maintenanceReason: 'Sterilisasi kamar & pembersihan menyeluruh pasca discharge' },
   { id: 'MWR-201-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Occupied', patientId: '000002', roomName: 'Kamar 201', bedNumber: 'Bed A', occupiedSince: '2026-09-21' },
-  { id: 'MWR-201-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 201', bedNumber: 'Bed B' },
-  { id: 'MWR-202-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 202', bedNumber: 'Bed A' },
-  { id: 'MWR-202-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 202', bedNumber: 'Bed B' },
+  { id: 'MWR-201-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Occupied', patientId: '000008', roomName: 'Kamar 201', bedNumber: 'Bed B', occupiedSince: '2026-09-22' },
+  { id: 'MWR-202-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Occupied', patientId: '000009', roomName: 'Kamar 202', bedNumber: 'Bed A', occupiedSince: '2026-09-23' },
+  { id: 'MWR-202-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Occupied', patientId: '000010', roomName: 'Kamar 202', bedNumber: 'Bed B', occupiedSince: '2026-09-24' },
 
-  // Bangsal Melati (Bedah Umum)
+  // Bangsal Melati (Bedah Umum) - 5 Beds
   { id: 'MLT-201-A', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 2', status: 'Occupied', patientId: '000003', roomName: 'Kamar 201', bedNumber: 'Bed A', occupiedSince: '2026-09-22' },
-  { id: 'MLT-201-B', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 201', bedNumber: 'Bed B' },
-  { id: 'MLT-301-A', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 3', status: 'Available', patientId: null, roomName: 'Kamar 301', bedNumber: 'Bed A' },
+  { id: 'MLT-201-B', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 2', status: 'Occupied', patientId: '000011', roomName: 'Kamar 201', bedNumber: 'Bed B', occupiedSince: '2026-09-23' },
+  { id: 'MLT-301-A', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 3', status: 'Occupied', patientId: '000012', roomName: 'Kamar 301', bedNumber: 'Bed A', occupiedSince: '2026-09-24' },
   { id: 'MLT-301-B', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 3', status: 'Available', patientId: null, roomName: 'Kamar 301', bedNumber: 'Bed B' },
   { id: 'MLT-301-C', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 3', status: 'Maintenance', patientId: null, roomName: 'Kamar 301', bedNumber: 'Bed C', maintenanceReason: 'Perbaikan panel oksigen sentral & tuas hidrolik tempat tidur' },
 
-  // Bangsal Anggrek (Kebidanan & Obgyn)
+  // Bangsal Anggrek (Kebidanan & Obgyn) - 3 Beds
   { id: 'AGR-101-A', room: 'Bangsal Anggrek - Kebidanan & Kandungan', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000004', roomName: 'Kamar 101', bedNumber: 'Bed A', occupiedSince: '2026-09-22' },
-  { id: 'AGR-101-B', room: 'Bangsal Anggrek - Kebidanan & Kandungan', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 101', bedNumber: 'Bed B' },
+  { id: 'AGR-101-B', room: 'Bangsal Anggrek - Kebidanan & Kandungan', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000013', roomName: 'Kamar 101', bedNumber: 'Bed B', occupiedSince: '2026-09-23' },
   { id: 'AGR-201-A', room: 'Bangsal Anggrek - Kebidanan & Kandungan', floor: '2', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 201', bedNumber: 'Bed A' },
 
-  // Bangsal Dahlia (Anak)
+  // Bangsal Dahlia (Anak) - 2 Beds
   { id: 'DHL-201-A', room: 'Bangsal Dahlia - Anak (Pediatrik)', floor: '3', class: 'Kelas 2', status: 'Occupied', patientId: '000005', roomName: 'Kamar 201', bedNumber: 'Bed A', occupiedSince: '2026-09-23' },
-  { id: 'DHL-201-B', room: 'Bangsal Dahlia - Anak (Pediatrik)', floor: '3', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 201', bedNumber: 'Bed B' },
+  { id: 'DHL-201-B', room: 'Bangsal Dahlia - Anak (Pediatrik)', floor: '3', class: 'Kelas 2', status: 'Occupied', patientId: '000014', roomName: 'Kamar 201', bedNumber: 'Bed B', occupiedSince: '2026-09-24' },
 
-  // Bangsal Cempaka (Saraf & Jantung)
-  { id: 'CMP-101-A', room: 'Bangsal Cempaka - Saraf & Jantung', floor: '4', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 101', bedNumber: 'Bed A' },
-  { id: 'CMP-201-A', room: 'Bangsal Cempaka - Saraf & Jantung', floor: '4', class: 'Kelas 2', status: 'Maintenance', patientId: null, roomName: 'Kamar 201', bedNumber: 'Bed A', maintenanceReason: 'Dalam proses sterilisasi UV ruangan' },
+  // Bangsal Cempaka (Saraf & Jantung) - 2 Beds
+  { id: 'CMP-101-A', room: 'Bangsal Cempaka - Saraf & Jantung', floor: '4', class: 'Kelas 1', status: 'Occupied', patientId: '000015', roomName: 'Kamar 101', bedNumber: 'Bed A', occupiedSince: '2026-09-23' },
+  { id: 'CMP-201-A', room: 'Bangsal Cempaka - Saraf & Jantung', floor: '4', class: 'Kelas 2', status: 'Occupied', patientId: '000016', roomName: 'Kamar 201', bedNumber: 'Bed A', occupiedSince: '2026-09-24' },
 
-  // VIP & VVIP
+  // VIP & VVIP - 3 Beds
   { id: 'VIP-EDL-01', room: 'Ruang VIP Edelweiss', floor: '5', class: 'VIP', status: 'Occupied', patientId: '000006', roomName: 'Kamar VIP 501', bedNumber: 'Bed Tunggal', occupiedSince: '2026-09-21' },
-  { id: 'VIP-EDL-02', room: 'Ruang VIP Edelweiss', floor: '5', class: 'VIP', status: 'Available', patientId: null, roomName: 'Kamar VIP 502', bedNumber: 'Bed Tunggal' },
+  { id: 'VIP-EDL-02', room: 'Ruang VIP Edelweiss', floor: '5', class: 'VIP', status: 'Occupied', patientId: '000017', roomName: 'Kamar VIP 502', bedNumber: 'Bed Tunggal', occupiedSince: '2026-09-22' },
   { id: 'VVIP-WJK-01', room: 'Ruang VVIP Wijayakusuma', floor: '5', class: 'VVIP', status: 'Available', patientId: null, roomName: 'Suite VVIP 508', bedNumber: 'Bed Elektrik' },
 
-  // ICU & Isolasi
-  { id: 'ICU-01', room: 'Ruang Perawatan Intensif (ICU)', floor: '2', class: 'ICU', status: 'Available', patientId: null, roomName: 'ICU Unit', bedNumber: 'Bed 01' },
+  // ICU & Isolasi - 2 Beds
+  { id: 'ICU-01', room: 'Ruang Perawatan Intensif (ICU)', floor: '2', class: 'ICU', status: 'Occupied', patientId: '000018', roomName: 'ICU Unit', bedNumber: 'Bed 01', occupiedSince: '2026-09-24' },
   { id: 'ICU-02', room: 'Ruang Perawatan Intensif (ICU)', floor: '2', class: 'ICU', status: 'Available', patientId: null, roomName: 'ICU Unit', bedNumber: 'Bed 02' },
   { id: 'ISO-01', room: 'Ruang Isolasi Tekanan Negatif', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Isolasi 01', bedNumber: 'Bed Isolasi' },
 ];

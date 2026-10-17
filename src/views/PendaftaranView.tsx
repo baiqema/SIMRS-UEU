@@ -31,7 +31,8 @@ export const PendaftaranView: React.FC = () => {
   const {
     registrations, patients, users, beds, generalConsents, medicalRecords,
     addRegistration, addPatient, updatePatient, getPatient, getUser, params, navigate, canEditPage,
-    generateNoRM, cancelRegistration, updateRegistration, activePage
+    generateNoRM, cancelRegistration, updateRegistration, activePage,
+    masterRuangan, masterBed, masterDokter, masterPoli, doctorPoliMappings, getDoctorsForPoli
   } = useApp();
 
   const isEditable = canEditPage('pendaftaran');
@@ -475,10 +476,61 @@ export const PendaftaranView: React.FC = () => {
     }
   }, [doctors]);
 
-  // Doctors for the currently selected Poliklinik (Master 21 Poliklinik & 63 Dokter)
+  // Searchable Poli & Searchable Kamar/Bed States (Mencegah scroll panjang)
+  const [poliSearchText, setPoliSearchText] = useState('');
+  const [isPoliDropdownOpen, setIsPoliDropdownOpen] = useState(false);
+  const [ranapSearchText, setRanapSearchText] = useState('');
+  const [isRanapDropdownOpen, setIsRanapDropdownOpen] = useState(false);
+
+  // Available Polikliniks with instant search filter
+  const availablePolis = useMemo(() => {
+    const list = masterPoli && masterPoli.length > 0 
+      ? masterPoli.filter(p => p.status === 'Aktif')
+      : MASTER_POLIKLINIK.map(p => ({
+          id: p.name,
+          kode: p.kodeSpesialis,
+          nama: p.name,
+          kelompokLayanan: p.kelompokLayanan,
+          lokasi: 'Gedung Rawat Jalan',
+          jamPelayanan: 'Senin - Sabtu (08:00 - 16:00 WIB)',
+          status: 'Aktif' as const
+        }));
+
+    if (!poliSearchText.trim()) return list;
+    const q = poliSearchText.toLowerCase();
+    return list.filter(p => 
+      p.nama.toLowerCase().includes(q) || 
+      p.kode.toLowerCase().includes(q) || 
+      p.kelompokLayanan.toLowerCase().includes(q)
+    );
+  }, [masterPoli, poliSearchText]);
+
+  // Available Rooms for Ranap with instant search filter
+  const availableRooms = useMemo(() => {
+    const list = masterRuangan && masterRuangan.length > 0 
+      ? masterRuangan.filter(r => r.status === 'Aktif')
+      : [];
+
+    if (!ranapSearchText.trim()) return list;
+    const q = ranapSearchText.toLowerCase();
+    return list.filter(r => 
+      r.nama.toLowerCase().includes(q) || 
+      r.kode.toLowerCase().includes(q) || 
+      r.jenis.toLowerCase().includes(q) || 
+      r.lokasi.toLowerCase().includes(q)
+    );
+  }, [masterRuangan, ranapSearchText]);
+
+  // Doctors for the currently selected Poliklinik (Master Data Mapping & Fallback)
   const currentPoliDoctors = useMemo(() => {
+    if (getDoctorsForPoli) {
+      const fromMaster = getDoctorsForPoli(poliklinikTujuan);
+      if (fromMaster && fromMaster.length > 0) {
+        return fromMaster.map(d => ({ id: d.id, name: d.nama, specialty: d.spesialisasi }));
+      }
+    }
     return getDoctorsByPoliklinik(poliklinikTujuan);
-  }, [poliklinikTujuan]);
+  }, [poliklinikTujuan, getDoctorsForPoli, doctorPoliMappings, masterDokter]);
 
   // Auto-select doctor corresponding to selected Poliklinik spesialis
   useEffect(() => {
@@ -1751,15 +1803,16 @@ export const PendaftaranView: React.FC = () => {
                 {/* 1. Nama Lengkap Pasien & 2. NIK KTP (16 Digit) - Disimpan setelah nama pasien */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Nama Lengkap Pasien <span className="text-rose-600">*</span>
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Nama Lengkap Pasien <span className="text-rose-600">*</span></span>
+                      <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">HURUF KAPITAL (CAPSLOCK)</span>
                     </label>
                     <input
                       type="text"
                       value={namaLengkap}
-                      onChange={e => setNamaLengkap(e.target.value)}
-                      placeholder="Masukkan nama lengkap sesuai identitas"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500"
+                      onChange={e => setNamaLengkap(e.target.value.toUpperCase())}
+                      placeholder="NAMA LENGKAP TANPA GELAR (HURUF BESAR / CAPSLOCK)"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 uppercase focus:bg-white focus:outline-none focus:border-blue-500"
                       required
                     />
                   </div>
@@ -2221,43 +2274,105 @@ export const PendaftaranView: React.FC = () => {
                     </span>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Poliklinik Tujuan (21 Poliklinik / Pelayanan) *</label>
-                    <select
-                      value={poliklinikTujuan}
-                      onChange={e => setPoliklinikTujuan(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-bold text-blue-900"
-                      required
-                    >
-                      <optgroup label="Spesialis Dasar">
-                        {MASTER_POLIKLINIK.filter(p => p.kelompokLayanan === 'Spesialis Dasar').map(p => (
-                          <option key={p.name} value={p.name}>
-                            {p.name} ({p.kodeSpesialis})
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Spesialis Lain">
-                        {MASTER_POLIKLINIK.filter(p => p.kelompokLayanan === 'Spesialis Lain').map(p => (
-                          <option key={p.name} value={p.name}>
-                            {p.name} ({p.kodeSpesialis})
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Gigi Spesialis">
-                        {MASTER_POLIKLINIK.filter(p => p.kelompokLayanan === 'Gigi Spesialis').map(p => (
-                          <option key={p.name} value={p.name}>
-                            {p.name} ({p.kodeSpesialis})
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Penunjang Medik">
-                        {MASTER_POLIKLINIK.filter(p => p.kelompokLayanan === 'Penunjang Medik').map(p => (
-                          <option key={p.name} value={p.name}>
-                            {p.name} ({p.kodeSpesialis})
-                          </option>
-                        ))}
-                      </optgroup>
-                    </select>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Poliklinik Tujuan (Master 21 Poliklinik & Pelayanan) <span className="text-rose-600">*</span>
+                      </label>
+                      <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                        Pencarian Instan (Tanpa Scroll)
+                      </span>
+                    </div>
+
+                    {/* Search Input for Poli */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-blue-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={poliSearchText}
+                        onChange={e => {
+                          setPoliSearchText(e.target.value);
+                          setIsPoliDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsPoliDropdownOpen(true)}
+                        placeholder="Ketik nama poli/spesialis untuk mencari (misal: anak, bedah, mata, dalam, saraf)..."
+                        className="w-full pl-8 pr-8 py-2 bg-white border-2 border-blue-300 rounded-xl text-xs font-bold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                      {poliSearchText && (
+                        <button
+                          type="button"
+                          onClick={() => setPoliSearchText('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Instant Search Results Dropdown List */}
+                    {isPoliDropdownOpen && (
+                      <div className="p-2 bg-slate-50 border border-blue-200 rounded-xl max-h-48 overflow-y-auto space-y-1 shadow-md scrollbar-thin animate-in fade-in z-20 relative">
+                        <div className="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-wider flex items-center justify-between">
+                          <span>Pilihan Poliklinik ({availablePolis.length} Unit)</span>
+                          <button
+                            type="button"
+                            onClick={() => setIsPoliDropdownOpen(false)}
+                            className="text-blue-600 hover:underline cursor-pointer lowercase"
+                          >
+                            tutup
+                          </button>
+                        </div>
+                        {availablePolis.length === 0 ? (
+                          <div className="text-xs text-slate-400 p-2 text-center">
+                            Tidak ditemukan poli dengan kata kunci "{poliSearchText}".
+                          </div>
+                        ) : (
+                          availablePolis.map(p => {
+                            const isSelected = poliklinikTujuan.toLowerCase() === p.nama.toLowerCase();
+                            return (
+                              <button
+                                type="button"
+                                key={p.id || p.nama}
+                                onClick={() => {
+                                  setPoliklinikTujuan(p.nama);
+                                  setIsPoliDropdownOpen(false);
+                                  setPoliSearchText('');
+                                }}
+                                className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white font-bold shadow-xs'
+                                    : 'text-slate-800 hover:bg-blue-100/70'
+                                }`}
+                              >
+                                <span>{p.nama}</span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                                  isSelected ? 'bg-blue-700 text-blue-100' : 'bg-slate-200 text-slate-600'
+                                }`}>
+                                  {p.kode || p.kelompokLayanan}
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+
+                    {/* Currently Selected Poli Confirmation Bar */}
+                    <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                        <span className="text-xs text-blue-950 font-bold">
+                          Poliklinik Terpilih: <span className="text-blue-700 underline">{poliklinikTujuan}</span>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsPoliDropdownOpen(prev => !prev)}
+                        className="text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-white px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs cursor-pointer"
+                      >
+                        {isPoliDropdownOpen ? 'Sembunyikan' : 'Pilih Poli Lain'}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2393,24 +2508,105 @@ export const PendaftaranView: React.FC = () => {
                     </span>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Ruang / Bangsal Rawat Inap *</label>
-                    <select
-                      value={ruangRawatBangsal}
-                      onChange={e => setRuangRawatBangsal(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-amber-900"
-                      required
-                    >
-                      <option value="Bangsal Mawar - Penyakit Dalam">Bangsal Mawar - Spesialis Penyakit Dalam</option>
-                      <option value="Bangsal Melati - Bedah Umum">Bangsal Melati - Bedah Umum</option>
-                      <option value="Bangsal Anggrek - Kebidanan & Kandungan">Bangsal Anggrek - Kebidanan & Obgyn</option>
-                      <option value="Bangsal Dahlia - Anak (Pediatrik)">Bangsal Dahlia - Spesialis Anak</option>
-                      <option value="Bangsal Cempaka - Saraf & Jantung">Bangsal Cempaka - Saraf & Kardiovaskular</option>
-                      <option value="Ruang VIP Edelweiss">Ruang VIP Edelweiss</option>
-                      <option value="Ruang VVIP Wijayakusuma">Ruang VVIP Wijayakusuma</option>
-                      <option value="Ruang Perawatan Intensif (ICU)">Ruang Perawatan Intensif (ICU)</option>
-                      <option value="Ruang Isolasi Tekanan Negatif">Ruang Isolasi Tekanan Negatif</option>
-                    </select>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-700">
+                        Ruang / Bangsal Rawat Inap (Master Ruangan RS) <span className="text-rose-600">*</span>
+                      </label>
+                      <span className="text-[10px] text-amber-900 font-bold bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                        Pencarian Instan (Tanpa Scroll)
+                      </span>
+                    </div>
+
+                    {/* Search Input for Room */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-amber-700 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={ranapSearchText}
+                        onChange={e => {
+                          setRanapSearchText(e.target.value);
+                          setIsRanapDropdownOpen(true);
+                        }}
+                        onFocus={() => setIsRanapDropdownOpen(true)}
+                        placeholder="Ketik nama bangsal/kamar untuk mencari langsung (misal: mawar, melati, icu, vip)..."
+                        className="w-full pl-8 pr-8 py-2 bg-white border-2 border-amber-300 rounded-xl text-xs font-bold text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                      />
+                      {ranapSearchText && (
+                        <button
+                          type="button"
+                          onClick={() => setRanapSearchText('')}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dropdown Room List */}
+                    {isRanapDropdownOpen && (
+                      <div className="p-2 bg-slate-50 border border-amber-200 rounded-xl max-h-48 overflow-y-auto space-y-1 shadow-md scrollbar-thin animate-in fade-in z-20 relative">
+                        <div className="text-[10px] font-bold text-slate-400 px-1 uppercase tracking-wider flex items-center justify-between">
+                          <span>Daftar Ruangan Master ({availableRooms.length} Ruangan)</span>
+                          <button
+                            type="button"
+                            onClick={() => setIsRanapDropdownOpen(false)}
+                            className="text-amber-700 hover:underline cursor-pointer lowercase"
+                          >
+                            tutup
+                          </button>
+                        </div>
+                        {availableRooms.length === 0 ? (
+                          <div className="text-xs text-slate-400 p-2 text-center">
+                            Tidak ditemukan ruangan dengan kata kunci "{ranapSearchText}".
+                          </div>
+                        ) : (
+                          availableRooms.map(r => {
+                            const isSelected = ruangRawatBangsal.toLowerCase().includes(r.nama.toLowerCase());
+                            return (
+                              <button
+                                type="button"
+                                key={r.id}
+                                onClick={() => {
+                                  setRuangRawatBangsal(r.nama);
+                                  setIsRanapDropdownOpen(false);
+                                  setRanapSearchText('');
+                                }}
+                                className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-amber-600 text-white font-bold shadow-xs'
+                                    : 'text-slate-800 hover:bg-amber-100/70'
+                                }`}
+                              >
+                                <span>{r.nama}</span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                                  isSelected ? 'bg-amber-700 text-amber-100' : 'bg-slate-200 text-slate-600'
+                                }`}>
+                                  {r.jenis} &bull; Kapasitas {r.kapasitas} Bed
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+
+                    {/* Currently Selected Room Confirmation Bar */}
+                    <div className="flex items-center justify-between p-2.5 bg-amber-100/70 border border-amber-300 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-amber-700 shrink-0" />
+                        <span className="text-xs text-amber-950 font-bold">
+                          Ruangan Terpilih: <span className="text-amber-800 underline">{ruangRawatBangsal}</span>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsRanapDropdownOpen(prev => !prev)}
+                        className="text-[11px] font-bold text-amber-900 hover:text-amber-950 bg-white px-2.5 py-1 rounded-lg border border-amber-300 shadow-2xs cursor-pointer"
+                      >
+                        {isRanapDropdownOpen ? 'Sembunyikan' : 'Pilih Ruangan Lain'}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
