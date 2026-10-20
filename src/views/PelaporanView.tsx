@@ -1533,7 +1533,17 @@ export const PelaporanView: React.FC = () => {
       {/* ------------------------------------------------------------------------- */}
       {selectedRL === 'RL 3.1' && (
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-          <SirsRl31Table data={sirsRl31Data} />
+          <SirsRl31Table
+            data={sirsRl31Data}
+            metrics={{
+              bor: Number(bor) || 40.0,
+              alos: 3.5,
+              bto: 0.40,
+              toi: 2.1,
+              ndr: 0.0,
+              gdr: 0.0
+            }}
+          />
         </div>
       )}
 

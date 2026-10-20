@@ -350,14 +350,14 @@ export const PendaftaranView: React.FC = () => {
     responseCode: string;
     dbSynced: boolean;
   }>({
-    checked: true,
+    checked: false,
     status: 'Aktif',
-    statusDesc: 'Peserta Mandiri / PBI Terdaftar Aktif',
+    statusDesc: 'Belum dilakukan pengecekan SEP',
     hakKelas: 'Kelas 1',
     faskes1: 'Puskesmas Kebon Jeruk (0112001)',
-    lastChecked: 'Terverifikasi',
-    responseCode: '200 OK',
-    dbSynced: true
+    lastChecked: '-',
+    responseCode: 'Aktif',
+    dbSynced: false
   });
 
   // Log Pemantauan Sinkronisasi VClaim (tersimpan di localStorage agar selalu stabil dan muncul)
@@ -395,7 +395,7 @@ export const PendaftaranView: React.FC = () => {
         hakKelas: 'Kelas 1',
         faskes1: 'Puskesmas Kebon Jeruk (0112001)',
         sepNo: '0012R0010826V000881',
-        responseCode: '200 OK',
+        responseCode: 'Aktif',
         dbSynced: true
       },
       {
@@ -410,7 +410,7 @@ export const PendaftaranView: React.FC = () => {
         hakKelas: 'Kelas 2',
         faskes1: 'Puskesmas Palmerah (0112002)',
         sepNo: '0012R0010826V000912',
-        responseCode: '200 OK',
+        responseCode: 'Aktif',
         dbSynced: true
       },
       {
@@ -425,7 +425,7 @@ export const PendaftaranView: React.FC = () => {
         hakKelas: 'Kelas 3',
         faskes1: 'Puskesmas Kebon Jeruk (0112001)',
         sepNo: '-',
-        responseCode: '201 Not Active',
+        responseCode: 'Tidak Aktif',
         dbSynced: true
       }
     ];
@@ -448,7 +448,18 @@ export const PendaftaranView: React.FC = () => {
     const digitsOnly = val.replace(/\D/g, '').slice(0, 13);
     setNoAsuransi(digitsOnly);
 
-    // Otomatis sinkronkan status jika nomor terdaftar pada database pasien
+    // Jika angka belum lengkap 13 digit atau dihapus, hasil SEP tida boleh muncul
+    if (digitsOnly.length < 13) {
+      setGeneratedSepDummy('');
+      setCurrentVclaimStatus(prev => ({
+        ...prev,
+        checked: false,
+        dbSynced: false
+      }));
+      return;
+    }
+
+    // Otomatis sinkronkan status jika nomor 13 digit terdaftar pada database pasien
     const matched = patients.find(p => p.noBPJS === digitsOnly);
     if (matched) {
       const isAktif = matched.bpjsStatus !== 'Tidak Aktif';
@@ -459,7 +470,7 @@ export const PendaftaranView: React.FC = () => {
         hakKelas: matched.bpjsClass || 'Kelas 1',
         faskes1: 'Puskesmas Kebon Jeruk (0112001)',
         lastChecked: new Date().toLocaleTimeString('id-ID'),
-        responseCode: isAktif ? '200 OK' : '201 Not Active',
+        responseCode: isAktif ? 'Aktif' : 'Tidak Aktif',
         dbSynced: true
       });
     }
@@ -477,9 +488,10 @@ export const PendaftaranView: React.FC = () => {
   }, [doctors]);
 
   // Searchable Poli & Searchable Kamar/Bed States (Mencegah scroll panjang)
-  const [poliSearchText, setPoliSearchText] = useState('');
+  // Searchable Poli & Searchable Kamar/Bed States (Mencegah scroll panjang)
+  const [poliSearchText, setPoliSearchText] = useState('Poliklinik Penyakit Dalam');
   const [isPoliDropdownOpen, setIsPoliDropdownOpen] = useState(false);
-  const [ranapSearchText, setRanapSearchText] = useState('');
+  const [ranapSearchText, setRanapSearchText] = useState('Bangsal Mawar - Penyakit Dalam');
   const [isRanapDropdownOpen, setIsRanapDropdownOpen] = useState(false);
 
   // Available Polikliniks with instant search filter
@@ -496,14 +508,14 @@ export const PendaftaranView: React.FC = () => {
           status: 'Aktif' as const
         }));
 
-    if (!poliSearchText.trim()) return list;
+    if (!poliSearchText.trim() || poliSearchText.toLowerCase() === poliklinikTujuan.toLowerCase()) return list;
     const q = poliSearchText.toLowerCase();
     return list.filter(p => 
       p.nama.toLowerCase().includes(q) || 
       p.kode.toLowerCase().includes(q) || 
       p.kelompokLayanan.toLowerCase().includes(q)
     );
-  }, [masterPoli, poliSearchText]);
+  }, [masterPoli, poliSearchText, poliklinikTujuan]);
 
   // Available Rooms for Ranap with instant search filter
   const availableRooms = useMemo(() => {
@@ -511,7 +523,7 @@ export const PendaftaranView: React.FC = () => {
       ? masterRuangan.filter(r => r.status === 'Aktif')
       : [];
 
-    if (!ranapSearchText.trim()) return list;
+    if (!ranapSearchText.trim() || ranapSearchText.toLowerCase() === ruangRawatBangsal.toLowerCase()) return list;
     const q = ranapSearchText.toLowerCase();
     return list.filter(r => 
       r.nama.toLowerCase().includes(q) || 
@@ -519,7 +531,7 @@ export const PendaftaranView: React.FC = () => {
       r.jenis.toLowerCase().includes(q) || 
       r.lokasi.toLowerCase().includes(q)
     );
-  }, [masterRuangan, ranapSearchText]);
+  }, [masterRuangan, ranapSearchText, ruangRawatBangsal]);
 
   // Doctors for the currently selected Poliklinik (Master Data Mapping & Fallback)
   const currentPoliDoctors = useMemo(() => {
@@ -569,12 +581,27 @@ export const PendaftaranView: React.FC = () => {
   };
 
   const handleCheckVclaim = () => {
-    // Validasi digit BPJS (Harus angka dan 13 digit)
-    if (noAsuransi && noAsuransi.length !== 13) {
+    // Validasi No. BPJS: Angka WAJIB dimasukkan terlebih dahulu sebelum cek SEP
+    const cleanBpjs = (noAsuransi || '').trim();
+    if (!cleanBpjs) {
+      setGeneratedSepDummy('');
+      setCurrentVclaimStatus(prev => ({ ...prev, checked: false, dbSynced: false }));
       Swal.fire({
         icon: 'warning',
-        title: 'Validasi Digit No. BPJS',
-        text: `Nomor Kartu BPJS Kesehatan harus tepat 13 digit angka (saat ini ${noAsuransi.length} digit). Harap periksa kembali.`,
+        title: 'Nomor BPJS Belum Diisi',
+        text: 'Silakan masukkan nomor kartu BPJS Kesehatan (13 digit angka) terlebih dahulu sebelum melakukan pengecekan SEP.',
+        confirmButtonColor: '#2563eb'
+      });
+      return;
+    }
+
+    if (cleanBpjs.length !== 13) {
+      setGeneratedSepDummy('');
+      setCurrentVclaimStatus(prev => ({ ...prev, checked: false, dbSynced: false }));
+      Swal.fire({
+        icon: 'warning',
+        title: 'Nomor Kartu BPJS Wajib 13 Digit',
+        text: `Nomor Kartu BPJS Kesehatan harus tepat 13 digit angka (saat ini ${cleanBpjs.length} digit). Harap masukkan nomor BPJS lengkap terlebih dahulu sebelum melihat hasil SEP.`,
         confirmButtonColor: '#2563eb'
       });
       return;
@@ -586,14 +613,14 @@ export const PendaftaranView: React.FC = () => {
       // Resolve patient from current input or selection
       const matchedPatient = patients.find(p =>
         (selectedPasienLamaId && p.id === selectedPasienLamaId) ||
-        (noAsuransi && p.noBPJS === noAsuransi) ||
+        (cleanBpjs && p.noBPJS === cleanBpjs) ||
         (nik && p.nik === nik) ||
         (namaLengkap && p.name.toLowerCase() === namaLengkap.toLowerCase())
       );
 
-      const resolvedName = namaLengkap.trim() || matchedPatient?.name || (noAsuransi ? `Peserta BPJS (${noAsuransi})` : '-');
-      const resolvedBpjs = noAsuransi || matchedPatient?.noBPJS || '';
-      const resolvedNik = nik || matchedPatient?.nik || '';
+      const resolvedName = namaLengkap.trim() || matchedPatient?.name || `Peserta BPJS (${cleanBpjs})`;
+      const resolvedBpjs = cleanBpjs;
+      const resolvedNik = nik || matchedPatient?.nik || '-';
       const resolvedRM = noRM || matchedPatient?.noRM || '-';
 
       // Cek apakah aktif atau tidak aktif
@@ -607,14 +634,15 @@ export const PendaftaranView: React.FC = () => {
 
       const hakKelas = matchedPatient?.bpjsClass || currentVclaimStatus.hakKelas || 'Kelas 1';
       const faskes1 = 'Puskesmas Kebon Jeruk (0112001)';
-      const respCode = isCardActive ? '200 OK' : '201 Not Active';
+      const respCode = isCardActive ? 'Aktif' : 'Tidak Aktif';
       const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
       const newSep = isCardActive ? `0012R0010826V${Math.floor(100000 + Math.random() * 900000)}` : '-';
 
       if (isCardActive) {
         setGeneratedSepDummy(newSep);
+      } else {
+        setGeneratedSepDummy('');
       }
-      if (!noAsuransi) setNoAsuransi(resolvedBpjs);
 
       // Perbarui status VClaim aktif saat ini
       setCurrentVclaimStatus({
@@ -659,8 +687,8 @@ export const PendaftaranView: React.FC = () => {
       Swal.fire({
         icon: isCardActive ? 'success' : 'error',
         title: isCardActive
-          ? 'Bridging VClaim BPJS - STATUS AKTIF (200 OK)'
-          : 'Bridging VClaim BPJS - STATUS TIDAK AKTIF (201)',
+          ? 'Bridging VClaim BPJS - STATUS AKTIF'
+          : 'Bridging VClaim BPJS - STATUS TIDAK AKTIF',
         html: `
           <div class="text-left text-xs space-y-2 p-3.5 rounded-xl border mt-2 ${
             isCardActive ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-rose-50 border-rose-300 text-rose-950'
@@ -678,7 +706,7 @@ export const PendaftaranView: React.FC = () => {
             <div><strong>No. Kartu BPJS:</strong> <span class="font-mono font-bold">${resolvedBpjs}</span> (13 Digit Angka)</div>
             <div><strong>NIK KTP:</strong> <span class="font-mono">${resolvedNik}</span></div>
             <div><strong>Status Kepesertaan:</strong> <span class="font-bold ${isCardActive ? 'text-emerald-700' : 'text-rose-700'}">${isCardActive ? 'AKTIF (PBI APBN / NON-PBI)' : 'TIDAK AKTIF (Tunggakan Premi / Non-Aktif)'}</span></div>
-            <div><strong>Keterangan Respon:</strong> ${statusDesc} (Kode ${respCode})</div>
+            <div><strong>Keterangan Respon:</strong> ${statusDesc}</div>
             <div><strong>Hak Kelas:</strong> ${hakKelas}</div>
             <div><strong>Faskes Rujukan 1:</strong> ${faskes1}</div>
             ${!isCardActive ? '<div class="p-2.5 bg-white rounded-lg border border-rose-200 text-rose-700 font-semibold mt-1">Peringatan Admisi: Status kartu BPJS TIDAK AKTIF. Pelayanan tidak dijamin oleh BPJS Kesehatan. Pasien disarankan menyelesaikan tunggakan iuran atau dialihkan ke pembayaran UMUM / Mandiri.</div>' : ''}
@@ -701,12 +729,15 @@ export const PendaftaranView: React.FC = () => {
     setTanggalLahir(p.dob);
     setNoTelp(p.phone);
     setCaraPembayaran(p.insuranceType === 'BPJS' ? 'BPJS KESEHATAN' : p.insuranceType === 'Umum' ? 'UMUM / CASH / DEBIT' : 'ASURANSI SWASTA');
-    setNoAsuransi(p.noBPJS !== '-' ? p.noBPJS : '');
+    const cleanDigits = (p.noBPJS && p.noBPJS !== '-') ? p.noBPJS.replace(/\D/g, '').slice(0, 13) : '';
+    setNoAsuransi(cleanDigits);
     setSatuSehatId('P-' + Math.floor(10000000 + Math.random() * 90000000));
 
-    // Sinkronisasi status VClaim & DB Pasien Lokal
-    if (p.insuranceType === 'BPJS' || (p.noBPJS && p.noBPJS !== '-')) {
+    // Sinkronisasi status VClaim & DB Pasien Lokal bila ada nomor BPJS 13 digit
+    if (p.insuranceType === 'BPJS' && cleanDigits.length === 13) {
       const isAktif = p.bpjsStatus !== 'Tidak Aktif';
+      const autoSep = isAktif ? `0012R0010826V${Math.floor(100000 + Math.random() * 900000)}` : '';
+      setGeneratedSepDummy(autoSep);
       setCurrentVclaimStatus({
         checked: true,
         status: isAktif ? 'Aktif' : 'Tidak Aktif',
@@ -714,9 +745,16 @@ export const PendaftaranView: React.FC = () => {
         hakKelas: p.bpjsClass || 'Kelas 1',
         faskes1: 'Puskesmas Kebon Jeruk (0112001)',
         lastChecked: new Date().toLocaleTimeString('id-ID'),
-        responseCode: isAktif ? '200 OK' : '201 Not Active',
+        responseCode: isAktif ? 'Aktif' : 'Tidak Aktif',
         dbSynced: true
       });
+    } else {
+      setGeneratedSepDummy('');
+      setCurrentVclaimStatus(prev => ({
+        ...prev,
+        checked: false,
+        dbSynced: false
+      }));
     }
     
     if (p.country) setNegaraPasien(p.country);
@@ -2336,7 +2374,7 @@ export const PendaftaranView: React.FC = () => {
                                 onClick={() => {
                                   setPoliklinikTujuan(p.nama);
                                   setIsPoliDropdownOpen(false);
-                                  setPoliSearchText('');
+                                  setPoliSearchText(p.nama);
                                 }}
                                 className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
                                   isSelected
@@ -2367,7 +2405,13 @@ export const PendaftaranView: React.FC = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setIsPoliDropdownOpen(prev => !prev)}
+                        onClick={() => {
+                          setIsPoliDropdownOpen(prev => {
+                            const next = !prev;
+                            if (next) setPoliSearchText(poliklinikTujuan);
+                            return next;
+                          });
+                        }}
                         className="text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-white px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs cursor-pointer"
                       >
                         {isPoliDropdownOpen ? 'Sembunyikan' : 'Pilih Poli Lain'}
@@ -2570,7 +2614,7 @@ export const PendaftaranView: React.FC = () => {
                                 onClick={() => {
                                   setRuangRawatBangsal(r.nama);
                                   setIsRanapDropdownOpen(false);
-                                  setRanapSearchText('');
+                                  setRanapSearchText(r.nama);
                                 }}
                                 className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
                                   isSelected
@@ -2601,7 +2645,13 @@ export const PendaftaranView: React.FC = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setIsRanapDropdownOpen(prev => !prev)}
+                        onClick={() => {
+                          setIsRanapDropdownOpen(prev => {
+                            const next = !prev;
+                            if (next) setRanapSearchText(ruangRawatBangsal);
+                            return next;
+                          });
+                        }}
                         className="text-[11px] font-bold text-amber-900 hover:text-amber-950 bg-white px-2.5 py-1 rounded-lg border border-amber-300 shadow-2xs cursor-pointer"
                       >
                         {isRanapDropdownOpen ? 'Sembunyikan' : 'Pilih Ruangan Lain'}
@@ -3062,6 +3112,65 @@ export const PendaftaranView: React.FC = () => {
                         * Format nomor kartu BPJS Kesehatan selalu berupa 13 digit angka dan tidak dapat memuat karakter huruf.
                       </p>
                     </div>
+
+                    {/* HASIL VERIFIKASI SEP & VCLAIM BPJS (HANYA MUNCUL JIKA NOMOR BPJS SUDAH DIMASUKKAN & DIVALIDASI) */}
+                    {noAsuransi.length === 13 && currentVclaimStatus.checked ? (
+                      <div className={`p-3.5 rounded-xl border space-y-2.5 animate-in fade-in transition-all ${
+                        currentVclaimStatus.status === 'Aktif'
+                          ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950'
+                          : 'bg-rose-50/90 border-rose-300 text-rose-950'
+                      }`}>
+                        <div className="flex items-center justify-between pb-2 border-b border-emerald-200/80">
+                          <div className="flex items-center gap-2">
+                            {currentVclaimStatus.status === 'Aktif' ? (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            ) : (
+                              <AlertTriangle className="w-4 h-4 text-rose-600" />
+                            )}
+                            <span className="font-bold text-xs">Hasil Verifikasi VClaim & Penerbitan SEP</span>
+                          </div>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            currentVclaimStatus.status === 'Aktif'
+                              ? 'bg-emerald-200 text-emerald-900 border border-emerald-300'
+                              : 'bg-rose-200 text-rose-900 border border-rose-300'
+                          }`}>
+                            {currentVclaimStatus.status === 'Aktif' ? '✓ STATUS: AKTIF' : '⚠ STATUS: TIDAK AKTIF'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">Nomor SEP:</span>
+                            <span className="font-mono font-bold text-blue-700 text-sm">
+                              {generatedSepDummy || 'SEP-OTOMATIS'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">Hak Kelas Rawat:</span>
+                            <span className="font-bold text-slate-800">{currentVclaimStatus.hakKelas}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">Faskes Tingkat 1:</span>
+                            <span className="font-medium text-slate-800">{currentVclaimStatus.faskes1}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">Keterangan:</span>
+                            <span className="font-medium text-slate-800">{currentVclaimStatus.statusDesc}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-white/70 border border-dashed border-emerald-200 rounded-xl text-[11px] text-slate-500 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                        <span>
+                          {noAsuransi.length === 0
+                            ? 'Nomor kartu BPJS belum dimasukkan. Masukkan 13 digit angka untuk memunculkan hasil SEP.'
+                            : noAsuransi.length < 13
+                            ? `Nomor kartu baru ${noAsuransi.length}/13 digit. Lengkapi 13 digit angka sebelum hasil SEP dapat ditampilkan.`
+                            : 'Nomor BPJS telah dimasukkan. Klik tombol "Cek VClaim & SEP" di atas untuk memvalidasi dan memunculkan hasil SEP.'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3888,7 +3997,7 @@ export const PendaftaranView: React.FC = () => {
               hakKelas: data.hakKelas,
               faskes1: 'Puskesmas Kebon Jeruk (0112001)',
               lastChecked: new Date().toLocaleTimeString('id-ID'),
-              responseCode: data.status === 'Aktif' ? '200 OK' : '201 Not Active',
+              responseCode: data.status === 'Aktif' ? 'Aktif' : 'Tidak Aktif',
               dbSynced: true
             });
           }}

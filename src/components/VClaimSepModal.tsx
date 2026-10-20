@@ -94,7 +94,7 @@ export const VClaimSepModal: React.FC<VClaimSepModalProps> = ({
           </div>
           <div>
             <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
-              Bridging VClaim BPJS Kesehatan <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">ONLINE 200 OK</span>
+              Bridging VClaim BPJS Kesehatan <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">ONLINE</span>
             </h3>
             <p className="text-[11px] text-slate-500">Preview & Cetak Surat Eligibilitas Peserta (SEP) SIMRS</p>
           </div>
