@@ -1843,7 +1843,7 @@ export const PendaftaranView: React.FC = () => {
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
                       <span>Nama Lengkap Pasien <span className="text-rose-600">*</span></span>
-                      <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">HURUF KAPITAL (CAPSLOCK)</span>
+                      <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider"></span>
                     </label>
                     <input
                       type="text"
@@ -1918,7 +1918,7 @@ export const PendaftaranView: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Usia Pasien (Hitung Otomatis)</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Usia Pasien</label>
                     <input
                       type="text"
                       value={calculateAgeStr(tanggalLahir)}

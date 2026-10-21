@@ -4,7 +4,8 @@ import { ReadOnlyBanner } from '../components/ReadOnlyBanner';
 import {
   BarChart3, FileText, CheckCircle2, TrendingUp, Layers, Download, Printer,
   Filter, Search, Building2, Users, Stethoscope, Activity, HeartPulse,
-  Syringe, ShieldAlert, Sparkles, ChevronRight, HelpCircle, Trophy, Percent, CreditCard
+  Syringe, ShieldAlert, Sparkles, ChevronRight, HelpCircle, Trophy, Percent, CreditCard,
+  ChevronLeft, ChevronDown, Calendar, RotateCcw, X
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { INITIAL_ICD10 } from '../data/mockData';
@@ -58,19 +59,232 @@ export const PelaporanView: React.FC = () => {
   const [selectedPeriodMonth, setSelectedPeriodMonth] = useState('08');
   const [selectedPeriodYear, setSelectedPeriodYear] = useState('2026');
 
-  // Dynamic Real-Time Patient & Encounter Analytics (100% Sesuai Data Pasien Riil)
+  // Filter Date & Search State (Preset, Custom Date Range, and Search Execution)
+  const [datePreset, setDatePreset] = useState<'hari_ini' | 'minggu_ini' | 'bulan_ini' | 'tahun_ini' | 'custom'>('tahun_ini');
+  const [startDate, setStartDate] = useState<string>('2026-01-01');
+  const [endDate, setEndDate] = useState<string>('2026-12-31');
+  const [searchKeyword, setSearchKeyword] = useState<string>('');
+
+  // Applied filter state (Executed when "Jalankan Filter" is clicked)
+  const [appliedSearch, setAppliedSearch] = useState<string>('');
+  const [appliedStartDate, setAppliedStartDate] = useState<string>('2026-01-01');
+  const [appliedEndDate, setAppliedEndDate] = useState<string>('2026-12-31');
+  const [showDatePickerPopover, setShowDatePickerPopover] = useState<boolean>(false);
+
+  const formatDateDisplay = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
+
+  // Sub-forms Horizontal Scrollbar Ref & Progress (Image 2 & 3)
+  const subformsScrollRef = React.useRef<HTMLDivElement>(null);
+  const [scrollProgress, setScrollProgress] = useState({ scrollLeft: 0, scrollWidth: 1, clientWidth: 1 });
+
+  const updateScrollProgress = () => {
+    if (subformsScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = subformsScrollRef.current;
+      setScrollProgress({ scrollLeft, scrollWidth, clientWidth });
+    }
+  };
+
+  const scrollSubforms = (direction: 'left' | 'right') => {
+    if (subformsScrollRef.current) {
+      const offset = direction === 'left' ? -260 : 260;
+      subformsScrollRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
+
+  const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!subformsScrollRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+    const maxScroll = Math.max(1, subformsScrollRef.current.scrollWidth - subformsScrollRef.current.clientWidth);
+    subformsScrollRef.current.scrollTo({ left: ratio * maxScroll, behavior: 'smooth' });
+  };
+
+  const maxScroll = Math.max(1, scrollProgress.scrollWidth - scrollProgress.clientWidth);
+  const canScroll = scrollProgress.scrollWidth > scrollProgress.clientWidth;
+  const thumbWidthPercent = canScroll
+    ? Math.min(95, Math.max(15, (scrollProgress.clientWidth / scrollProgress.scrollWidth) * 100))
+    : 100;
+  const thumbLeftPercent = canScroll
+    ? Math.min(100 - thumbWidthPercent, Math.max(0, (scrollProgress.scrollLeft / maxScroll) * (100 - thumbWidthPercent)))
+    : 0;
+
+  const handleThumbMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const initialScroll = subformsScrollRef.current ? subformsScrollRef.current.scrollLeft : 0;
+    const trackEl = (e.currentTarget.parentElement as HTMLDivElement);
+    const trackRect = trackEl?.getBoundingClientRect();
+    const trackWidth = trackRect?.width || 1;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!subformsScrollRef.current) return;
+      const currentMaxScroll = Math.max(1, subformsScrollRef.current.scrollWidth - subformsScrollRef.current.clientWidth);
+      const deltaX = moveEvent.clientX - startX;
+      const scrollRatio = deltaX / trackWidth;
+      subformsScrollRef.current.scrollLeft = Math.max(0, Math.min(currentMaxScroll, initialScroll + scrollRatio * currentMaxScroll));
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
+  React.useEffect(() => {
+    const el = subformsScrollRef.current;
+    if (!el) return;
+    const handleScroll = () => updateScrollProgress();
+    el.addEventListener('scroll', handleScroll);
+    updateScrollProgress();
+    window.addEventListener('resize', handleScroll);
+    // Timeout to recalculate when tab changes and layout settles
+    const timer = setTimeout(() => updateScrollProgress(), 80);
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [activeBab]);
+
+  // Date Preset Switcher (Matching Image 1: Hari Ini, Minggu Ini, Bulan Ini, Tahun 2026)
+  const handleSelectPreset = (preset: 'hari_ini' | 'minggu_ini' | 'bulan_ini' | 'tahun_ini') => {
+    setDatePreset(preset);
+    const today = new Date().toISOString().split('T')[0];
+    let start = today;
+    let end = today;
+
+    if (preset === 'hari_ini') {
+      start = today;
+      end = today;
+    } else if (preset === 'minggu_ini') {
+      const d = new Date();
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff)).toISOString().split('T')[0];
+      start = monday;
+      end = today;
+    } else if (preset === 'bulan_ini') {
+      const year = selectedPeriodYear || '2026';
+      const month = selectedPeriodMonth || '08';
+      start = `${year}-${month}-01`;
+      const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+      end = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
+    } else if (preset === 'tahun_ini') {
+      const year = selectedPeriodYear || '2026';
+      start = `${year}-01-01`;
+      end = `${year}-12-31`;
+    }
+
+    setStartDate(start);
+    setEndDate(end);
+    setAppliedStartDate(start);
+    setAppliedEndDate(end);
+  };
+
+  const handlePeriodMonthChange = (month: string) => {
+    setSelectedPeriodMonth(month);
+    const year = selectedPeriodYear;
+    const start = `${year}-${month}-01`;
+    const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+    const end = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
+    setStartDate(start);
+    setEndDate(end);
+    setAppliedStartDate(start);
+    setAppliedEndDate(end);
+    setDatePreset('bulan_ini');
+  };
+
+  const handlePeriodYearChange = (year: string) => {
+    setSelectedPeriodYear(year);
+    const month = selectedPeriodMonth;
+    const start = `${year}-${month}-01`;
+    const lastDay = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+    const end = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
+    setStartDate(start);
+    setEndDate(end);
+    setAppliedStartDate(start);
+    setAppliedEndDate(end);
+  };
+
+  // Execute Filter Data when Search / Filter button is clicked
+  const handleExecuteFilter = () => {
+    setAppliedSearch(searchKeyword.trim());
+    setAppliedStartDate(startDate);
+    setAppliedEndDate(endDate);
+  };
+
+  const handleResetFilter = () => {
+    setSearchKeyword('');
+    setAppliedSearch('');
+    setDatePreset('tahun_ini');
+    setStartDate('2026-01-01');
+    setEndDate('2026-12-31');
+    setAppliedStartDate('2026-01-01');
+    setAppliedEndDate('2026-12-31');
+  };
+
+  // Dynamic Filtered Registrations by Date & Search Keyword
+  const filteredRegistrations = useMemo(() => {
+    return registrations.filter(r => {
+      // Date filter
+      if (appliedStartDate && r.date < appliedStartDate) return false;
+      if (appliedEndDate && r.date > appliedEndDate) return false;
+
+      // Search keyword filter
+      if (appliedSearch) {
+        const q = appliedSearch.toLowerCase();
+        const p = patients.find(pt => pt.id === r.patientId);
+        const mr = medicalRecords.find(m => m.regId === r.id);
+        const cd = coding.find(c => c.regId === r.id);
+
+        const matchPatient = p?.name.toLowerCase().includes(q) || p?.noRM.toLowerCase().includes(q) || (p?.nik && p.nik.includes(q));
+        const matchReg = (r.poli || '').toLowerCase().includes(q) ||
+          (r.room || '').toLowerCase().includes(q) ||
+          r.type.toLowerCase().includes(q) ||
+          (r.status || '').toLowerCase().includes(q) ||
+          (r.sepNo || '').toLowerCase().includes(q) ||
+          (r.id || '').toLowerCase().includes(q) ||
+          (r.dpjp || '').toLowerCase().includes(q);
+        const matchMed = (mr?.diagnosis || '').toLowerCase().includes(q) ||
+          (mr?.symptoms || '').toLowerCase().includes(q) ||
+          (cd?.primaryCode || '').toLowerCase().includes(q) ||
+          (cd?.primaryDesc || '').toLowerCase().includes(q);
+        const matchIns = (p?.insuranceType || '').toLowerCase().includes(q);
+
+        if (!matchPatient && !matchReg && !matchMed && !matchIns) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [registrations, appliedStartDate, appliedEndDate, appliedSearch, patients, medicalRecords, coding]);
+
+  // Dynamic Real-Time Patient & Encounter Analytics (100% Sesuai Data Pasien Riil Terfilter)
   const patientStats = useMemo(() => {
     const totalPatients = patients.length;
     const malePatients = patients.filter(p => p.gender === 'M' || p.gender === 'L');
     const femalePatients = patients.filter(p => p.gender === 'F' || p.gender === 'P');
 
-    const ranapRegs = registrations.filter(r => r.type === 'Rawat Inap');
-    const ralanRegs = registrations.filter(r => r.type === 'Rawat Jalan');
-    const igdRegs = registrations.filter(r => r.type === 'IGD');
+    const ranapRegs = filteredRegistrations.filter(r => r.type === 'Rawat Inap');
+    const ralanRegs = filteredRegistrations.filter(r => r.type === 'Rawat Jalan');
+    const igdRegs = filteredRegistrations.filter(r => r.type === 'IGD');
 
     // Registration counts per patient to identify Pengunjung Baru vs Lama
     const regCountMap: Record<string, number> = {};
-    registrations.forEach(r => {
+    filteredRegistrations.forEach(r => {
       regCountMap[r.patientId] = (regCountMap[r.patientId] || 0) + 1;
     });
 
@@ -153,7 +367,7 @@ export const PelaporanView: React.FC = () => {
     let umumRanapL = 0, umumRanapP = 0, umumRalanL = 0, umumRalanP = 0, umumIgdL = 0, umumIgdP = 0;
     let asuransiRanapL = 0, asuransiRanapP = 0, asuransiRalanL = 0, asuransiRalanP = 0, asuransiIgdL = 0, asuransiIgdP = 0;
 
-    registrations.forEach(r => {
+    filteredRegistrations.forEach(r => {
       const p = patients.find(pt => pt.id === r.patientId);
       const isMale = p?.gender === 'M' || p?.gender === 'L';
       const ins = p?.insuranceType || 'BPJS';
@@ -237,7 +451,7 @@ export const PelaporanView: React.FC = () => {
       ranapCount: ranapRegs.length,
       ralanCount: ralanRegs.length,
       igdCount: igdRegs.length,
-      totalRegs: registrations.length,
+      totalRegs: filteredRegistrations.length,
       pengunjungBaruL,
       pengunjungBaruP,
       totalPengunjungBaru,
@@ -319,7 +533,7 @@ export const PelaporanView: React.FC = () => {
 
   // RL 3.2 Rekapitulasi Kegiatan Pelayanan Rawat Inap (36 Layanan + 99 TOTAL)
   const sirsRl32Data: SirsRl32Row[] = useMemo(() => {
-    const ranapRegs = registrations.filter(r => r.type === 'Rawat Inap');
+    const ranapRegs = filteredRegistrations.filter(r => r.type === 'Rawat Inap');
     
     // Baseline sample monthly distribution across the 36 services
     const baseDistribution: Record<string, { masuk: number; hidup: number; awal: number; lama: number; akhir: number; hp: number; tt: number; vvip: number; vip: number; k1: number; k2: number; k3: number; kKhusus: number; ml48: number; mg48: number; fl48: number; fg48: number }> = {
@@ -409,11 +623,11 @@ export const PelaporanView: React.FC = () => {
     };
 
     return [...rows, totalRow];
-  }, [registrations]);
+  }, [filteredRegistrations]);
 
   // RL 3.3 Rekapitulasi Kegiatan Pelayanan Rawat Darurat (Format Resmi Image 3)
   const sirsRl33Data: SirsRl33Row[] = useMemo(() => {
-    const igdRegs = registrations.filter(r => r.type === 'IGD');
+    const igdRegs = filteredRegistrations.filter(r => r.type === 'IGD');
     const liveIgdCount = igdRegs.length;
     const liveDirawat = igdRegs.filter(r => r.status === 'Dirawat').length;
     const livePulang = igdRegs.filter(r => r.status === 'Selesai' || r.status === 'Pulang').length;
@@ -445,11 +659,11 @@ export const PelaporanView: React.FC = () => {
       }
       return { ...row };
     });
-  }, [registrations]);
+  }, [filteredRegistrations]);
 
   // RL 3.5 Rekapitulasi Kunjungan (34 Layanan + 99 TOTAL + 66 + 77 - Image 4)
   const sirsRl35Data: SirsRl35Row[] = useMemo(() => {
-    const ralanRegs = registrations.filter(r => r.type === 'Rawat Jalan' || r.type === 'IGD');
+    const ralanRegs = filteredRegistrations.filter(r => r.type === 'Rawat Jalan' || r.type === 'IGD');
     
     const baseVisits: Record<string, { dL: number; dP: number; lL: number; lP: number }> = {
       '1': { dL: 42, dP: 48, lL: 14, lP: 16 },
@@ -537,7 +751,7 @@ export const PelaporanView: React.FC = () => {
     };
 
     return [...rows, totalRow];
-  }, [registrations, patients]);
+  }, [filteredRegistrations, patients]);
 
   // RL 3.6 Rekapitulasi Kegiatan Pelayanan Kebidanan (Image 5)
   const sirsRl36Data: SirsRl36Row[] = useMemo(() => {
@@ -563,7 +777,7 @@ export const PelaporanView: React.FC = () => {
     coding.forEach(c => {
       const codes = Array.isArray(c.icd10) ? c.icd10 : [c.icd10];
       const mr = medicalRecords.find(m => m.id === c.mrId);
-      const reg = mr ? registrations.find(r => r.id === mr.regId) : null;
+      const reg = mr ? filteredRegistrations.find(r => r.id === mr.regId) : null;
       const p = reg ? patients.find(pt => pt.id === reg.patientId) : null;
       const isMale = p?.gender === 'M' || p?.gender === 'L';
       const isRalan = reg?.type === 'Rawat Jalan' || reg?.type === 'IGD';
@@ -588,7 +802,7 @@ export const PelaporanView: React.FC = () => {
     // 2. Also incorporate medical records diagnoses (in case not all are coded yet)
     medicalRecords.forEach(mr => {
       if (!mr.diagnosis) return;
-      const reg = registrations.find(r => r.id === mr.regId);
+      const reg = filteredRegistrations.find(r => r.id === mr.regId);
       const p = reg ? patients.find(pt => pt.id === reg.patientId) : null;
       const isMale = p?.gender === 'M' || p?.gender === 'L';
       const isRalan = reg?.type === 'Rawat Jalan' || reg?.type === 'IGD';
@@ -621,7 +835,7 @@ export const PelaporanView: React.FC = () => {
       rank: idx + 1,
       percentage: ((item.total * 100) / grandTotal).toFixed(1)
     }));
-  }, [coding, medicalRecords, registrations, patients]);
+  }, [coding, medicalRecords, filteredRegistrations, patients]);
 
   // =========================================================================
   // SIRS 6.3 RL 4 (RAWAT INAP) MORBIDITAS & MORTALITAS ANALYTICS
@@ -636,7 +850,7 @@ export const PelaporanView: React.FC = () => {
     }));
 
     // Inject any live Inpatient (Ranap) patients diagnosed in the system
-    registrations
+    filteredRegistrations
       .filter(r => r.type === 'Rawat Inap')
       .forEach(reg => {
         const p = patients.find(pt => pt.id === reg.patientId);
@@ -710,7 +924,7 @@ export const PelaporanView: React.FC = () => {
       const codeB = String(b?.code || '');
       return codeA.localeCompare(codeB);
     });
-  }, [registrations, coding, patients]);
+  }, [filteredRegistrations, coding, patients]);
 
   // Dynamic RL 4.2: 10 Besar Penyakit Rawat Inap (Sorted by Total Hidup & Mati)
   const sirsRl42Data: SirsRl42Top10Row[] = useMemo(() => {
@@ -761,7 +975,7 @@ export const PelaporanView: React.FC = () => {
     }));
 
     // Inject live Rawat Jalan (Ralan) patients diagnosed in the system
-    registrations
+    filteredRegistrations
       .filter(r => r.type === 'Rawat Jalan')
       .forEach(reg => {
         const p = patients.find(pt => pt.id === reg.patientId);
@@ -837,7 +1051,7 @@ export const PelaporanView: React.FC = () => {
       const codeB = String(b?.code || '');
       return codeA.localeCompare(codeB);
     });
-  }, [registrations, coding, patients]);
+  }, [filteredRegistrations, coding, patients]);
 
   // Dynamic RL 5.2: 10 Besar Kasus Baru Penyakit Rawat Jalan
   const sirsRl52Data: SirsRl52Top10KasusBaruRow[] = useMemo(() => {
@@ -1123,6 +1337,252 @@ export const PelaporanView: React.FC = () => {
         </div>
       </div>
 
+      {/* ========================================================================= */}
+      {/* FILTER TANGGAL & SEARCH UNTUK MENJALANKAN FILTER (SIRS 6.3 & PELAPORAN) */}
+      {/* ========================================================================= */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+        {/* Row 1: Presets & Date Range Settings (Matching user image 1) */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-blue-600" /> Filter Tanggal:
+            </span>
+
+            {/* Presets: Hari Ini | Minggu Ini | Bulan Ini | Tahun 2026 (Image 1) */}
+            <div className="bg-slate-100/90 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/90 text-slate-600 select-none">
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('hari_ini')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  datePreset === 'hari_ini'
+                    ? 'bg-white text-blue-600 shadow-xs border border-slate-200/60'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Hari Ini
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('minggu_ini')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  datePreset === 'minggu_ini'
+                    ? 'bg-white text-blue-600 shadow-xs border border-slate-200/60'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Minggu Ini
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('bulan_ini')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  datePreset === 'bulan_ini'
+                    ? 'bg-white text-blue-600 shadow-xs border border-slate-200/60'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Bulan Ini
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('tahun_ini')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  datePreset === 'tahun_ini'
+                    ? 'bg-white text-blue-600 shadow-xs border border-slate-200/60'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Tahun {selectedPeriodYear}
+              </button>
+            </div>
+
+            {/* Tanggal Kalender Pill (Matching Image 1: 📅 01/01/2026 - 31/12/2026 ⌵) */}
+            <button
+              type="button"
+              onClick={() => setShowDatePickerPopover(!showDatePickerPopover)}
+              className={`px-3.5 py-1.5 rounded-2xl border font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs ${
+                showDatePickerPopover
+                  ? 'bg-blue-50 text-blue-700 border-blue-300 ring-2 ring-blue-200'
+                  : 'bg-white text-slate-700 border-slate-200/90 hover:bg-slate-50'
+              }`}
+              title="Klik untuk buka/tutup panel pengaturan tanggal kustom"
+            >
+              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              <span>{formatDateDisplay(startDate)} - {formatDateDisplay(endDate)}</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          </div>
+
+          {/* Setting Tanggal Rentang Kustom (Start Date s/d End Date) */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
+            <span className="font-bold text-slate-600 text-[11px]">Setting Tanggal:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => {
+                setStartDate(e.target.value);
+                setDatePreset('custom');
+              }}
+              className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              title="Tanggal Awal"
+            />
+            <span className="text-slate-400 font-bold">s/d</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => {
+                setEndDate(e.target.value);
+                setDatePreset('custom');
+              }}
+              className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              title="Tanggal Akhir"
+            />
+          </div>
+        </div>
+
+        {/* Collapsible Popover Panel for Calendar Settings */}
+        {showDatePickerPopover && (
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <span className="font-bold text-slate-700">Pilih Tahun & Bulan Cepat:</span>
+              <select
+                value={selectedPeriodMonth}
+                onChange={e => handlePeriodMonthChange(e.target.value)}
+                className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 font-bold text-slate-800 text-xs"
+              >
+                <option value="01">Januari</option>
+                <option value="02">Februari</option>
+                <option value="03">Maret</option>
+                <option value="04">April</option>
+                <option value="05">Mei</option>
+                <option value="06">Juni</option>
+                <option value="07">Juli</option>
+                <option value="08">Agustus</option>
+                <option value="09">September</option>
+                <option value="10">Oktober</option>
+                <option value="11">November</option>
+                <option value="12">Desember</option>
+              </select>
+              <select
+                value={selectedPeriodYear}
+                onChange={e => handlePeriodYearChange(e.target.value)}
+                className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 font-bold text-slate-800 text-xs"
+              >
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+              </select>
+            </div>
+            <div className="text-[11px] text-slate-500 font-mono">
+              Periode terpilih: {startDate} s/d {endDate}
+            </div>
+          </div>
+        )}
+
+        {/* Row 2: Search Input & "Jalankan Filter" Button */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100">
+          <div className="flex-1 min-w-[280px] relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchKeyword}
+              onChange={e => setSearchKeyword(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  handleExecuteFilter();
+                }
+              }}
+              placeholder="Cari data laporan: nama pasien, No. RM, NIK, DPJP, poli, diagnosis, kode ICD-10..."
+              className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400 shadow-2xs"
+            />
+            {searchKeyword && (
+              <button
+                type="button"
+                onClick={() => setSearchKeyword('')}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                title="Hapus teks pencarian"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Jalankan Filter Button */}
+          <button
+            type="button"
+            onClick={handleExecuteFilter}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-black rounded-xl text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+            title="Klik untuk menjalankan filter data berdasarkan tanggal dan pencarian"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>Jalankan Filter</span>
+          </button>
+
+          {/* Reset Filter Button */}
+          {(appliedSearch || datePreset !== 'tahun_ini' || appliedStartDate !== `${selectedPeriodYear}-01-01` || appliedEndDate !== `${selectedPeriodYear}-12-31`) && (
+            <button
+              type="button"
+              onClick={handleResetFilter}
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center gap-1.5 border border-slate-200 cursor-pointer transition-all"
+              title="Reset semua filter ke kondisi awal tahun penuh"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+              <span>Reset</span>
+            </button>
+          )}
+
+          {/* Divider */}
+          <div className="hidden sm:block h-6 w-px bg-slate-200 my-auto" />
+
+          {/* Export Excel Button */}
+          <button
+            type="button"
+            onClick={() => handleExportExcel(selectedRL)}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold rounded-xl text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+            title={`Export data formulir ${selectedRL} ke format Excel (XLS / CSV)`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Excel</span>
+          </button>
+
+          {/* Cetak Button */}
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+            title="Cetak dokumen formulir pelaporan yang sedang ditampilkan"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Cetak</span>
+          </button>
+        </div>
+
+        {/* Active Filter Status Banner */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-blue-50/70 border border-blue-100 rounded-xl text-[11px] text-blue-900">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-black flex items-center gap-1 text-blue-800">
+              <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+              Status Filter Data:
+            </span>
+            <span className="bg-white px-2 py-0.5 rounded-md border border-blue-200 font-mono font-bold text-blue-700">
+              📅 {appliedStartDate} s/d {appliedEndDate}
+            </span>
+            {appliedSearch ? (
+              <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md border border-amber-200 font-bold">
+                🔍 Kata Kunci: "{appliedSearch}"
+              </span>
+            ) : (
+              <span className="text-slate-500 font-medium">(Semua transaksi)</span>
+            )}
+          </div>
+          <span className="font-bold text-slate-700">
+            Ditemukan: <strong className="text-blue-700 font-black">{filteredRegistrations.length}</strong> Registrasi Pasien Terfilter
+          </span>
+        </div>
+      </div>
+
       {/* KATEGORI TABS (5 KEMENKES) */}
       <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
         <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-700 px-2 pt-1">
@@ -1204,114 +1664,158 @@ export const PelaporanView: React.FC = () => {
           </button>
         </div>
 
-        {/* SUB-FORM SELECTION BUTTONS FOR CURRENT BAB */}
-        <div className="bg-slate-100 p-2 rounded-xl border border-slate-200 flex items-center gap-1.5 overflow-x-auto pt-2 scrollbar-none">
-          <span className="text-[11px] font-black text-slate-700 px-2 uppercase shrink-0">PILIH FORMULIR:</span>
-          {activeBab === 'BAB2' && (
-            <>
-              {['RL 1.1', 'RL 1.2', 'RL 1.3', 'RL 1.4'].map(rl => (
-                <button
-                  key={rl}
-                  type="button"
-                  onClick={() => setSelectedRL(rl)}
-                  className={`px-3 py-1.5 rounded-lg font-extrabold text-xs shrink-0 transition-all cursor-pointer ${
-                    selectedRL === rl ? 'bg-sky-700 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {rl} {rl === 'RL 1.1' ? 'Profil RS' : rl === 'RL 1.2' ? 'Ketersediaan Pelayanan' : rl === 'RL 1.3' ? 'Tempat Tidur' : 'ASPAK'}
-                </button>
-              ))}
-            </>
-          )}
+        {/* SUB-FORM SELECTION BUTTONS WITH HORIZONTAL SCROLLBAR SLIDER */}
+        <div className="bg-slate-100 rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+          <div
+            ref={subformsScrollRef}
+            className="p-2 flex items-center gap-1.5 overflow-x-auto scroll-smooth scrollbar-none"
+          >
+            <span className="text-[11px] font-black text-slate-700 px-2 uppercase shrink-0">PILIH FORMULIR:</span>
+            {activeBab === 'BAB2' && (
+              <>
+                {['RL 1.1', 'RL 1.2', 'RL 1.3', 'RL 1.4'].map(rl => (
+                  <button
+                    key={rl}
+                    type="button"
+                    onClick={() => setSelectedRL(rl)}
+                    className={`px-3 py-1.5 rounded-lg font-extrabold text-xs shrink-0 transition-all cursor-pointer ${
+                      selectedRL === rl ? 'bg-sky-700 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {rl} {rl === 'RL 1.1' ? 'Profil RS' : rl === 'RL 1.2' ? 'Ketersediaan Pelayanan' : rl === 'RL 1.3' ? 'Tempat Tidur' : 'ASPAK'}
+                  </button>
+                ))}
+              </>
+            )}
 
-          {activeBab === 'BAB3' && (
+            {activeBab === 'BAB3' && (
+              <button
+                type="button"
+                onClick={() => setSelectedRL('RL 2')}
+                className="px-3 py-1.5 rounded-lg font-extrabold text-xs bg-sky-700 text-white shrink-0 shadow-xs"
+              >
+                RL 2 - Data Ketenagaan RS (SISDMK)
+              </button>
+            )}
+
+            {activeBab === 'BAB4' && (
+              <>
+                {[
+                  { id: 'RL 3.1', label: 'RL 3.1 Indikator' },
+                  { id: 'RL 3.2', label: 'RL 3.2 Rawat Inap' },
+                  { id: 'RL 3.3', label: 'RL 3.3 Rawat Darurat' },
+                  { id: 'RL 3.4', label: 'RL 3.4 Pengunjung' },
+                  { id: 'RL 3.5', label: 'RL 3.5 Kunjungan' },
+                  { id: 'RL 3.6', label: 'RL 3.6 Kebidanan' },
+                  { id: 'RL 3.7', label: 'RL 3.7 Neonatal/Bayi/Balita' },
+                  { id: 'RL 3.8', label: 'RL 3.8 Laboratorium' },
+                  { id: 'RL 3.9', label: 'RL 3.9 Radiologi' },
+                  { id: 'RL 3.10', label: 'RL 3.10 Rujukan' },
+                  { id: 'RL 3.11', label: 'RL 3.11 Gigi & Mulut' },
+                  { id: 'RL 3.12', label: 'RL 3.12 Pembedahan' },
+                  { id: 'RL 3.13', label: 'RL 3.13 Rehab Medik' },
+                  { id: 'RL 3.14', label: 'RL 3.14 Pelayanan Khusus' },
+                  { id: 'RL 3.15', label: 'RL 3.15 Kesehatan Jiwa' },
+                  { id: 'RL 3.16', label: 'RL 3.16 KB' },
+                  { id: 'RL 3.17', label: 'RL 3.17 Pengadaan Obat' },
+                  { id: 'RL 3.18', label: 'RL 3.18 Resep' },
+                  { id: 'RL 3.19', label: 'RL 3.19 Cara Bayar' },
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedRL(item.id)}
+                    className={`px-3 py-1.5 rounded-lg font-extrabold text-xs shrink-0 transition-all cursor-pointer ${
+                      selectedRL === item.id ? 'bg-sky-700 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </>
+            )}
+
+            {activeBab === 'BAB5' && (
+              <>
+                {[
+                  { id: 'RL 4.1', label: 'RL 4.1 Kompilasi Penyakit/Morbiditas Pasien Rawat Inap' },
+                  { id: 'RL 4.2', label: 'RL 4.2 10 Besar Penyakit Rawat Inap' },
+                  { id: 'RL 4.3', label: 'RL 4.3 10 Besar Kematian Penyakit Rawat Inap' },
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedRL(item.id)}
+                    className={`px-3 py-1.5 rounded-lg font-extrabold text-xs shrink-0 transition-all cursor-pointer ${
+                      selectedRL === item.id ? 'bg-sky-700 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </>
+            )}
+
+            {activeBab === 'BAB6' && (
+              <>
+                {[
+                  { id: 'RL 5.1', label: 'RL 5.1 Kompilasi Morbiditas Pasien Rawat Jalan' },
+                  { id: 'RL 5.2', label: 'RL 5.2 10 Besar Kasus Baru Penyakit Rawat Jalan' },
+                  { id: 'RL 5.3', label: 'RL 5.3 10 Besar Kunjungan Penyakit Rawat Jalan' },
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedRL(item.id)}
+                    className={`px-3 py-1.5 rounded-lg font-extrabold text-xs shrink-0 transition-all cursor-pointer ${
+                      selectedRL === item.id ? 'bg-sky-700 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* Garis penggeser horizontal (Slider Scrollbar matching user image 3) */}
+          <div className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-200/70 border-t border-slate-200 select-none">
+            {/* Tombol Geser Kiri ◄ */}
             <button
               type="button"
-              onClick={() => setSelectedRL('RL 2')}
-              className="px-3 py-1.5 rounded-lg font-extrabold text-xs bg-sky-700 text-white shrink-0 shadow-xs"
+              onClick={() => scrollSubforms('left')}
+              title="Geser Formulir ke Kiri (◄)"
+              className="w-5 h-5 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-300 active:bg-slate-400 rounded cursor-pointer transition-colors shrink-0"
             >
-              RL 2 - Data Ketenagaan RS (SISDMK)
+              <span className="text-[11px] font-black leading-none">◄</span>
             </button>
-          )}
 
-          {activeBab === 'BAB4' && (
-            <>
-              {[
-                { id: 'RL 3.1', label: 'RL 3.1 Indikator' },
-                { id: 'RL 3.2', label: 'RL 3.2 Rawat Inap' },
-                { id: 'RL 3.3', label: 'RL 3.3 Rawat Darurat' },
-                { id: 'RL 3.4', label: 'RL 3.4 Pengunjung' },
-                { id: 'RL 3.5', label: 'RL 3.5 Kunjungan' },
-                { id: 'RL 3.6', label: 'RL 3.6 Kebidanan' },
-                { id: 'RL 3.7', label: 'RL 3.7 Neonatal/Bayi/Balita' },
-                { id: 'RL 3.8', label: 'RL 3.8 Laboratorium' },
-                { id: 'RL 3.9', label: 'RL 3.9 Radiologi' },
-                { id: 'RL 3.10', label: 'RL 3.10 Rujukan' },
-                { id: 'RL 3.11', label: 'RL 3.11 Gigi & Mulut' },
-                { id: 'RL 3.12', label: 'RL 3.12 Pembedahan' },
-                { id: 'RL 3.13', label: 'RL 3.13 Rehab Medik' },
-                { id: 'RL 3.14', label: 'RL 3.14 Pelayanan Khusus' },
-                { id: 'RL 3.15', label: 'RL 3.15 Kesehatan Jiwa' },
-                { id: 'RL 3.16', label: 'RL 3.16 KB' },
-                { id: 'RL 3.17', label: 'RL 3.17 Pengadaan Obat' },
-                { id: 'RL 3.18', label: 'RL 3.18 Resep' },
-                { id: 'RL 3.19', label: 'RL 3.19 Cara Bayar' },
-              ].map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedRL(item.id)}
-                  className={`px-3 py-1.5 rounded-lg font-extrabold text-xs shrink-0 transition-all cursor-pointer ${
-                    selectedRL === item.id ? 'bg-sky-700 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </>
-          )}
+            {/* Slider Track & Draggable Thumb (Garis penggeser seperti di gambar) */}
+            <div
+              onClick={handleTrackClick}
+              className="flex-1 h-3.5 bg-slate-300 hover:bg-slate-350 rounded-full cursor-pointer relative overflow-hidden transition-all shadow-inner"
+              title="Klik atau geser garis ini untuk berpindah ke formulir lainnya"
+            >
+              <div
+                onMouseDown={handleThumbMouseDown}
+                className="h-full bg-slate-500 hover:bg-slate-600 active:bg-slate-700 rounded-full absolute top-0 cursor-grab active:cursor-grabbing transition-all shadow-xs"
+                style={{
+                  width: `${thumbWidthPercent}%`,
+                  left: `${thumbLeftPercent}%`,
+                }}
+              />
+            </div>
 
-          {activeBab === 'BAB5' && (
-            <>
-              {[
-                { id: 'RL 4.1', label: 'RL 4.1 Kompilasi Penyakit/Morbiditas Pasien Rawat Inap' },
-                { id: 'RL 4.2', label: 'RL 4.2 10 Besar Penyakit Rawat Inap' },
-                { id: 'RL 4.3', label: 'RL 4.3 10 Besar Kematian Penyakit Rawat Inap' },
-              ].map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedRL(item.id)}
-                  className={`px-3 py-1.5 rounded-lg font-extrabold text-xs shrink-0 transition-all cursor-pointer ${
-                    selectedRL === item.id ? 'bg-sky-700 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </>
-          )}
-
-          {activeBab === 'BAB6' && (
-            <>
-              {[
-                { id: 'RL 5.1', label: 'RL 5.1 Kompilasi Morbiditas Pasien Rawat Jalan' },
-                { id: 'RL 5.2', label: 'RL 5.2 10 Besar Kasus Baru Penyakit Rawat Jalan' },
-                { id: 'RL 5.3', label: 'RL 5.3 10 Besar Kunjungan Penyakit Rawat Jalan' },
-              ].map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setSelectedRL(item.id)}
-                  className={`px-3 py-1.5 rounded-lg font-extrabold text-xs shrink-0 transition-all cursor-pointer ${
-                    selectedRL === item.id ? 'bg-sky-700 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </>
-          )}
+            {/* Tombol Geser Kanan ► */}
+            <button
+              type="button"
+              onClick={() => scrollSubforms('right')}
+              title="Geser Formulir ke Kanan (►)"
+              className="w-5 h-5 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-300 active:bg-slate-400 rounded cursor-pointer transition-colors shrink-0"
+            >
+              <span className="text-[11px] font-black leading-none">►</span>
+            </button>
+          </div>
         </div>
       </div>
 

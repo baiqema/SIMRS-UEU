@@ -68,9 +68,8 @@ export const Sidebar: React.FC = () => {
       ]
     },
     {
-      group: 'PRAKTIKUM & ADMIN',
+      group: 'ADMINISTRASI & SISTEM',
       items: [
-        { id: 'praktikum', label: 'Ujian Praktik & Simulasi', icon: GraduationCap },
         { id: 'masterdata', label: 'Master Data SIMRS', icon: Database, superadminOnly: true },
         { id: 'audit', label: 'Audit Trail (Superadmin)', icon: ShieldCheck, superadminOnly: true },
         { id: 'logaktivitas', label: 'Log Aktivitas', icon: History },

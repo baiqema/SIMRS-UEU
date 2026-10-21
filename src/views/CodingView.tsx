@@ -31,9 +31,18 @@ import {
   UserCheck,
   Layers,
   FileSpreadsheet,
-  Plus
+  Plus,
+  Users,
+  Filter,
+  RotateCcw,
+  X,
+  Edit3,
+  ClipboardList,
+  Bed,
+  CheckCircle
 } from 'lucide-react';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM } from '../data/icdDatabase';
+import type { Registration } from '../types';
 
 export const CodingView: React.FC = () => {
   const {
@@ -42,6 +51,7 @@ export const CodingView: React.FC = () => {
     cppt,
     registrations,
     patients,
+    users,
     user,
     params,
     saveEncounterCoding,
@@ -56,11 +66,72 @@ export const CodingView: React.FC = () => {
 
   const isEditable = canEditPage('coding');
 
-  // Active view tab: 'workbench' (Lembar Kerja & Riwayat Kunjungan) vs 'rekap' (Semua Data Koding)
-  const [activeTab, setActiveTab] = useState<'workbench' | 'rekap'>('workbench');
+  // Active view tab: 'kunjungan' (Daftar Kunjungan Pasien) vs 'workbench' (Lembar Kerja Koding) vs 'rekap' (Rekap Koding RS)
+  const [activeTab, setActiveTab] = useState<'kunjungan' | 'workbench' | 'rekap'>(() => {
+    if (params?.patientId || params?.regId) return 'workbench';
+    return 'kunjungan';
+  });
   const [showVclaimModal, setShowVclaimModal] = useState(false);
 
-  // Search & Filter state for Patient Selector
+  // =========================================================================
+  // DAFTAR KUNJUNGAN PASIEN (VISIT-BASED CODING) STATES & FILTERS
+  // =========================================================================
+  const [visitSearch, setVisitSearch] = useState('');
+  const [serviceTypeFilter, setServiceTypeFilter] = useState<'all' | 'Rawat Jalan' | 'Rawat Inap'>('all');
+  const [statusKodingFilter, setStatusKodingFilter] = useState<'all' | 'Menunggu Koding' | 'Dalam Proses Koding' | 'Selesai Dikoding' | 'Menunggu Pemeriksaan' | 'Belum Lengkap'>('all');
+  const [filterVisitDate, setFilterVisitDate] = useState('');
+  const [filterVisitMonth, setFilterVisitMonth] = useState('all');
+  const [filterVisitYear, setFilterVisitYear] = useState('2026');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+
+  // Applied filter state (Executed when "Terapkan Filter" is clicked)
+  const [appliedVisitFilters, setAppliedVisitFilters] = useState({
+    search: '',
+    serviceType: 'all',
+    statusKoding: 'all',
+    date: '',
+    month: 'all',
+    year: '2026',
+    startDate: '',
+    endDate: ''
+  });
+
+  const handleApplyVisitFilter = () => {
+    setAppliedVisitFilters({
+      search: visitSearch.trim(),
+      serviceType: serviceTypeFilter,
+      statusKoding: statusKodingFilter,
+      date: filterVisitDate,
+      month: filterVisitMonth,
+      year: filterVisitYear,
+      startDate: filterStartDate,
+      endDate: filterEndDate
+    });
+  };
+
+  const handleResetVisitFilter = () => {
+    setVisitSearch('');
+    setServiceTypeFilter('all');
+    setStatusKodingFilter('all');
+    setFilterVisitDate('');
+    setFilterVisitMonth('all');
+    setFilterVisitYear('2026');
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setAppliedVisitFilters({
+      search: '',
+      serviceType: 'all',
+      statusKoding: 'all',
+      date: '',
+      month: 'all',
+      year: '2026',
+      startDate: '',
+      endDate: ''
+    });
+  };
+
+  // Search & Filter state for Patient Selector in Workbench
   const [patientSearch, setPatientSearch] = useState('');
 
   // Selected Patient ID
@@ -87,6 +158,30 @@ export const CodingView: React.FC = () => {
   // Table Rekap Search & Filter
   const [searchTable, setSearchTable] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Draft' | 'Locked'>('all');
+
+  // Action to start / continue coding a visit from the visit list
+  const handleSelectVisitForCoding = (patientId: string, regId: string) => {
+    setSelectedPatientId(patientId);
+    setSelectedRegId(regId);
+    setActiveTab('workbench');
+
+    const patient = patients.find(p => p.id === patientId);
+    const reg = registrations.find(r => r.id === regId);
+
+    Swal.fire({
+      icon: 'info',
+      title: 'Membuka Lembar Kerja Koding',
+      html: `
+        <div class="text-left text-xs space-y-1.5">
+          <p>Pasien: <strong>${patient?.name || '-'}</strong> (${patient?.noRM || '-'})</p>
+          <p>Kunjungan: <strong class="font-mono text-blue-700">${regId}</strong> - ${reg?.date || '-'} (${reg?.type} / ${reg?.poli || reg?.room || '-'})</p>
+          <p class="text-slate-500 text-[11px]">Silakan lakukan pengkodean ICD-10 & ICD-9-CM pada formulir lembar kerja.</p>
+        </div>
+      `,
+      timer: 1500,
+      showConfirmButton: false
+    });
+  };
 
   // All visits / encounters for the selected patient, sorted newest first
   const patientEncounters = useMemo(() => {
@@ -463,6 +558,176 @@ export const CodingView: React.FC = () => {
     }
   };
 
+  // =========================================================================
+  // VISIT-BASED CODING LIST: STATUS EVALUATION & DATA PIPELINE
+  // =========================================================================
+  const getEncounterData = (reg: Registration) => {
+    const patient = patients.find(p => p.id === reg.patientId);
+    const mr = medicalRecords.find(m => m.regId === reg.id);
+    const cpptList = cppt.filter(c => c.regId === reg.id || (mr && c.mrId === mr.id));
+    const codingItem = coding.find(c => c.regId === reg.id || (mr && c.mrId === mr.id));
+    const dpjpUser = users.find(u => u.id === reg.dpjp);
+
+    // Keterangan Koding (Rawat Inap vs Rawat Jalan)
+    const codingCategory = reg.type === 'Rawat Inap' ? 'Koding Rawat Inap' : 'Koding Rawat Jalan';
+
+    // Status Pemeriksaan
+    let examStatusLabel: 'Selesai Diperiksa' | 'Sedang Diperiksa' | 'Menunggu Pemeriksaan' | 'Belum Lengkap' | 'Batal' = 'Menunggu Pemeriksaan';
+    let examBadgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
+
+    if (reg.status === 'Batal') {
+      examStatusLabel = 'Batal';
+      examBadgeClass = 'bg-slate-100 text-slate-600 border-slate-200';
+    } else if (reg.examinationStatus === 'Selesai Diperiksa' || reg.status === 'Selesai' || (mr && mr.diagnosis && mr.diagnosisStatus === 'Verified')) {
+      examStatusLabel = 'Selesai Diperiksa';
+      examBadgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+    } else if (mr && (mr.diagnosis || mr.anamnesis || mr.physicalExam || cpptList.length > 0)) {
+      examStatusLabel = 'Sedang Diperiksa';
+      examBadgeClass = 'bg-amber-100 text-amber-800 border-amber-300';
+    } else if (reg.status === 'Dirawat' || reg.status === 'Siap Diperiksa') {
+      examStatusLabel = 'Menunggu Pemeriksaan';
+      examBadgeClass = 'bg-sky-100 text-sky-800 border-sky-200';
+    } else {
+      examStatusLabel = 'Belum Lengkap';
+      examBadgeClass = 'bg-rose-100 text-rose-800 border-rose-200';
+    }
+
+    // Status Koding (5 kondisi yang disyaratkan user)
+    let codingStatusLabel: 'Menunggu Koding' | 'Dalam Proses Koding' | 'Selesai Dikoding' | 'Menunggu Pemeriksaan' | 'Belum Lengkap' = 'Menunggu Koding';
+    let codingBadgeClass = 'bg-blue-100 text-blue-900 border-blue-300';
+    let codingStatusDesc = 'Pemeriksaan selesai, data siap dikoding';
+
+    const hasIcd10 = codingItem && (Array.isArray(codingItem.icd10) ? codingItem.icd10.length > 0 : Boolean(codingItem.icd10));
+
+    if (codingItem && (codingItem.status === 'Locked' || hasIcd10)) {
+      if (codingItem.status === 'Locked') {
+        codingStatusLabel = 'Selesai Dikoding';
+        codingBadgeClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+        codingStatusDesc = 'Seluruh proses koding telah selesai & terkunci';
+      } else {
+        codingStatusLabel = 'Dalam Proses Koding';
+        codingBadgeClass = 'bg-amber-100 text-amber-900 border-amber-300';
+        codingStatusDesc = 'Petugas sedang melakukan pengkodean (Draft)';
+      }
+    } else if (codingItem && codingItem.status === 'Draft') {
+      codingStatusLabel = 'Dalam Proses Koding';
+      codingBadgeClass = 'bg-amber-100 text-amber-900 border-amber-300';
+      codingStatusDesc = 'Petugas sedang melakukan pengkodean (Draft)';
+    } else if (examStatusLabel === 'Selesai Diperiksa') {
+      codingStatusLabel = 'Menunggu Koding';
+      codingBadgeClass = 'bg-blue-100 text-blue-900 border-blue-300';
+      codingStatusDesc = 'Pemeriksaan telah selesai, data siap dikoding';
+    } else if (examStatusLabel === 'Sedang Diperiksa' || examStatusLabel === 'Menunggu Pemeriksaan') {
+      codingStatusLabel = 'Menunggu Pemeriksaan';
+      codingBadgeClass = 'bg-slate-100 text-slate-700 border-slate-300';
+      codingStatusDesc = 'Data kunjungan belum selesai diperiksa';
+    } else {
+      codingStatusLabel = 'Belum Lengkap';
+      codingBadgeClass = 'bg-rose-100 text-rose-800 border-rose-300';
+      codingStatusDesc = 'Dokumentasi klinis atau diagnosis belum lengkap';
+    }
+
+    // Diagnosa & Klinis
+    const diagnosisText = mr?.diagnosis || (cpptList[0]?.assessment) || '-';
+    const anamnesisText = mr?.anamnesis || (cpptList[0]?.subjective) || '-';
+
+    return {
+      reg,
+      patient,
+      mr,
+      codingItem,
+      dpjpUser,
+      codingCategory,
+      examStatusLabel,
+      examBadgeClass,
+      codingStatusLabel,
+      codingBadgeClass,
+      codingStatusDesc,
+      diagnosisText,
+      anamnesisText
+    };
+  };
+
+  // Compile all encounters
+  const allVisitsData = useMemo(() => {
+    return registrations.map(reg => getEncounterData(reg));
+  }, [registrations, patients, medicalRecords, cppt, coding, users]);
+
+  // Dynamic Filtered Visits List
+  const filteredVisits = useMemo(() => {
+    return allVisitsData.filter(item => {
+      const { reg, patient, codingStatusLabel } = item;
+
+      // 1. Service Type Filter
+      if (appliedVisitFilters.serviceType === 'Rawat Jalan') {
+        if (reg.type !== 'Rawat Jalan' && reg.type !== 'IGD') return false;
+      } else if (appliedVisitFilters.serviceType === 'Rawat Inap') {
+        if (reg.type !== 'Rawat Inap') return false;
+      }
+
+      // 2. Status Koding Filter
+      if (appliedVisitFilters.statusKoding !== 'all') {
+        if (codingStatusLabel !== appliedVisitFilters.statusKoding) return false;
+      }
+
+      // 3. Date Filters
+      if (appliedVisitFilters.date && reg.date !== appliedVisitFilters.date) {
+        return false;
+      }
+      if (appliedVisitFilters.year !== 'all') {
+        if (!reg.date.startsWith(appliedVisitFilters.year)) return false;
+      }
+      if (appliedVisitFilters.month !== 'all') {
+        const regMonth = reg.date.split('-')[1];
+        if (regMonth !== appliedVisitFilters.month) return false;
+      }
+      if (appliedVisitFilters.startDate && reg.date < appliedVisitFilters.startDate) {
+        return false;
+      }
+      if (appliedVisitFilters.endDate && reg.date > appliedVisitFilters.endDate) {
+        return false;
+      }
+
+      // 4. Search Filter (Nama lengkap, No. RM, Tanggal Lahir, NIK, DPJP, Poli)
+      if (appliedVisitFilters.search) {
+        const q = appliedVisitFilters.search.toLowerCase();
+        const pName = (patient?.name || '').toLowerCase();
+        const pRM = (patient?.noRM || '').toLowerCase();
+        const pNIK = (patient?.nik || '').toLowerCase();
+        const pDOB = (patient?.dob || '').toLowerCase();
+        const regId = (reg.id || '').toLowerCase();
+        const poli = (reg.poli || '').toLowerCase();
+        const room = (reg.room || '').toLowerCase();
+        const diag = (item.diagnosisText || '').toLowerCase();
+
+        const match =
+          pName.includes(q) ||
+          pRM.includes(q) ||
+          pNIK.includes(q) ||
+          pDOB.includes(q) ||
+          regId.includes(q) ||
+          poli.includes(q) ||
+          room.includes(q) ||
+          diag.includes(q);
+
+        if (!match) return false;
+      }
+
+      return true;
+    }).sort((a, b) => new Date(b.reg.date).getTime() - new Date(a.reg.date).getTime());
+  }, [allVisitsData, appliedVisitFilters]);
+
+  // Overall KPI statistics
+  const visitStats = useMemo(() => {
+    const total = allVisitsData.length;
+    const waitingExam = allVisitsData.filter(v => v.codingStatusLabel === 'Menunggu Pemeriksaan').length;
+    const waitingCoding = allVisitsData.filter(v => v.codingStatusLabel === 'Menunggu Koding').length;
+    const inProgress = allVisitsData.filter(v => v.codingStatusLabel === 'Dalam Proses Koding').length;
+    const completed = allVisitsData.filter(v => v.codingStatusLabel === 'Selesai Dikoding').length;
+    const incomplete = allVisitsData.filter(v => v.codingStatusLabel === 'Belum Lengkap').length;
+    return { total, waitingExam, waitingCoding, inProgress, completed, incomplete };
+  }, [allVisitsData]);
+
   return (
     <div id="coding-view-root" className="space-y-6">
       {/* Read-Only Mode Banner if user has view-only permissions */}
@@ -516,7 +781,26 @@ export const CodingView: React.FC = () => {
           {/* View Tab Switcher */}
           <div className="bg-slate-900/90 border border-blue-700/80 p-1 rounded-xl flex items-center gap-1 shadow-inner">
             <button
+              id="tab-kunjungan"
+              type="button"
+              onClick={() => setActiveTab('kunjungan')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'kunjungan'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-blue-200 hover:text-white'
+              }`}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>Daftar Kunjungan Pasien</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'kunjungan' ? 'bg-white text-blue-700' : 'bg-blue-800 text-cyan-200'
+              }`}>
+                {filteredVisits.length}
+              </span>
+            </button>
+            <button
               id="tab-workbench"
+              type="button"
               onClick={() => setActiveTab('workbench')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'workbench'
@@ -529,6 +813,7 @@ export const CodingView: React.FC = () => {
             </button>
             <button
               id="tab-rekap"
+              type="button"
               onClick={() => setActiveTab('rekap')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'rekap'
@@ -543,42 +828,540 @@ export const CodingView: React.FC = () => {
         </div>
       </div>
 
+      {/* ========================================================================= */}
+      {/* TAB 0: DAFTAR KUNJUNGAN PASIEN (VISIT-BASED CODING) */}
+      {/* ========================================================================= */}
+      {activeTab === 'kunjungan' && (
+        <div className="space-y-6">
+          {/* 1. KPI SUMMARY CARDS */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+              <div className="flex items-center justify-between text-slate-500 mb-1">
+                <span className="text-[11px] font-bold">Total Kunjungan</span>
+                <Hospital className="w-4 h-4 text-slate-400" />
+              </div>
+              <div className="text-xl font-black text-slate-800">{visitStats.total}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Semua episode pasien</div>
+            </div>
+
+            <div className="bg-sky-50/70 p-3.5 rounded-2xl border border-sky-200/80 shadow-2xs">
+              <div className="flex items-center justify-between text-sky-700 mb-1">
+                <span className="text-[11px] font-bold">Menunggu Periksa</span>
+                <Clock className="w-4 h-4 text-sky-600" />
+              </div>
+              <div className="text-xl font-black text-sky-900">{visitStats.waitingExam}</div>
+              <div className="text-[10px] text-sky-600 mt-0.5">Belum selesai di RME</div>
+            </div>
+
+            <div className="bg-blue-50/80 p-3.5 rounded-2xl border border-blue-200 shadow-2xs">
+              <div className="flex items-center justify-between text-blue-800 mb-1">
+                <span className="text-[11px] font-bold">Menunggu Koding</span>
+                <Sparkles className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="text-xl font-black text-blue-900">{visitStats.waitingCoding}</div>
+              <div className="text-[10px] text-blue-700 font-semibold mt-0.5">Siap Dikodekan</div>
+            </div>
+
+            <div className="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 shadow-2xs">
+              <div className="flex items-center justify-between text-amber-800 mb-1">
+                <span className="text-[11px] font-bold">Proses Koding</span>
+                <Edit3 className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="text-xl font-black text-amber-900">{visitStats.inProgress}</div>
+              <div className="text-[10px] text-amber-700 mt-0.5">Draft pengkodean</div>
+            </div>
+
+            <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200 shadow-2xs">
+              <div className="flex items-center justify-between text-emerald-800 mb-1">
+                <span className="text-[11px] font-bold">Selesai Dikoding</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="text-xl font-black text-emerald-900">{visitStats.completed}</div>
+              <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">Terkunci / Final</div>
+            </div>
+
+            <div className="bg-rose-50/70 p-3.5 rounded-2xl border border-rose-200/80 shadow-2xs">
+              <div className="flex items-center justify-between text-rose-800 mb-1">
+                <span className="text-[11px] font-bold">Belum Lengkap</span>
+                <AlertCircle className="w-4 h-4 text-rose-600" />
+              </div>
+              <div className="text-xl font-black text-rose-900">{visitStats.incomplete}</div>
+              <div className="text-[10px] text-rose-600 mt-0.5">Dokumentasi klinis</div>
+            </div>
+          </div>
+
+          {/* 2. FILTER & PENCARIAN KUNJUNGAN PASIEN BAR */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-blue-700" />
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  Filter & Pencarian Kunjungan Pasien
+                </h3>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Pencarian multi-kriteria: Nama, No RM, Tanggal Lahir, Poli, Dokter, dan Status
+              </span>
+            </div>
+
+            {/* Filter Inputs Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs">
+              {/* 1. Search Bar */}
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
+                  <Search className="w-3.5 h-3.5 text-blue-600" />
+                  Cari Pasien / No. RM / Tanggal Lahir / DPJP
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={visitSearch}
+                    onChange={e => setVisitSearch(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleApplyVisitFilter()}
+                    placeholder="Contoh: Siti Aminah, 00-01-24, 1990-05-12, dr. Hendra, Penyakit Dalam..."
+                    className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all text-xs"
+                  />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  {visitSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setVisitSearch('')}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      title="Hapus pencarian"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. Jenis Pelayanan Filter */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                  Jenis Pelayanan
+                </label>
+                <select
+                  value={serviceTypeFilter}
+                  onChange={e => setServiceTypeFilter(e.target.value as any)}
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 text-xs"
+                >
+                  <option value="all">Semua Pelayanan (Rawat Jalan & Inap)</option>
+                  <option value="Rawat Jalan">Rawat Jalan (Ralan / Poliklinik / IGD)</option>
+                  <option value="Rawat Inap">Rawat Inap (Ranap / Bangsal)</option>
+                </select>
+              </div>
+
+              {/* 3. Status Koding Filter */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
+                  <Tag className="w-3.5 h-3.5 text-blue-600" />
+                  Status Koding
+                </label>
+                <select
+                  value={statusKodingFilter}
+                  onChange={e => setStatusKodingFilter(e.target.value as any)}
+                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 text-xs"
+                >
+                  <option value="all">Semua Status Koding</option>
+                  <option value="Menunggu Koding">Menunggu Koding (Siap Dikoding)</option>
+                  <option value="Dalam Proses Koding">Dalam Proses Koding (Draft)</option>
+                  <option value="Selesai Dikoding">Selesai Dikoding (Terkunci)</option>
+                  <option value="Menunggu Pemeriksaan">Menunggu Pemeriksaan (Dokter)</option>
+                  <option value="Belum Lengkap">Belum Lengkap (Dokumentasi)</option>
+                </select>
+              </div>
+
+              {/* 4. Filter Periode: Tanggal Spesifik */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                  Tanggal Kunjungan
+                </label>
+                <input
+                  type="date"
+                  value={filterVisitDate}
+                  onChange={e => setFilterVisitDate(e.target.value)}
+                  className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 text-xs cursor-pointer"
+                />
+              </div>
+
+              {/* 5. Filter Bulan */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-600">Bulan Pelayanan</label>
+                <select
+                  value={filterVisitMonth}
+                  onChange={e => setFilterVisitMonth(e.target.value)}
+                  className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 text-xs"
+                >
+                  <option value="all">Semua Bulan</option>
+                  <option value="01">Januari</option>
+                  <option value="02">Februari</option>
+                  <option value="03">Maret</option>
+                  <option value="04">April</option>
+                  <option value="05">Mei</option>
+                  <option value="06">Juni</option>
+                  <option value="07">Juli</option>
+                  <option value="08">Agustus</option>
+                  <option value="09">September</option>
+                  <option value="10">Oktober</option>
+                  <option value="11">November</option>
+                  <option value="12">Desember</option>
+                </select>
+              </div>
+
+              {/* 6. Filter Tahun */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-extrabold text-slate-600">Tahun Pelayanan</label>
+                <select
+                  value={filterVisitYear}
+                  onChange={e => setFilterVisitYear(e.target.value)}
+                  className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600 text-xs"
+                >
+                  <option value="all">Semua Tahun</option>
+                  <option value="2026">2026</option>
+                  <option value="2025">2025</option>
+                  <option value="2024">2024</option>
+                </select>
+              </div>
+
+              {/* 7. Rentang Tanggal & Tombol Aksi */}
+              <div className="space-y-1 flex flex-col justify-end">
+                <label className="text-[11px] font-extrabold text-slate-600">Rentang Tanggal (Opsional)</label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="date"
+                    value={filterStartDate}
+                    onChange={e => setFilterStartDate(e.target.value)}
+                    placeholder="Mulai"
+                    className="w-1/2 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-800 cursor-pointer"
+                    title="Tanggal Mulai"
+                  />
+                  <span className="text-slate-400 font-bold text-xs">-</span>
+                  <input
+                    type="date"
+                    value={filterEndDate}
+                    onChange={e => setFilterEndDate(e.target.value)}
+                    placeholder="Sampai"
+                    className="w-1/2 py-1.5 px-2 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-800 cursor-pointer"
+                    title="Tanggal Akhir"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Action Buttons & Active Status Banner */}
+            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleApplyVisitFilter}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                  title="Terapkan filter pada daftar kunjungan pasien"
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Terapkan Filter</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetVisitFilter}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 flex items-center gap-1.5 cursor-pointer transition-all"
+                  title="Reset filter ke kondisi default"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Reset Filter</span>
+                </button>
+              </div>
+
+              {/* Status Banner */}
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <span className="bg-blue-50 text-blue-800 font-extrabold px-2.5 py-1 rounded-lg border border-blue-200">
+                  Ditemukan: <strong>{filteredVisits.length}</strong> Kunjungan Pasien
+                </span>
+                {appliedVisitFilters.search && (
+                  <span className="bg-amber-50 text-amber-900 font-semibold px-2 py-0.5 rounded-md border border-amber-200 text-[11px]">
+                    Kata kunci: "{appliedVisitFilters.search}"
+                  </span>
+                )}
+                {appliedVisitFilters.serviceType !== 'all' && (
+                  <span className="bg-sky-50 text-sky-800 font-semibold px-2 py-0.5 rounded-md border border-sky-200 text-[11px]">
+                    Layanan: {appliedVisitFilters.serviceType}
+                  </span>
+                )}
+                {appliedVisitFilters.statusKoding !== 'all' && (
+                  <span className="bg-indigo-50 text-indigo-800 font-semibold px-2 py-0.5 rounded-md border border-indigo-200 text-[11px]">
+                    Status: {appliedVisitFilters.statusKoding}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 3. VISITS TABLE (MODEL DAFTAR KUNJUNGAN PASIEN / ENCOUNTER-BASED) */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-blue-900" />
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  Daftar Kunjungan Pasien untuk Kodifikasi Klinis
+                </h3>
+              </div>
+              <div className="text-[11px] text-slate-500 font-medium">
+                Setiap baris merepresentasikan 1 episode kunjungan/pelayanan terpisah
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] text-slate-700 font-black uppercase tracking-wider">
+                    <th className="py-3 px-3.5 text-center w-12">No.</th>
+                    <th className="py-3 px-3.5">Encounter & Tanggal</th>
+                    <th className="py-3 px-3.5">Data Pasien</th>
+                    <th className="py-3 px-3.5">Jenis Koding & Layanan</th>
+                    <th className="py-3 px-3.5">DPJP (Dokter)</th>
+                    <th className="py-3 px-3.5 min-w-[200px]">Diagnosis & Pemeriksaan</th>
+                    <th className="py-3 px-3.5 text-center">Status Pemeriksaan</th>
+                    <th className="py-3 px-3.5 text-center">Status Koding</th>
+                    <th className="py-3 px-3.5 text-center w-28">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                  {filteredVisits.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
+                        <div className="max-w-md mx-auto space-y-2">
+                          <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
+                          <p className="font-bold text-slate-600 text-xs">
+                            Tidak ada data kunjungan pasien yang sesuai dengan filter.
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            Silakan ubah kriteria pencarian atau klik tombol Reset Filter untuk melihat semua kunjungan.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleResetVisitFilter}
+                            className="mt-2 px-3 py-1.5 bg-blue-50 text-blue-700 font-bold rounded-lg border border-blue-200 text-xs hover:bg-blue-100 cursor-pointer inline-flex items-center gap-1.5"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" /> Reset Filter
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredVisits.map((item, idx) => {
+                      const { reg, patient, dpjpUser, codingCategory, examStatusLabel, examBadgeClass, codingStatusLabel, codingBadgeClass, codingStatusDesc, diagnosisText, anamnesisText } = item;
+
+                      return (
+                        <tr
+                          key={reg.id}
+                          className="hover:bg-blue-50/40 transition-colors"
+                        >
+                          {/* 1. No */}
+                          <td className="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">
+                            {idx + 1}
+                          </td>
+
+                          {/* 2. Encounter ID & Tanggal Kunjungan */}
+                          <td className="py-3 px-3.5">
+                            <div className="font-mono font-bold text-blue-900 text-[11px]">
+                              {reg.id}
+                            </div>
+                            <div className="flex items-center gap-1 text-[11px] text-slate-600 mt-0.5">
+                              <Calendar className="w-3 h-3 text-slate-400" />
+                              <span>{reg.date}</span>
+                            </div>
+                            {reg.sepNo && (
+                              <div className="text-[10px] text-emerald-700 font-mono mt-0.5" title="Nomor SEP BPJS">
+                                SEP: {reg.sepNo}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* 3. Data Pasien: No. RM, Nama, Tanggal Lahir, Gender */}
+                          <td className="py-3 px-3.5">
+                            <div className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
+                              <span>{patient?.name || 'Pasien Tanpa Nama'}</span>
+                              <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${
+                                patient?.gender === 'M' || patient?.gender === 'L'
+                                  ? 'bg-sky-100 text-sky-800'
+                                  : 'bg-pink-100 text-pink-800'
+                              }`}>
+                                {patient?.gender === 'M' || patient?.gender === 'L' ? 'L' : 'P'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5 font-mono">
+                              <span className="font-black text-blue-800">{patient?.noRM || '-'}</span>
+                              <span>•</span>
+                              <span>Lahir: {patient?.dob || '-'}</span>
+                            </div>
+                            {patient?.insuranceType && (
+                              <span className="inline-block mt-0.5 px-2 py-0.2 bg-slate-100 text-slate-600 rounded text-[10px] font-semibold">
+                                {patient.insuranceType}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* 4. Keterangan Koding & Layanan */}
+                          <td className="py-3 px-3.5">
+                            <span className={`inline-block px-2.5 py-0.5 rounded-md text-[10px] font-black tracking-wide uppercase border ${
+                              reg.type === 'Rawat Inap'
+                                ? 'bg-purple-50 text-purple-800 border-purple-200'
+                                : 'bg-sky-50 text-sky-800 border-sky-200'
+                            }`}>
+                              {codingCategory}
+                            </span>
+                            <div className="text-xs font-bold text-slate-700 mt-1">
+                              {reg.type}
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                              {reg.poli || reg.room || '-'}
+                            </div>
+                          </td>
+
+                          {/* 5. DPJP */}
+                          <td className="py-3 px-3.5">
+                            <div className="font-bold text-slate-800 text-xs">
+                              {dpjpUser?.name || reg.dpjp || '-'}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              Dokter Penanggung Jawab
+                            </div>
+                          </td>
+
+                          {/* 6. Diagnosis & Pemeriksaan */}
+                          <td className="py-3 px-3.5 max-w-xs">
+                            <div className="font-extrabold text-slate-800 line-clamp-2" title={diagnosisText}>
+                              {diagnosisText}
+                            </div>
+                            <div className="text-[11px] text-slate-500 line-clamp-1 mt-0.5" title={anamnesisText}>
+                              {anamnesisText !== '-' ? `Anamnesis: ${anamnesisText}` : 'Belum ada catatan anamnesis'}
+                            </div>
+                          </td>
+
+                          {/* 7. Status Pemeriksaan */}
+                          <td className="py-3 px-3.5 text-center">
+                            <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black border ${examBadgeClass}`}>
+                              {examStatusLabel}
+                            </span>
+                          </td>
+
+                          {/* 8. Status Koding */}
+                          <td className="py-3 px-3.5 text-center">
+                            <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black border ${codingBadgeClass}`}>
+                              {codingStatusLabel}
+                            </span>
+                            <div className="text-[10px] text-slate-400 mt-0.5 max-w-[130px] mx-auto leading-tight">
+                              {codingStatusDesc}
+                            </div>
+                          </td>
+
+                          {/* 9. Tombol Aksi */}
+                          <td className="py-3 px-3.5 text-center">
+                            {codingStatusLabel === 'Selesai Dikoding' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleSelectVisitForCoding(patient?.id || reg.patientId, reg.id)}
+                                className="w-full px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg border border-blue-200 text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shadow-2xs"
+                                title="Lihat rincian kode diagnosis ICD-10 & prosedur ICD-9-CM"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Lihat</span>
+                              </button>
+                            ) : codingStatusLabel === 'Dalam Proses Koding' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleSelectVisitForCoding(patient?.id || reg.patientId, reg.id)}
+                                className="w-full px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold rounded-lg text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shadow-2xs"
+                                title="Lanjutkan pengkodean klinis formulir lembar kerja"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Lanjutkan</span>
+                              </button>
+                            ) : codingStatusLabel === 'Menunggu Koding' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleSelectVisitForCoding(patient?.id || reg.patientId, reg.id)}
+                                className="w-full px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-lg text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shadow-xs"
+                                title="Mulai lakukan proses koding ICD-10 & ICD-9-CM"
+                              >
+                                <Zap className="w-3.5 h-3.5" />
+                                <span>Koding</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleSelectVisitForCoding(patient?.id || reg.patientId, reg.id)}
+                                className="w-full px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-slate-200 text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shadow-2xs"
+                                title="Buka detail rekam medis kunjungan"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>Detail</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Table Footer Summary */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+              <div>
+                Menampilkan <strong className="text-slate-800">{filteredVisits.length}</strong> dari total <strong className="text-slate-800">{allVisitsData.length}</strong> kunjungan pasien
+              </div>
+              <div className="flex items-center gap-3 text-[11px]">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span> Siap Dikoding
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-500"></span> Dalam Proses
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Selesai
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TAB 1: WORKBENCH (LEMBAR KERJA & RIWAYAT KUNJUNGAN) */}
       {activeTab === 'workbench' && (
         <div className="space-y-6">
-          {/* Patient Quick Selector & Information Banner */}
+          {/* Patient & Encounter Information Banner with Back Button */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-blue-900" />
-                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                  PILIH PASIEN & KUNJUNGAN YANG AKAN DIKODEKAN
+            {/* Navigation Header: Tombol Kembali ke Daftar Kunjungan */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <button
+                type="button"
+                id="btn-back-to-kunjungan"
+                onClick={() => setActiveTab('kunjungan')}
+                className="px-4 py-2 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 text-blue-900 font-extrabold text-xs rounded-xl border border-blue-200 flex items-center gap-2 cursor-pointer transition-all shadow-2xs group"
+                title="Kembali ke Daftar Kunjungan Pasien"
+              >
+                <ArrowLeft className="w-4 h-4 text-blue-700 group-hover:-translate-x-1 transition-transform" />
+                <span>← Kembali ke Daftar Kunjungan Pasien</span>
+              </button>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-slate-500 font-medium">Episode Pelayanan:</span>
+                <span className="font-mono font-black text-blue-900 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
+                  {currentEncounter?.id || '-'}
                 </span>
-              </div>
-              {/* Quick Search Patient */}
-              <div className="flex items-center gap-2">
-                <div className="relative w-full sm:w-72">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={patientSearch}
-                    onChange={e => setPatientSearch(e.target.value)}
-                    placeholder="Cari Pasien (Nama, No RM, NIK)..."
-                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-600"
-                  />
-                </div>
-                <select
-                  id="select-patient"
-                  value={selectedPatientId}
-                  onChange={e => setSelectedPatientId(e.target.value)}
-                  className="px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-bold text-blue-950 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
-                >
-                  {filteredPatients.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.noRM} - {p.name} ({p.nik})
-                    </option>
-                  ))}
-                </select>
+                <span className={`px-2.5 py-1 rounded-lg font-black text-[11px] border ${
+                  currentEncounter?.type === 'Rawat Inap'
+                    ? 'bg-purple-50 text-purple-800 border-purple-200'
+                    : 'bg-sky-50 text-sky-800 border-sky-200'
+                }`}>
+                  {currentEncounter?.type === 'Rawat Inap' ? 'Koding Rawat Inap' : 'Koding Rawat Jalan'}
+                </span>
+                <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-bold text-[11px]">
+                  {currentEncounter?.poli || currentEncounter?.room || '-'}
+                </span>
               </div>
             </div>
 
@@ -1107,6 +1890,15 @@ export const CodingView: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
+                        onClick={() => setActiveTab('kunjungan')}
+                        className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs border border-slate-300 flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                        title="Kembali ke Daftar Kunjungan Pasien"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
+                        <span>Kembali ke Kunjungan</span>
+                      </button>
+                      <button
                         id="btn-submit-coding"
                         type="submit"
                         disabled={!isEditable}
@@ -1228,7 +2020,17 @@ export const CodingView: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="pt-3 border-t border-slate-100 flex justify-end">
+                  <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('kunjungan')}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs border border-slate-300 flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+                      title="Kembali ke Daftar Kunjungan Pasien"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Kembali ke Daftar Kunjungan</span>
+                    </button>
+
                     {activeSessionEncounter && (
                       <button
                         onClick={() => setSelectedRegId(activeSessionEncounter.id)}
