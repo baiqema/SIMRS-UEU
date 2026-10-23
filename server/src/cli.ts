@@ -6,8 +6,8 @@ import { migrate } from './migrate';
 import { MIN_PASSWORD_LENGTH } from './passwords';
 
 const usage = `Usage:
-  node server.js migrate [--no-seed]
-  node server.js bootstrap --admin-password <pw> [--admin-username admin] [--class "Kelas RMIK"] [--demo]
+  node server/dist/cli.js migrate [--no-seed]
+  node server/dist/cli.js bootstrap --admin-password <pw> [--admin-username admin] [--class "Kelas RMIK"] [--demo]
 
 DATABASE_URL must point at the SIMRS database.`;
 

@@ -15,6 +15,8 @@ export interface AppOptions {
   tokenTtl?: string;
   /** Folder with the built web app (vite build). Served with an SPA fallback when present. */
   staticDir?: string;
+  /** Express "trust proxy" value: which reverse proxies may set X-Forwarded-For. */
+  trustProxy?: string;
 }
 
 const TABLES = new Set<string>(Object.values(SLICES).map(s => s.table));
@@ -86,7 +88,7 @@ export function createApp(opts: AppOptions) {
   const app = express();
   const limiter = createLoginLimiter();
   app.disable('x-powered-by');
-  app.set('trust proxy', 'loopback');
+  app.set('trust proxy', opts.trustProxy ?? 'loopback');
 
   const api = express.Router();
   api.use(express.json({ limit: '10mb' }));

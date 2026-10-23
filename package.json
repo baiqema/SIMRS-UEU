@@ -13,7 +13,7 @@
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "seed:build": "tsx scripts/build-seed.ts",
     "server:dev": "tsx watch server/src/index.ts",
-    "server:build": "esbuild server/src/index.ts server/src/cli.ts --bundle --platform=node --format=esm --target=node20 --packages=external --outdir=server/dist",
+    "server:build": "esbuild server/src/index.ts server/src/cli.ts --bundle --platform=node --format=esm --target=node20 --external:pg-native --outdir=server/dist --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
     "start": "node server/dist/index.js",
     "db:migrate": "tsx server/src/cli.ts migrate",
     "db:bootstrap": "tsx server/src/cli.ts bootstrap"

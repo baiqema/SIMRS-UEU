@@ -1,5 +1,7 @@
 # SIMRS-UEU — Real Backend (Supabase) Design
 
+> **Update 2026-10-23:** Supabase was replaced by a Node.js API (`server/`) on plain PostgreSQL (`db/`), because the campus runs its own PostgreSQL server. The data model, row-level security and audit design below still apply; the Supabase Auth, Realtime and Edge Function parts do not. See `docs/operations/campus-deployment.md`.
+
 - **Date:** 2026-10-09
 - **Status:** Draft for review
 - **Authors:** Daniel Happy Putra (with Claude Code); product and interface owner: Ema Prayitna

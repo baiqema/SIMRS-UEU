@@ -1971,7 +1971,7 @@ export const ManajemenUserView: React.FC = () => {
         </Modal>
       )}
 
-      {/* MODAL 4: SKEMA POSTGRESQL & ATURAN RLS SUPABASE */}
+      {/* MODAL 4: SKEMA POSTGRESQL & ATURAN RLS */}
       {isSqlSchemaModalOpen && (
         <Modal
           isOpen={isSqlSchemaModalOpen}

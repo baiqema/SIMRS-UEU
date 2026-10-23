@@ -23,4 +23,5 @@ createApp({
   jwtSecret,
   tokenTtl: process.env.TOKEN_TTL ?? '12h',
   staticDir: process.env.STATIC_DIR ?? 'dist',
+  trustProxy: process.env.TRUST_PROXY,
 }).listen(port, () => console.log(`SIMRS API listening on :${port}`));

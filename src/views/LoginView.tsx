@@ -7,10 +7,10 @@ import { Building2, Eye, EyeOff, LogIn, ShieldAlert, FileText, Activity, Graduat
 
 export const LoginView: React.FC = () => {
   const { login, classes, activeClassId } = useApp();
-  const [username, setUsername] = useState('20240306044');
+  const [username, setUsername] = useState(isDemoMode() ? '20240306044' : '');
   const [selectedRole, setSelectedRole] = useState<RoleId>('R09'); // Default: Mahasiswa Coding
   const [selectedClassId, setSelectedClassId] = useState<string>(activeClassId || 'RMIK-2024-A');
-  const [password, setPassword] = useState('mhs123');
+  const [password, setPassword] = useState(isDemoMode() ? 'mhs123' : '');
   const [rememberMe, setRememberMe] = useState(true);
   const [showPass, setShowPass] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');

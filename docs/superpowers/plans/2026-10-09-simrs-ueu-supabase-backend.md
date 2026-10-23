@@ -1,5 +1,7 @@
 # SIMRS-UEU Supabase Backend Implementation Plan
 
+> **Update 2026-10-23:** Supabase was replaced by a Node.js API (`server/`) on plain PostgreSQL (`db/`), because the campus runs its own PostgreSQL server. The data model, row-level security and audit design below still apply; the Supabase Auth, Realtime and Edge Function parts do not. See `docs/operations/campus-deployment.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give Ema's SIMRS-UEU React app a real backend: shared class hospitals in Postgres, real login, rules enforced by the database, and an append-only audit trail. Her interface stays unchanged, and Praktikum/Ujian are removed.
