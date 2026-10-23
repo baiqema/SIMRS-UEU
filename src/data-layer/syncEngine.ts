@@ -1,14 +1,14 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { sanitizeMedicalRecords, sanitizePatientList } from '../data/seedNormalizers';
+import { api } from '../lib/apiClient';
 import type { MedicalRecord, Patient } from '../types';
 import { sliceRegistry } from './registry';
+import type { AuditRow } from './serverQueries';
 import { SLICE_BY_TABLE, SLICE_NAMES, SLICES, type SliceName } from './slices';
 import type { SlicePersistence } from './useSlice';
 
-const CHUNK = 500;
-const PAGE = 1000;
+type Call = <T>(method: string, path: string, body?: unknown) => Promise<T>;
 
-export const toRow = (classId: string, obj: { id: string }) => ({ class_id: classId, id: obj.id, data: obj });
+const CHUNK = 500;
 
 export function normalizeLoaded(name: SliceName, rows: unknown[]): unknown[] {
   if (name === 'patients') return sanitizePatientList(rows as Patient[]);
@@ -18,69 +18,48 @@ export function normalizeLoaded(name: SliceName, rows: unknown[]): unknown[] {
 
 export type SyncEngine = Omit<SlicePersistence, 'onSaveError'> & {
   loadAll(): Promise<Record<SliceName, unknown[]>>;
-  subscribe(): () => void;
+  /**
+   * Applies other users' changes from audit log rows (newest first, as polled).
+   * Returns true when a class reset was seen and the caller must reload everything.
+   */
+  applyChanges(rows: AuditRow[], myUserId: string): boolean;
 };
 
-export function createSyncEngine(client: SupabaseClient, classId: string): SyncEngine {
-  async function fetchSlice(name: SliceName): Promise<unknown[]> {
-    const all: unknown[] = [];
-    for (let from = 0; ; from += PAGE) {
-      const { data, error } = await client
-        .from(SLICES[name].table)
-        .select('data')
-        .eq('class_id', classId)
-        .order('created_at', { ascending: false })
-        .order('seq', { ascending: true })
-        .range(from, from + PAGE - 1);
-      if (error) throw new Error(error.message);
-      const page = data ?? [];
-      for (const r of page) all.push(r.data);
-      if (page.length < PAGE) break;
-    }
-    return normalizeLoaded(name, all);
-  }
-
+export function createSyncEngine(classId: string, call: Call = api): SyncEngine {
+  const base = `/classes/${classId}/data`;
   return {
     async push(name, diff) {
-      const table = SLICES[name].table;
+      const path = `${base}/${SLICES[name].table}`;
       for (let i = 0; i < diff.upserts.length; i += CHUNK) {
-        const rows = diff.upserts.slice(i, i + CHUNK).map(o => toRow(classId, o));
-        const { error } = await client.from(table).upsert(rows, { onConflict: 'class_id,id' });
-        if (error) throw new Error(error.message);
+        await call('POST', path, { upserts: diff.upserts.slice(i, i + CHUNK), deletes: [] });
       }
       for (let i = 0; i < diff.deletes.length; i += CHUNK) {
-        const chunk = diff.deletes.slice(i, i + CHUNK);
-        const { data, error } = await client.from(table).delete().eq('class_id', classId).in('id', chunk).select('id');
-        if (error) throw new Error(error.message);
-        // RLS filters refused deletes silently; a short count means the role may not delete here.
-        if ((data?.length ?? 0) < chunk.length) throw new Error('42501: hapus ditolak');
+        await call('POST', path, { upserts: [], deletes: diff.deletes.slice(i, i + CHUNK) });
       }
     },
-    refetch: fetchSlice,
+    async refetch(name) {
+      return normalizeLoaded(name, await call<unknown[]>('GET', `${base}/${SLICES[name].table}`));
+    },
     async loadAll() {
-      const entries = await Promise.all(SLICE_NAMES.map(async n => [n, await fetchSlice(n)] as const));
-      return Object.fromEntries(entries) as Record<SliceName, unknown[]>;
+      const byTable = await call<Record<string, unknown[]>>('GET', base);
+      return Object.fromEntries(SLICE_NAMES.map(n => [n, normalizeLoaded(n, byTable[SLICES[n].table] ?? [])])) as Record<SliceName, unknown[]>;
     },
-    subscribe() {
-      const channel = client.channel(`class-${classId}`);
-      for (const name of SLICE_NAMES) {
-        channel.on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: SLICES[name].table, filter: `class_id=eq.${classId}` },
-          payload => {
-            const slice = SLICE_BY_TABLE[payload.table];
-            if (payload.eventType === 'DELETE') {
-              const old = payload.old as { id?: string; class_id?: string } | undefined;
-              if (old?.id && old.class_id === classId) sliceRegistry.applyRemote(slice, { type: 'delete', id: old.id });
-            } else {
-              const row = payload.new as { class_id?: string; data?: { id: string } } | undefined;
-              if (row?.data && row.class_id === classId) sliceRegistry.applyRemote(slice, { type: 'upsert', row: row.data });
-            }
-          },
-        );
+    applyChanges(rows, myUserId) {
+      let reload = false;
+      // Oldest first so later edits win.
+      for (const r of [...rows].reverse()) {
+        if (r.class_id !== classId) continue;
+        if (r.action === 'RESET') { reload = true; continue; }
+        // Own saves are already in local state; replaying them could undo a newer local edit.
+        if (r.actor_id === myUserId) continue;
+        const slice = SLICE_BY_TABLE[r.entity];
+        if (!slice || !r.entity_id) continue;
+        if (r.action === 'DELETE') sliceRegistry.applyRemote(slice, { type: 'delete', id: r.entity_id });
+        else if ((r.action === 'CREATE' || r.action === 'UPDATE') && r.new_data && typeof r.new_data === 'object') {
+          sliceRegistry.applyRemote(slice, { type: 'upsert', row: r.new_data as { id: string } });
+        }
       }
-      channel.subscribe();
-      return () => { void client.removeChannel(channel); };
+      return reload;
     },
   };
 }

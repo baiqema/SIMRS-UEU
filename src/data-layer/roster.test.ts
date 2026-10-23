@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRoster, validateRows } from './validate';
+import { parseRoster, validateRows } from './roster';
 
 describe('parseRoster', () => {
   it('accepts comma, semicolon or tab separated "NIM, Nama" lines and skips a header', () => {

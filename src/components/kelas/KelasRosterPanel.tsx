@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
 import { Upload, RefreshCw, Download, School, UserPlus } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { getSupabase } from '../../lib/supabaseClient';
+import { createClass as createClassApi, createDosenAccount, importRoster as importRosterApi, type RosterAccount } from '../../data-layer/serverQueries';
 import { buildRosterCsv } from './rosterCsv';
-import { parseRoster } from '../../../supabase/functions/import-roster/validate';
+import { parseRoster } from '../../data-layer/roster';
 
-type AccountStatus = 'created' | 'existing' | 'skipped' | 'failed';
-interface Account { username: string; name: string; status: AccountStatus; tempPassword: string | null; message?: string }
+type AccountStatus = RosterAccount['status'];
+type Account = RosterAccount;
 
 const STATUS_LABEL: Record<AccountStatus, string> = {
   created: 'Akun baru', existing: 'Sudah ada', skipped: 'Dilewati', failed: 'Gagal',
@@ -17,7 +17,7 @@ const escapeHtml = (v: string) =>
   v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export const KelasRosterPanel: React.FC = () => {
-  const { activeClass, users, user, resetActiveClass, accountType, setMemberActive } = useApp();
+  const { activeClass, users, user, resetActiveClass, accountType, setMemberActive, reloadMembers } = useApp();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Account[]>([]);
@@ -33,25 +33,18 @@ export const KelasRosterPanel: React.FC = () => {
     users.filter((u: { id: string }) => /^[0-9a-f-]{36}$/.test(u.id));
   const isAdmin = accountType === 'admin';
 
-  const functionError = async (error: { message: string }) => {
-    let msg = error.message;
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const body = await (error as any).context?.json?.();
-      if (body && typeof body.error === 'string') msg = body.error;
-    } catch { /* keep default message */ }
-    return msg;
-  };
-
   const createDosen = async () => {
     if (!dosenUsername.trim() || !dosenName.trim() || creatingDosen) return;
     setCreatingDosen(true);
-    const { data, error } = await getSupabase().functions.invoke('import-roster', {
-      body: { action: 'create_dosen', username: dosenUsername.trim(), name: dosenName.trim() },
-    });
-    setCreatingDosen(false);
-    if (error) { void Swal.fire({ icon: 'error', title: 'Gagal membuat akun dosen', text: await functionError(error) }); return; }
-    const acc = Array.isArray(data?.accounts) ? (data.accounts[0] as Account | undefined) : undefined;
+    let acc: Account | undefined;
+    try {
+      acc = await createDosenAccount(dosenUsername.trim(), dosenName.trim());
+    } catch (e) {
+      void Swal.fire({ icon: 'error', title: 'Gagal membuat akun dosen', text: (e as Error).message });
+      return;
+    } finally {
+      setCreatingDosen(false);
+    }
     if (!acc) { void Swal.fire({ icon: 'error', title: 'Gagal membuat akun dosen', text: 'Respons server tidak valid.' }); return; }
     setDosenUsername('');
     setDosenName('');
@@ -75,21 +68,18 @@ export const KelasRosterPanel: React.FC = () => {
   const importRoster = async () => {
     if (!activeClass || parsed.rows.length === 0) return;
     setBusy(true);
-    const { data, error } = await getSupabase().functions.invoke('import-roster', {
-      body: { action: 'import_roster', classId: activeClass.id, rows: parsed.rows },
-    });
-    setBusy(false);
-    if (error) {
-      void Swal.fire({ icon: 'error', title: 'Impor gagal', text: await functionError(error) });
+    let accounts: Account[];
+    try {
+      accounts = await importRosterApi(activeClass.id, parsed.rows);
+    } catch (e) {
+      void Swal.fire({ icon: 'error', title: 'Impor gagal', text: (e as Error).message });
       return;
+    } finally {
+      setBusy(false);
     }
-    if (!data || !Array.isArray(data.accounts)) {
-      void Swal.fire({ icon: 'error', title: 'Impor gagal', text: 'Respons server tidak valid.' });
-      return;
-    }
-    const accounts = data.accounts as Account[];
     setResult(accounts);
     setText('');
+    void reloadMembers();
     const skipped = accounts.filter(a => a.status === 'skipped').length;
     const failed = accounts.filter(a => a.status === 'failed').length;
     if (skipped > 0 || failed > 0) {
@@ -124,9 +114,14 @@ export const KelasRosterPanel: React.FC = () => {
   const createClass = async () => {
     if (!newClassName.trim() || creating) return;
     setCreating(true);
-    const { error } = await getSupabase().rpc('create_class', { p_name: newClassName.trim() });
-    setCreating(false);
-    if (error) { void Swal.fire({ icon: 'error', title: 'Gagal membuat kelas', text: error.message }); return; }
+    try {
+      await createClassApi(newClassName.trim());
+    } catch (e) {
+      void Swal.fire({ icon: 'error', title: 'Gagal membuat kelas', text: (e as Error).message });
+      return;
+    } finally {
+      setCreating(false);
+    }
     setNewClassName('');
     void Swal.fire({ icon: 'success', title: 'Kelas dibuat', text: 'Keluar lalu masuk kembali untuk memilih kelas baru.' });
   };

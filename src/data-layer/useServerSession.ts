@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { getSupabase } from '../lib/supabaseClient';
 import type { AuditEntry, Role, RoleId, User } from '../types';
 import { getBackendMode } from './config';
 import { installFocusRefresh } from './focusRefresh';
@@ -9,7 +8,10 @@ import {
   changePassword as changePw, endPractice, restoreSession, signIn, startPractice,
   type AccountType, type ClassInfo, type PracticeSession, type Profile,
 } from './session';
-import { loadAudit, loadMembers, loadPracticeRoles, subscribeAudit } from './supabaseQueries';
+import {
+  loadAuditRows, loadMembers, loadPracticeRoles, mapAuditRow, resetClass, setMemberActive as setMemberActiveApi,
+  type AuditRow,
+} from './serverQueries';
 import { createSyncEngine } from './syncEngine';
 import { setSlicePersistence } from './useSlice';
 
@@ -22,8 +24,13 @@ interface Deps {
 
 type Result = { success: boolean; error?: string };
 
-export function useSupabaseSession(deps: Deps) {
-  const enabled = getBackendMode() === 'supabase';
+/** How often other users' changes are fetched while the tab is visible. */
+export const POLL_MS = 5_000;
+
+const maxId = (rows: AuditRow[]) => rows.reduce((m, r) => Math.max(m, Number(r.id)), 0);
+
+export function useServerSession(deps: Deps) {
+  const enabled = getBackendMode() === 'server';
   const [booting, setBooting] = useState(enabled);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [classOptions, setClassOptions] = useState<ClassInfo[] | null>(null);
@@ -33,49 +40,64 @@ export function useSupabaseSession(deps: Deps) {
   const teardown = useRef<(() => void) | null>(null);
 
   async function enterClass(p: Profile, cls: ClassInfo, roleId: RoleId, existing?: PracticeSession) {
-    const client = getSupabase();
     try {
-      const session = existing ?? await startPractice(client, cls.id, roleId);
-      const engine = createSyncEngine(client, cls.id);
+      const session = existing ?? await startPractice(cls.id, roleId);
+      const engine = createSyncEngine(cls.id);
       setSlicePersistence({ ...engine, onSaveError: notifySaveError });
-      const [rows, roles, memberUsers, audit] = await Promise.all([
-        engine.loadAll(), loadPracticeRoles(client), loadMembers(client, cls.id), loadAudit(client, cls.id),
+      const [rows, roles, memberUsers, auditRows] = await Promise.all([
+        engine.loadAll(), loadPracticeRoles(), loadMembers(cls.id), loadAuditRows(cls.id),
       ]);
       sliceRegistry.hydrateAll(rows);
       deps.setRoles(roles);
-      deps.setAuditTrail(audit);
+      deps.setAuditTrail(auditRows.map(mapAuditRow));
       setMembers(memberUsers);
-      const offData = engine.subscribe();
-      const offAudit = subscribeAudit(client, cls.id, e => deps.setAuditTrail(prev => [e, ...prev].slice(0, 500)));
+
       let live = true;
-      const offFocus = installFocusRefresh({
-        win: window,
-        doc: document,
-        refresh: async () => {
-          const [freshRows, freshMembers, freshAudit] = await Promise.all([
-            engine.loadAll(), loadMembers(client, cls.id), loadAudit(client, cls.id),
-          ]);
-          if (!live) return;
-          sliceRegistry.hydrateAll(freshRows);
-          setMembers(freshMembers);
-          deps.setAuditTrail(freshAudit);
-        },
-      });
-      teardown.current = () => { live = false; offData(); offAudit(); offFocus(); };
+      let lastAudit = maxId(auditRows);
+      const reloadAll = async () => {
+        const [freshRows, freshMembers, freshAudit] = await Promise.all([
+          engine.loadAll(), loadMembers(cls.id), loadAuditRows(cls.id),
+        ]);
+        if (!live) return;
+        sliceRegistry.hydrateAll(freshRows);
+        setMembers(freshMembers);
+        deps.setAuditTrail(freshAudit.map(mapAuditRow));
+        lastAudit = Math.max(lastAudit, maxId(freshAudit));
+      };
+
+      // Other users' changes arrive through the class audit log, which every write lands in.
+      let polling = false;
+      const poll = async () => {
+        if (polling || document.visibilityState !== 'visible') return;
+        polling = true;
+        try {
+          const fresh = await loadAuditRows(cls.id, lastAudit);
+          if (!live || fresh.length === 0) return;
+          lastAudit = Math.max(lastAudit, maxId(fresh));
+          deps.setAuditTrail(prev => [...fresh.map(mapAuditRow), ...prev].slice(0, 500));
+          if (engine.applyChanges(fresh, p.id)) await reloadAll();
+        } catch { /* transient network error: try again next tick */ } finally {
+          polling = false;
+        }
+      };
+      const timer = window.setInterval(() => { void poll(); }, POLL_MS);
+      const offFocus = installFocusRefresh({ win: window, doc: document, refresh: reloadAll });
+      teardown.current = () => { live = false; window.clearInterval(timer); offFocus(); };
+
       setProfile(p);
       setActiveClass(cls);
       setClassOptions(null);
       deps.setUser({ id: p.id, username: p.username, name: p.full_name, roleId: session.role_id as RoleId, active: true });
     } catch (e) {
-      // Leave nothing behind: no subscriptions, no slice persistence, no open practice
-      // session, and no authenticated session without an app user.
+      // Leave nothing behind: no polling, no slice persistence, no open practice
+      // session, and no signed-in token without an app user.
       teardown.current?.();
       teardown.current = null;
       setSlicePersistence(null);
       // A restored session is left open (a transient load failure should not end it);
       // one we just started (or are about to) is ended, which also signs out.
       if (!existing) {
-        try { await endPractice(client); } catch { /* best effort */ }
+        try { await endPractice(); } catch { /* best effort */ }
       }
       throw e;
     }
@@ -101,7 +123,7 @@ export function useSupabaseSession(deps: Deps) {
     let cancelled = false;
     (async () => {
       try {
-        const restored = await restoreSession(getSupabase());
+        const restored = await restoreSession();
         if (cancelled || !restored?.session) return;
         const cls = restored.classes.find(c => c.id === restored.session!.class_id);
         if (cls) await enterClass(restored.profile, cls, restored.session.role_id as RoleId, restored.session);
@@ -111,12 +133,12 @@ export function useSupabaseSession(deps: Deps) {
         if (!cancelled) setBooting(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; teardown.current?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
 
   async function login(username: string, password: string, roleId: RoleId): Promise<Result & { needsClassChoice?: boolean }> {
-    const res = await signIn(getSupabase(), username, password);
+    const res = await signIn(username, password);
     if ('error' in res) return { success: false, error: res.error };
     if (res.classes.length > 1) {
       pending.current = { profile: res.profile, roleId };
@@ -150,13 +172,13 @@ export function useSupabaseSession(deps: Deps) {
   }
 
   async function logout(): Promise<void> {
-    try { await endPractice(getSupabase()); } finally { clearLocal(); }
+    try { await endPractice(); } finally { clearLocal(); }
   }
 
   async function changePassword(newPassword: string): Promise<Result> {
     if (newPassword.length < 8) return { success: false, error: 'Password minimal 8 karakter' };
     try {
-      await changePw(getSupabase(), newPassword);
+      await changePw(newPassword);
       setProfile(prev => (prev ? { ...prev, must_change_password: false } : prev));
       return { success: true };
     } catch (e) {
@@ -166,29 +188,33 @@ export function useSupabaseSession(deps: Deps) {
 
   async function resetActiveClass(): Promise<Result> {
     if (!activeClass || !profile) return { success: false, error: 'Tidak ada kelas aktif' };
-    const { error } = await getSupabase().rpc('reset_class', { p_class: activeClass.id });
-    if (error) return { success: false, error: error.message };
     try {
-      const rows = await createSyncEngine(getSupabase(), activeClass.id).loadAll();
-      sliceRegistry.hydrateAll(rows);
+      await resetClass(activeClass.id);
+      sliceRegistry.hydrateAll(await createSyncEngine(activeClass.id).loadAll());
       return { success: true };
     } catch (e) {
       return { success: false, error: (e as Error).message };
     }
   }
 
+  async function reloadMembers(): Promise<void> {
+    if (!activeClass) return;
+    try { setMembers(await loadMembers(activeClass.id)); } catch { /* the next focus refresh retries */ }
+  }
+
   async function setMemberActive(userId: string, active: boolean): Promise<Result> {
     if (!activeClass) return { success: false, error: 'Tidak ada kelas aktif' };
-    const { error } = await getSupabase().rpc('set_member_active', {
-      p_class: activeClass.id, p_user: userId, p_active: active,
-    });
-    if (error) return { success: false, error: error.message };
+    try {
+      await setMemberActiveApi(activeClass.id, userId, active);
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
     setMembers(prev => prev.map(m => (m.id === userId ? { ...m, active } : m)));
     return { success: true };
   }
 
   return {
-    enabled, booting, members, classOptions, activeClass, setMemberActive,
+    enabled, booting, members, classOptions, activeClass, setMemberActive, reloadMembers,
     accountType: (profile?.account_type ?? null) as AccountType | null,
     mustChangePassword: profile?.must_change_password ?? false,
     login, chooseClass, logout, changePassword, resetActiveClass,

@@ -36,4 +36,4 @@ begin
   return v_row;
 end $$;
 
-revoke execute on function public.start_practice_session(uuid, text) from anon;
+revoke execute on function public.start_practice_session(uuid, text) from public;

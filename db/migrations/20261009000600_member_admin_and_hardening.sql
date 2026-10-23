@@ -30,17 +30,7 @@ begin
   end if;
 end $$;
 
--- Integration tests create TEST-* classes in the shared project; never offer them in the class picker.
-create or replace function public.my_classes() returns table (id uuid, name text)
-language sql stable security definer set search_path = public as $$
-  select c.id, c.name from public.classes c
-  where not c.is_template
-    and c.name not like 'TEST-%'
-    and (coalesce(public.account_type() = 'admin', false) or public.is_class_member(c.id))
-  order by c.created_at desc
-$$;
-
--- Security definer functions: callable by signed-in users only (RLS helpers stay executable by authenticated).
+-- Security definer functions: callable by signed-in users only (RLS helpers stay executable by simrs_user).
 do $$
 declare f text;
 begin
@@ -62,8 +52,8 @@ begin
     'public.reset_class(uuid)',
     'public.set_member_active(uuid, uuid, boolean)'
   ] loop
-    execute format('revoke execute on function %s from public, anon', f);
-    execute format('grant execute on function %s to authenticated', f);
+    execute format('revoke execute on function %s from public', f);
+    execute format('grant execute on function %s to simrs_user', f);
   end loop;
 end $$;
 

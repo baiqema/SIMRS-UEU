@@ -16,6 +16,12 @@ describe('buildSeedSql', () => {
   it('seeds staff without passwords', () => {
     expect(sql).toContain('insert into public.staff_directory');
     expect(sql).not.toMatch(/"password"/);
+    expect(sql).not.toMatch(/"tempPassword"/);
+  });
+  it('seeds the master data tables', () => {
+    for (const t of ['master_ruangan', 'master_bed', 'master_dokter', 'master_poli', 'doctor_poli_mappings']) {
+      expect(sql).toContain(`insert into public.${t}`);
+    }
   });
   it('seeds today registrations with the date placeholder', () => {
     expect(sql).toContain('insert into public.registrations');

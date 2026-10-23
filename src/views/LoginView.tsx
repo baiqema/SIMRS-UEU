@@ -60,8 +60,8 @@ export const LoginView: React.FC = () => {
     { id: 'R04', label: 'Mahasiswa (All Modul)', desc: 'Akses Penuh Seluruh Modul untuk Latihan Bebas' },
   ];
 
-  // The Supabase admin account is real; never advertise it as a preset.
-  const demoAccounts = getBackendMode() === 'supabase' ? DEMO_ACCOUNTS.filter(a => a.accountType !== 'admin') : DEMO_ACCOUNTS;
+  // The server admin account is real; never advertise it as a preset.
+  const demoAccounts = getBackendMode() === 'server' ? DEMO_ACCOUNTS.filter(a => a.accountType !== 'admin') : DEMO_ACCOUNTS;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 text-slate-800 flex items-center justify-center p-4 relative overflow-hidden font-sans">

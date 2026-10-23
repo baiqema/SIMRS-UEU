@@ -21,10 +21,9 @@ import {
 import { sanitizePatientList, sanitizeMedicalRecords } from '../data/seedNormalizers';
 import { useSlice } from '../data-layer/useSlice';
 import { getBackendMode } from '../data-layer/config';
-import { useSupabaseSession } from '../data-layer/useSupabaseSession';
-import { mergeStaffAndMembers, logNavigate, updateRoleAccess } from '../data-layer/supabaseQueries';
+import { useServerSession } from '../data-layer/useServerSession';
+import { mergeStaffAndMembers, logNavigate, updateRoleAccess } from '../data-layer/serverQueries';
 import { notifyInfo, notifySaveError } from '../data-layer/notify';
-import { getSupabase } from '../lib/supabaseClient';
 import type { BackendMode } from '../data-layer/config';
 import type { AccountType, ClassInfo } from '../data-layer/session';
 import { EXTENDED_ICD10, EXTENDED_ICD9CM } from '../data/icdDatabase';
@@ -68,6 +67,7 @@ interface AppContextType {
   changePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   resetActiveClass: () => Promise<{ success: boolean; error?: string }>;
   setMemberActive: (userId: string, active: boolean) => Promise<{ success: boolean; error?: string }>;
+  reloadMembers: () => Promise<void>;
   logout: () => void;
   navigate: (page: string, params?: any) => void;
   audit: (action: AuditEntry['action'], entity: string, entityId: string, details?: { field_name?: string; old_value?: any; new_value?: any }) => void;
@@ -202,7 +202,7 @@ const genId = (prefix: string) => prefix + Date.now().toString(36).toUpperCase()
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
-    if (getBackendMode() === 'supabase') return null;
+    if (getBackendMode() === 'server') return null;
     const saved = localStorage.getItem('simrs_current_user');
     return saved ? JSON.parse(saved) : null;
   });
@@ -368,12 +368,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [params, setParams] = useState<any>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const backendMode = getBackendMode();
-  const sb = useSupabaseSession({
+  const sb = useServerSession({
     setUser, setRoles, setAuditTrail,
     onExit: () => setActivePage('dashboard'),
   });
   const exposedUsers = useMemo(
-    () => (backendMode === 'supabase' ? mergeStaffAndMembers(users, sb.members) : users),
+    () => (backendMode === 'server' ? mergeStaffAndMembers(users, sb.members) : users),
     [backendMode, users, sb.members],
   );
 
@@ -392,9 +392,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     entityId: string,
     details?: { field_name?: string; old_value?: any; new_value?: any }
   ) => {
-    if (backendMode === 'supabase') {
+    if (backendMode === 'server') {
       // CREATE/UPDATE/DELETE are written by database triggers; LOGIN/LOGOUT by session RPCs.
-      if (action === 'NAVIGATE') logNavigate(getSupabase(), entityId);
+      if (action === 'NAVIGATE') logNavigate(entityId);
       return;
     }
     const newEntry: AuditEntry = {
@@ -432,7 +432,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addClass = (cls: Omit<SimClass, 'createdAt'>) => {
-    if (backendMode === 'supabase') return { success: false, message: 'Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.' };
+    if (backendMode === 'server') return { success: false, message: 'Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.' };
     const cleanId = cls.id.trim().toUpperCase();
     if (classes.some(c => c.id.toUpperCase() === cleanId)) {
       return { success: false, message: `Kode Kelas "${cleanId}" sudah digunakan.` };
@@ -448,7 +448,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const importRoster = (classId: string, students: Array<{ nim: string; name: string; roleId?: RoleId; tempPassword?: string }>) => {
-    if (backendMode === 'supabase') { notifyInfo('Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.'); return { success: false, count: 0 }; }
+    if (backendMode === 'server') { notifyInfo('Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.'); return { success: false, count: 0 }; }
     let count = 0;
     let duplicates = 0;
     setUsers(prev => {
@@ -495,7 +495,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleUserActive = (userId: string) => {
-    if (backendMode === 'supabase') { notifyInfo('Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.'); return; }
+    if (backendMode === 'server') { notifyInfo('Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.'); return; }
     setUsers(prev => prev.map(u => {
       if (u.id === userId) {
         const newActive = !u.active;
@@ -511,7 +511,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const batchSetUsersActive = (userIds: string[], active: boolean) => {
-    if (backendMode === 'supabase') { notifyInfo('Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.'); return; }
+    if (backendMode === 'server') { notifyInfo('Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.'); return; }
     const idSet = new Set(userIds);
     setUsers(prev => prev.map(u => {
       if (idSet.has(u.id)) {
@@ -526,7 +526,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetClassSimulation = (classId: string) => {
-    if (backendMode === 'supabase') {
+    if (backendMode === 'server') {
       sb.resetActiveClass().then(r => { if (!r.success) notifyInfo(r.error || 'Reset kelas gagal.'); }).catch(notifySaveError);
       return;
     }
@@ -567,7 +567,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const createDosenUser = (dosenData: { name: string; username: string; password?: string; classId?: string; nidn?: string }) => {
-    if (backendMode === 'supabase') return { success: false, message: 'Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.' };
+    if (backendMode === 'server') return { success: false, message: 'Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.' };
     if (user?.roleId !== 'R01') {
       return { success: false, message: 'Hanya Super Administrator (R01) yang berwenang membuat akun Dosen.' };
     }
@@ -669,7 +669,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const login = async (u: string, p: string, selectedRoleId?: RoleId, selectedClassId?: string) => {
-    if (backendMode === 'supabase') return sb.login(u, p, selectedRoleId ?? 'R04');
+    if (backendMode === 'server') return sb.login(u, p, selectedRoleId ?? 'R04');
     return loginLocal(u, p, selectedRoleId, selectedClassId);
   };
 
@@ -682,7 +682,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = () => {
-    if (backendMode === 'supabase') { sb.logout().catch(notifySaveError); return; }
+    if (backendMode === 'server') { sb.logout().catch(notifySaveError); return; }
     logoutLocal();
   };
 
@@ -1209,7 +1209,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       roleId: userData.roleId,
       active: true
     };
-    if (backendMode === 'supabase') {
+    if (backendMode === 'server') {
       // staff_directory never stores passwords (spec §6.1); staff entries are directory records only.
       delete newUser.password;
     }
@@ -1218,7 +1218,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true };
   };
 
-  const isClassMember = (id: string) => backendMode === 'supabase' && sb.members.some(m => m.id === id);
+  const isClassMember = (id: string) => backendMode === 'server' && sb.members.some(m => m.id === id);
 
   const updateUser = (id: string, updates: Partial<User>) => {
     if (isClassMember(id)) {
@@ -1254,8 +1254,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateRolePermissions = (roleId: RoleId, newAccess: string[]) => {
-    if (backendMode === 'supabase') {
-      updateRoleAccess(getSupabase(), roleId, newAccess)
+    if (backendMode === 'server') {
+      updateRoleAccess(roleId, newAccess)
         .then(() => setRoles(prev => prev.map(r => r.id === roleId ? { ...r, access: newAccess } : r)))
         .catch(notifySaveError);
       return;
@@ -2181,6 +2181,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         changePassword: sb.changePassword,
         resetActiveClass: sb.resetActiveClass,
         setMemberActive: sb.setMemberActive,
+        reloadMembers: sb.reloadMembers,
         // Master Data SIMRS
         masterRuangan,
         masterBed,

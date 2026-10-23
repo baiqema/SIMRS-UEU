@@ -48,16 +48,15 @@ begin
       alter table public.%1$I enable row level security;
       create trigger stamp_row before insert or update on public.%1$I
         for each row execute function private.stamp_row();
-      create policy %1$s_select on public.%1$I for select to authenticated
+      create policy %1$s_select on public.%1$I for select to simrs_user
         using (public.can_read_class(class_id));
-      create policy %1$s_insert on public.%1$I for insert to authenticated
+      create policy %1$s_insert on public.%1$I for insert to simrs_user
         with check (public.can_write(class_id, %1$L));
-      create policy %1$s_update on public.%1$I for update to authenticated
+      create policy %1$s_update on public.%1$I for update to simrs_user
         using (public.can_write(class_id, %1$L)) with check (public.can_write(class_id, %1$L));
-      create policy %1$s_delete on public.%1$I for delete to authenticated
+      create policy %1$s_delete on public.%1$I for delete to simrs_user
         using (public.can_write(class_id, %1$L));
-      alter publication supabase_realtime add table public.%1$I;
-      revoke all on public.%1$I from anon;
+      revoke all on public.%1$I from public;
     $f$, t);
   end loop;
 end $$;

@@ -1,77 +1,69 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { addMember, admin, anon, cleanupUsers, EMAIL_DOMAIN, insertClassDirect, makeUser, type TestUser } from './helpers';
+import { insertClassDirect, makeUser, owner, signIn, startApi, stopApi, type TestUser } from './helpers';
 
-let cls: string, m: TestUser, d: TestUser, a: TestUser, inactive: TestUser;
+let cls: string, m: TestUser, d: TestUser, a: TestUser;
+
+const start = (u: TestUser, roleId: string, classId = cls) => u.call('POST', '/practice-session', { classId, roleId });
 
 beforeAll(async () => {
+  await startApi();
   cls = await insertClassDirect();
-  [m, d, a, inactive] = await Promise.all([makeUser('mahasiswa'), makeUser('dosen'), makeUser('admin'), makeUser('mahasiswa')]);
-  await addMember(cls, m.id, 'mahasiswa');
-  await addMember(cls, d.id, 'dosen');
-  await addMember(cls, inactive.id, 'mahasiswa', false);
+  [m, d, a] = await Promise.all([makeUser('mahasiswa', { classId: cls }), makeUser('dosen', { classId: cls }), makeUser('admin')]);
 });
-afterAll(cleanupUsers);
+afterAll(stopApi);
 
-describe('start_practice_session', () => {
+describe('practice sessions', () => {
   it('students may pick operational roles including R04 but not R01 or R03', async () => {
-    expect((await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R09' })).error).toBeNull();
-    expect((await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R04' })).error).toBeNull();
-    expect((await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R01' })).error).not.toBeNull();
-    expect((await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R03' })).error).not.toBeNull();
+    expect((await start(m, 'R09')).status).toBe(200);
+    expect((await start(m, 'R04')).status).toBe(200);
+    expect((await start(m, 'R01')).status).toBe(403);
+    expect((await start(m, 'R03')).status).toBe(403);
+    expect((await start(m, 'R99')).status).toBe(400);
   });
 
   it('dosen may pick R03 and admin may pick R01 in any class', async () => {
-    expect((await d.client.rpc('start_practice_session', { p_class: cls, p_role: 'R03' })).error).toBeNull();
-    expect((await a.client.rpc('start_practice_session', { p_class: cls, p_role: 'R01' })).error).toBeNull();
+    expect((await start(d, 'R03')).status).toBe(200);
+    expect((await start(a, 'R01')).status).toBe(200);
   });
 
   it('inactive members and non-members are refused', async () => {
-    expect((await inactive.client.rpc('start_practice_session', { p_class: cls, p_role: 'R09' })).error).not.toBeNull();
     const other = await insertClassDirect();
-    expect((await m.client.rpc('start_practice_session', { p_class: other, p_role: 'R09' })).error).not.toBeNull();
+    expect((await start(m, 'R09', other)).status).toBe(403);
+    const both = await makeUser('mahasiswa', { classId: cls });
+    await owner().query('insert into public.class_members (class_id, user_id, member_role, active) values ($1, $2, $3, false)', [other, both.id, 'mahasiswa']);
+    expect((await start(both, 'R09', other)).status).toBe(403);
   });
 
-  it('switching role keeps exactly one open session', async () => {
-    expect((await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R07' })).error).toBeNull();
-    expect((await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R06' })).error).toBeNull();
-    const { data: logouts } = await admin().from('audit_log').select('details')
-      .eq('class_id', cls).eq('actor_id', m.id).eq('action', 'LOGOUT');
-    expect(logouts!.map(l => l.details.roleId)).toContain('R07');
-    const { data } = await m.client.rpc('my_practice_session');
-    expect(data).toHaveLength(1);
-    expect(data[0].role_id).toBe('R06');
+  it('switching role keeps exactly one open session and logs the old one out', async () => {
+    await start(m, 'R07');
+    await start(m, 'R06');
+    const { rows } = await owner().query(
+      "select details from public.audit_log where class_id = $1 and actor_id = $2 and action = 'LOGOUT'", [cls, m.id]);
+    expect(rows.map(r => r.details?.roleId)).toContain('R07');
+    const { rows: open } = await owner().query('select role_id from public.practice_sessions where user_id = $1 and ended_at is null', [m.id]);
+    expect(open).toEqual([{ role_id: 'R06' }]);
   });
 
-  it('my_practice_session returns the open session after re-login', async () => {
-    await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R13' });
-    const fresh = anon();
-    await fresh.auth.signInWithPassword({ email: `${m.username}@${EMAIL_DOMAIN}`, password: m.password });
-    const { data } = await fresh.rpc('my_practice_session');
-    expect(data[0]).toMatchObject({ class_id: cls, role_id: 'R13' });
+  it('a new login finds the open session again', async () => {
+    await start(m, 'R13');
+    await signIn(m);
+    expect((await m.call('GET', '/auth/me')).body.session).toMatchObject({ class_id: cls, role_id: 'R13' });
   });
 
-  it('end_practice_session closes it and logs LOGOUT', async () => {
-    const before = (await admin().from('audit_log').select('id', { count: 'exact', head: true })
-      .eq('class_id', cls).eq('actor_id', m.id).eq('action', 'LOGOUT')).count!;
-    expect((await m.client.rpc('end_practice_session')).error).toBeNull();
-    const after = (await admin().from('audit_log').select('id', { count: 'exact', head: true })
-      .eq('class_id', cls).eq('actor_id', m.id).eq('action', 'LOGOUT')).count!;
-    expect(after).toBe(before + 1);
-    expect((await m.client.rpc('my_practice_session')).data).toEqual([]);
+  it('ending the session closes it and logs LOGOUT', async () => {
+    const q = "select count(*)::int as n from public.audit_log where class_id = $1 and actor_id = $2 and action = 'LOGOUT'";
+    const before = (await owner().query(q, [cls, m.id])).rows[0].n;
+    expect((await m.call('DELETE', '/practice-session')).status).toBe(200);
+    expect((await owner().query(q, [cls, m.id])).rows[0].n).toBe(before + 1);
+    expect((await m.call('GET', '/auth/me')).body.session).toBeNull();
   });
 
-  it('my_classes lists active memberships only and hides TEST-* classes', async () => {
-    // A non-TEST class is needed to see a listing; it has no audit rows, so it can be deleted afterwards.
-    const visible = await insertClassDirect(`tmp-my-classes-${Date.now()}`);
-    try {
-      await addMember(visible, m.id, 'mahasiswa');
-      await addMember(visible, inactive.id, 'mahasiswa', false);
-      const ids = ((await m.client.rpc('my_classes')).data as { id: string }[]).map(c => c.id);
-      expect(ids).toContain(visible);
-      expect(ids).not.toContain(cls);
-      expect((await inactive.client.rpc('my_classes')).data).toEqual([]);
-    } finally {
-      await admin().from('classes').delete().eq('id', visible);
-    }
+  it('class list shows active memberships only', async () => {
+    const extra = await insertClassDirect();
+    const off = await makeUser('mahasiswa', { classId: cls });
+    await owner().query('insert into public.class_members (class_id, user_id, member_role, active) values ($1, $2, $3, true)', [extra, m.id, 'mahasiswa']);
+    await owner().query('insert into public.class_members (class_id, user_id, member_role, active) values ($1, $2, $3, false)', [extra, off.id, 'mahasiswa']);
+    expect((await m.call('GET', '/classes')).body.map((c: { id: string }) => c.id)).toEqual(expect.arrayContaining([cls, extra]));
+    expect((await off.call('GET', '/classes')).body.map((c: { id: string }) => c.id)).toEqual([cls]);
   });
 });

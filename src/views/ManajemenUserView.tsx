@@ -79,7 +79,7 @@ export const ManajemenUserView: React.FC = () => {
     backendMode, accountType
   } = useApp();
   // In database mode, classes and rosters live on the server: the roster tab shows KelasRosterPanel instead.
-  const isDbMode = backendMode === 'supabase';
+  const isDbMode = backendMode === 'server';
   const showRosterTab = !isDbMode || accountType === 'dosen' || accountType === 'admin';
 
   const isEditable = canEditPage('user');
@@ -1129,7 +1129,7 @@ export const ManajemenUserView: React.FC = () => {
                 <button
                   onClick={() => setIsSqlSchemaModalOpen(true)}
                   className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all border border-white/20"
-                  title="Lihat Skema Database PostgreSQL & Aturan RLS Supabase"
+                  title="Lihat Skema Database PostgreSQL & Aturan RLS"
                 >
                   <Database className="w-3.5 h-3.5 text-emerald-300" />
                   <span>Skema SQL & RLS</span>
@@ -1976,7 +1976,7 @@ export const ManajemenUserView: React.FC = () => {
         <Modal
           isOpen={isSqlSchemaModalOpen}
           onClose={() => setIsSqlSchemaModalOpen(false)}
-          title="Skema Database PostgreSQL & Aturan Row Level Security (RLS) Supabase"
+          title="Skema Database PostgreSQL & Aturan Row Level Security (RLS)"
         >
           <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-950 space-y-1">
@@ -1995,11 +1995,11 @@ export const ManajemenUserView: React.FC = () => {
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold text-slate-700">Folder: <code>supabase/migrations/</code></span>
+                <span className="text-xs font-bold text-slate-700">Folder: <code>db/migrations/</code></span>
                 <button
                   onClick={() => {
                     const sqlSnippet = `-- SIMRS RMIK MULTI-TENANT SCHEMA & RLS
--- Skema lengkap: folder supabase/migrations/ pada repositori (dijalankan berurutan)
+-- Skema lengkap: folder db/migrations/ pada repositori (dijalankan berurutan)
 -- Tabel inti: classes, profiles, class_members, practice_roles, practice_sessions, audit_log
 -- Tabel klinis & master data per kelas: patients, registrations, cppt, coding, billing, claims, master_poli, master_dokter, ...
 -- Trigger: audit_log_immutable() (IMMUTABLE AUDIT TRAIL)
@@ -2008,7 +2008,7 @@ export const ManajemenUserView: React.FC = () => {
                     Swal.fire({
                       icon: 'success',
                       title: 'Petunjuk Skema Disalin',
-                      text: 'Skema lengkap tersedia di folder supabase/migrations/ pada repositori.',
+                      text: 'Skema lengkap tersedia di folder db/migrations/ pada repositori.',
                       timer: 1600,
                       showConfirmButton: false
                     });
@@ -2021,7 +2021,7 @@ export const ManajemenUserView: React.FC = () => {
               </div>
 
               <div className="bg-slate-900 text-slate-200 p-3.5 rounded-xl text-[11px] font-mono leading-relaxed overflow-x-auto max-h-60 border border-slate-800">
-                <pre>{`-- 1. APPEND-ONLY IMMUTABLE AUDIT LOG (supabase/migrations/..._audit.sql)
+                <pre>{`-- 1. APPEND-ONLY IMMUTABLE AUDIT LOG (db/migrations/..._audit.sql)
 create function private.audit_log_immutable() returns trigger as $$
 begin
   raise exception 'audit_log is append-only' using errcode = '42501';

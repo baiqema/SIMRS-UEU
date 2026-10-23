@@ -1,12 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { sliceRegistry } from './registry';
-import { createSyncEngine, normalizeLoaded, toRow } from './syncEngine';
-
-describe('toRow', () => {
-  it('wraps the object as data with class and id', () => {
-    expect(toRow('c1', { id: 'P1', name: 'x' } as any)).toEqual({ class_id: 'c1', id: 'P1', data: { id: 'P1', name: 'x' } });
-  });
-});
+import type { AuditRow } from './serverQueries';
+import { createSyncEngine, normalizeLoaded } from './syncEngine';
 
 describe('normalizeLoaded', () => {
   it('applies Ema\'s patient RM normalization on load', () => {
@@ -19,100 +14,74 @@ describe('normalizeLoaded', () => {
   });
 });
 
-function fakeClient(deletedIds?: (ids: string[]) => string[]) {
-  const calls: any[] = [];
-  const builder = (table: string) => {
-    let ids: string[] = [];
-    const b: any = {
-      upsert: (rows: any, opts: any) => { calls.push(['upsert', table, rows, opts]); return Promise.resolve({ error: null }); },
-      delete: () => b,
-      eq: (c: string, v: string) => { calls.push(['eq', table, c, v]); return b; },
-      in: (c: string, v: string[]) => { calls.push(['in', table, c, v]); ids = v; return b; },
-      select: (cols: string) => {
-        calls.push(['select', table, cols]);
-        const kept = deletedIds ? deletedIds(ids) : ids;
-        return Promise.resolve({ data: kept.map(id => ({ id })), error: null });
-      },
-    };
-    return b;
-  };
-  return { calls, client: { from: vi.fn(builder) } as any };
-}
-
 describe('createSyncEngine.push', () => {
-  it('upserts on (class_id,id) and deletes by id within the class', async () => {
-    const { calls, client } = fakeClient();
-    const engine = createSyncEngine(client, 'c1');
-    await engine.push('patients', { upserts: [{ id: 'P1' }], deletes: ['P2'] });
-    expect(calls).toContainEqual(['upsert', 'patients', [{ class_id: 'c1', id: 'P1', data: { id: 'P1' } }], { onConflict: 'class_id,id' }]);
-    expect(calls).toContainEqual(['eq', 'patients', 'class_id', 'c1']);
-    expect(calls).toContainEqual(['in', 'patients', 'id', ['P2']]);
+  it('posts upserts and deletes to the slice table of the class', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    await createSyncEngine('c1', call).push('patients', { upserts: [{ id: 'P1' }], deletes: ['P2'] });
+    expect(call).toHaveBeenCalledWith('POST', '/classes/c1/data/patients', { upserts: [{ id: 'P1' }], deletes: [] });
+    expect(call).toHaveBeenCalledWith('POST', '/classes/c1/data/patients', { upserts: [], deletes: ['P2'] });
   });
 
-  it('throws a permission error when RLS silently filters some deletes', async () => {
-    const { client } = fakeClient(() => []);
-    await expect(createSyncEngine(client, 'c1').push('patients', { upserts: [], deletes: ['P2', 'P3'] }))
-      .rejects.toThrow('42501');
+  it('sends large saves in chunks of 500', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const upserts = Array.from({ length: 1001 }, (_, i) => ({ id: `r${i}` }));
+    await createSyncEngine('c1', call).push('cppt', { upserts, deletes: [] });
+    expect(call.mock.calls.map(c => c[2].upserts.length)).toEqual([500, 500, 1]);
   });
 
-  it('accepts deletes when every id comes back', async () => {
-    const { calls, client } = fakeClient();
-    await createSyncEngine(client, 'c1').push('patients', { upserts: [], deletes: ['P2'] });
-    expect(calls).toContainEqual(['select', 'patients', 'id']);
-  });
-
-  it('throws when Supabase returns an error', async () => {
-    const client = { from: () => ({ upsert: () => Promise.resolve({ error: { message: 'new row violates row-level security policy' } }) }) } as any;
-    await expect(createSyncEngine(client, 'c1').push('coding', { upserts: [{ id: 'x' }], deletes: [] })).rejects.toThrow('row-level security');
+  it('propagates server refusals', async () => {
+    const call = vi.fn().mockRejectedValue(new Error('42501: hapus ditolak'));
+    await expect(createSyncEngine('c1', call).push('patients', { upserts: [], deletes: ['P2'] })).rejects.toThrow('42501');
   });
 });
 
-describe('createSyncEngine.subscribe', () => {
+describe('createSyncEngine.loadAll', () => {
+  it('maps tables to slices and fills missing tables with empty lists', async () => {
+    const call = vi.fn().mockResolvedValue({ cppt: [{ id: 'x' }], master_poli: [{ id: 'p' }] });
+    const out = await createSyncEngine('c1', call).loadAll();
+    expect(call).toHaveBeenCalledWith('GET', '/classes/c1/data');
+    expect(out.cppt).toEqual([{ id: 'x' }]);
+    expect(out.masterPoli).toEqual([{ id: 'p' }]);
+    expect(out.billing).toEqual([]);
+  });
+});
+
+describe('createSyncEngine.applyChanges', () => {
+  const row = (over: Partial<AuditRow>): AuditRow => ({
+    id: 1, at: '', class_id: 'c1', actor_id: 'other', actor_name: 'B', practice_role_id: 'R04',
+    action: 'UPDATE', entity: 'patients', entity_id: 'P1', module: 'patients', old_data: null, new_data: { id: 'P1' }, details: null,
+    ...over,
+  });
+
   function setup() {
-    const handlers: Array<(p: any) => void> = [];
-    const channel: any = { on: (_t: string, _f: any, h: any) => { handlers.push(h); return channel; }, subscribe: vi.fn() };
-    const client = { channel: () => channel, removeChannel: vi.fn() } as any;
     const applyRemote = vi.fn();
     const unregister = sliceRegistry.register('patients', { hydrate: vi.fn(), applyRemote });
-    createSyncEngine(client, 'c1').subscribe();
-    const fire = (p: any) => handlers[0](p);
-    return { fire, applyRemote, unregister };
+    return { applyRemote, unregister, engine: createSyncEngine('c1', vi.fn()) };
   }
 
-  it('ignores deletes from other classes, applies own', () => {
-    const { fire, applyRemote, unregister } = setup();
-    fire({ eventType: 'DELETE', table: 'patients', old: { class_id: 'other', id: 'P1' } });
+  it('applies other users\' upserts and deletes oldest first', () => {
+    const { applyRemote, unregister, engine } = setup();
+    engine.applyChanges([row({ id: 2, action: 'DELETE', new_data: null }), row({ id: 1, action: 'CREATE' })], 'me');
+    expect(applyRemote.mock.calls.map(c => c[0].type)).toEqual(['upsert', 'delete']);
+    unregister();
+  });
+
+  it('skips own changes, other classes, events and rows without data', () => {
+    const { applyRemote, unregister, engine } = setup();
+    const reload = engine.applyChanges([
+      row({ actor_id: 'me' }),
+      row({ class_id: 'other' }),
+      row({ action: 'LOGIN', entity: 'User' }),
+      row({ new_data: null }),
+    ], 'me');
     expect(applyRemote).not.toHaveBeenCalled();
-    fire({ eventType: 'DELETE', table: 'patients', old: { class_id: 'c1', id: 'P1' } });
-    expect(applyRemote).toHaveBeenCalledWith({ type: 'delete', id: 'P1' });
+    expect(reload).toBe(false);
     unregister();
   });
 
-  it('applies own upserts and ignores payloads without data or from other classes', () => {
-    const { fire, applyRemote, unregister } = setup();
-    fire({ eventType: 'INSERT', table: 'patients', new: { class_id: 'c1', id: 'P2', data: { id: 'P2' } } });
-    expect(applyRemote).toHaveBeenCalledTimes(1);
-    expect(applyRemote).toHaveBeenCalledWith({ type: 'upsert', row: { id: 'P2' } });
-    fire({ eventType: 'UPDATE', table: 'patients', new: { class_id: 'c1', id: 'P3' } });
-    fire({ eventType: 'UPDATE', table: 'patients', new: { class_id: 'other', id: 'P4', data: { id: 'P4' } } });
-    expect(applyRemote).toHaveBeenCalledTimes(1);
+  it('asks for a full reload after a class reset', () => {
+    const { unregister, engine } = setup();
+    expect(engine.applyChanges([row({ action: 'RESET', entity: 'Class' })], 'me')).toBe(true);
     unregister();
-  });
-});
-
-describe('createSyncEngine.refetch pagination', () => {
-  it('pages through all rows', async () => {
-    const ranges: Array<[number, number]> = [];
-    const q: any = {
-      select: () => q, eq: () => q, order: () => q,
-      range: (a: number, b: number) => {
-        ranges.push([a, b]);
-        const n = a === 0 ? 1000 : 3;
-        return Promise.resolve({ data: Array.from({ length: n }, (_, i) => ({ data: { id: `r${a + i}` } })), error: null });
-      },
-    };
-    const out = await createSyncEngine({ from: () => q } as any, 'c1').refetch('cppt');
-    expect(out).toHaveLength(1003);
-    expect(ranges).toEqual([[0, 999], [1000, 1999]]);
   });
 });

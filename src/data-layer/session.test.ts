@@ -1,29 +1,47 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { signIn, usernameToEmail } from './session';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { normalizeUsername, signIn } from './session';
 
-describe('usernameToEmail', () => {
-  it('lowercases and trims, then appends the internal domain', () => {
-    expect(usernameToEmail('  DSN.Dr.Wati ')).toBe('dsn.dr.wati@users.simrs-ueu.invalid');
-    expect(usernameToEmail('20240306044')).toBe('20240306044@users.simrs-ueu.invalid');
+describe('normalizeUsername', () => {
+  it('lowercases and trims', () => {
+    expect(normalizeUsername('  DSN.Dr.Wati ')).toBe('dsn.dr.wati');
+    expect(normalizeUsername('20240306044')).toBe('20240306044');
   });
-  it('rejects characters that cannot form an email local part', () => {
-    expect(() => usernameToEmail('budi santoso')).toThrow(/Username hanya boleh/);
-    expect(() => usernameToEmail('')).toThrow(/Username hanya boleh/);
+  it('rejects characters a username cannot contain', () => {
+    expect(() => normalizeUsername('budi santoso')).toThrow(/Username hanya boleh/);
+    expect(() => normalizeUsername('')).toThrow(/Username hanya boleh/);
   });
 });
 
 describe('signIn', () => {
-  it('signs out and returns an error when post-login loading fails', async () => {
-    const signOut = vi.fn().mockResolvedValue({});
-    const client = {
-      auth: { signInWithPassword: vi.fn().mockResolvedValue({ data: { user: { id: 'u1' } }, error: null }), signOut },
-      from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({
-        data: { id: 'u1', username: 'a', full_name: 'A', account_type: 'mahasiswa', must_change_password: false, active: true }, error: null }) }) }) }),
-      rpc: vi.fn().mockResolvedValue({ data: null, error: { message: 'boom' } }),
-    } as unknown as SupabaseClient;
-    const res = await signIn(client, 'a', 'pw');
-    expect(res).toEqual({ error: 'Gagal memuat data akun. Coba lagi.' });
-    expect(signOut).toHaveBeenCalledTimes(1);
+  const store = new Map<string, string>();
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v); },
+      removeItem: (k: string) => { store.delete(k); },
+    });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); store.clear(); });
+
+  const respond = (status: number, body: unknown) =>
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status })));
+
+  it('stores the token and returns profile and classes', async () => {
+    respond(200, { token: 't1', profile: { id: 'u1' }, classes: [{ id: 'c1', name: 'A' }] });
+    const res = await signIn('A', 'pw');
+    expect(res).toEqual({ profile: { id: 'u1' }, classes: [{ id: 'c1', name: 'A' }] });
+    expect(store.get('simrs_api_token')).toBe('t1');
+  });
+
+  it('returns the server message for a refused login and keeps no token', async () => {
+    store.set('simrs_api_token', 'old');
+    respond(401, { error: 'Username/NIM atau password salah' });
+    expect(await signIn('a', 'bad')).toEqual({ error: 'Username/NIM atau password salah' });
+    expect(store.has('simrs_api_token')).toBe(false);
+  });
+
+  it('hides server errors behind a generic message', async () => {
+    respond(500, { error: 'Kesalahan server' });
+    expect(await signIn('a', 'pw')).toEqual({ error: 'Gagal memuat data akun. Coba lagi.' });
   });
 });

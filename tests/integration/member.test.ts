@@ -1,52 +1,52 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { addMember, admin, anon, cleanupUsers, insertClassDirect, makeUser, type TestUser } from './helpers';
+import { call, insertClassDirect, makeUser, owner, startApi, stopApi, type TestUser } from './helpers';
 
 let cls: string, m: TestUser, m2: TestUser, d: TestUser, d2: TestUser, a: TestUser;
 
 const setActive = (u: TestUser, user: string, active: boolean) =>
-  u.client.rpc('set_member_active', { p_class: cls, p_user: user, p_active: active });
+  u.call('PUT', `/classes/${cls}/members/${user}`, { active });
 
 beforeAll(async () => {
-  cls = await insertClassDirect(`TEST-member-${Date.now()}`);
+  await startApi();
+  cls = await insertClassDirect();
   [m, m2, d, d2, a] = await Promise.all([
-    makeUser('mahasiswa'), makeUser('mahasiswa'), makeUser('dosen'), makeUser('dosen'), makeUser('admin'),
+    makeUser('mahasiswa', { classId: cls }), makeUser('mahasiswa', { classId: cls }),
+    makeUser('dosen', { classId: cls }), makeUser('dosen', { classId: cls }), makeUser('admin'),
   ]);
-  await addMember(cls, m.id, 'mahasiswa');
-  await addMember(cls, m2.id, 'mahasiswa');
-  await addMember(cls, d.id, 'dosen');
-  await addMember(cls, d2.id, 'dosen');
 });
-afterAll(cleanupUsers);
+afterAll(stopApi);
 
-describe('set_member_active', () => {
+describe('member activation', () => {
   it('dosen deactivates a student: open session ends, new sessions refused, event audited', async () => {
-    expect((await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R09' })).error).toBeNull();
-    expect((await setActive(d, m.id, false)).error).toBeNull();
-    expect((await m.client.rpc('my_practice_session')).data).toEqual([]);
-    const again = await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R09' });
-    expect(again.error).not.toBeNull();
-    const { data: ev } = await admin().from('audit_log').select('action, entity, details')
-      .eq('class_id', cls).eq('entity', 'ClassMember').eq('entity_id', m.id);
-    expect(ev).toContainEqual({ action: 'UPDATE', entity: 'ClassMember', details: { active: false } });
-    expect((await setActive(d, m.id, true)).error).toBeNull();
-    expect((await m.client.rpc('start_practice_session', { p_class: cls, p_role: 'R09' })).error).toBeNull();
+    expect((await m.call('POST', '/practice-session', { classId: cls, roleId: 'R09' })).status).toBe(200);
+    expect((await setActive(d, m.id, false)).status).toBe(200);
+    expect((await m.call('GET', '/auth/me')).body.session).toBeNull();
+    expect((await m.call('POST', '/practice-session', { classId: cls, roleId: 'R09' })).status).toBe(403);
+    const { rows } = await owner().query(
+      "select action, details from public.audit_log where class_id = $1 and entity = 'ClassMember' and entity_id = $2", [cls, m.id]);
+    expect(rows).toContainEqual({ action: 'UPDATE', details: { active: false } });
+    expect((await setActive(d, m.id, true)).status).toBe(200);
+    expect((await m.call('POST', '/practice-session', { classId: cls, roleId: 'R09' })).status).toBe(200);
   });
 
   it('students cannot change membership status', async () => {
-    const res = await setActive(m2, m.id, false);
-    expect(res.error?.code).toBe('42501');
+    expect((await setActive(m2, m.id, false)).status).toBe(403);
   });
 
   it('dosen cannot deactivate a co-dosen or themselves; admin can deactivate a dosen', async () => {
-    expect((await setActive(d, d2.id, false)).error?.code).toBe('42501');
-    expect((await setActive(d, d.id, false)).error?.code).toBe('42501');
-    expect((await setActive(a, d2.id, false)).error).toBeNull();
-    const { data } = await admin().from('class_members').select('active').eq('class_id', cls).eq('user_id', d2.id).single();
-    expect(data!.active).toBe(false);
+    expect((await setActive(d, d2.id, false)).status).toBe(403);
+    expect((await setActive(d, d.id, false)).status).toBe(403);
+    expect((await setActive(a, d2.id, false)).status).toBe(200);
+    const { rows: [r] } = await owner().query('select active from public.class_members where class_id = $1 and user_id = $2', [cls, d2.id]);
+    expect(r.active).toBe(false);
   });
 
-  it('anonymous callers cannot execute it', async () => {
-    const res = await anon().rpc('set_member_active', { p_class: cls, p_user: m.id, p_active: false });
-    expect(res.error).not.toBeNull();
+  it('anonymous callers are refused', async () => {
+    expect((await call(null, 'PUT', `/classes/${cls}/members/${m.id}`, { active: false })).status).toBe(401);
+  });
+
+  it('members list shows names and status to the class', async () => {
+    const list = (await m2.call('GET', `/classes/${cls}/members`)).body;
+    expect(list.find((x: { id: string }) => x.id === d.id)).toMatchObject({ member_role: 'dosen', active: true });
   });
 });

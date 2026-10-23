@@ -17,6 +17,8 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // Server mode in development: `npm run server:dev` listens on 8080, the web app calls /api.
+      proxy: { '/api': `http://localhost:${process.env.API_PORT ?? 8080}` },
     },
   };
 });

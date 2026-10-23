@@ -30,7 +30,7 @@ export function createSliceSetter<T extends { id: string }>(
     ref.current = next;
     setState(next);
     const p = persistence;
-    if (mode !== 'supabase' || !p) return;
+    if (mode !== 'server' || !p) return;
     const diff = diffById(prev, next);
     if (diff.upserts.length === 0 && diff.deletes.length === 0) return;
     const run = (queues.get(name) ?? Promise.resolve())

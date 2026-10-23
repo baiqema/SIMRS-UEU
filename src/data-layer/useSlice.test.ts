@@ -6,7 +6,7 @@ vi.mock('./notify', () => ({ notifyInfo: vi.fn(), notifySaveError: vi.fn() }));
 
 const flush = () => new Promise(r => setTimeout(r, 0));
 
-function harness(initial: { id: string; v: number }[], mode: 'local' | 'supabase') {
+function harness(initial: { id: string; v: number }[], mode: 'local' | 'server') {
   const ref = { current: initial };
   const setState = vi.fn((next: typeof initial) => { ref.current = next; });
   const set = createSliceSetter('patients', mode, ref, setState);
@@ -21,10 +21,10 @@ describe('createSliceSetter', () => {
     expect(h.ref.current.map(r => r.id)).toEqual(['a', 'b']);
   });
 
-  it('pushes only the diff in supabase mode', async () => {
+  it('pushes only the diff in server mode', async () => {
     const push = vi.fn().mockResolvedValue(undefined);
     setSlicePersistence({ push, refetch: vi.fn(), onSaveError: vi.fn() });
-    const h = harness([{ id: 'a', v: 1 }], 'supabase');
+    const h = harness([{ id: 'a', v: 1 }], 'server');
     h.set(prev => prev.map(r => ({ ...r, v: 2 })));
     await flush();
     expect(push).toHaveBeenCalledWith('patients', { upserts: [{ id: 'a', v: 2 }], deletes: [] });
@@ -35,7 +35,7 @@ describe('createSliceSetter', () => {
     const onSaveError = vi.fn();
     const server = [{ id: 'a', v: 1 }];
     setSlicePersistence({ push: vi.fn().mockRejectedValue(new Error('rls')), refetch: vi.fn().mockResolvedValue(server), onSaveError });
-    const h = harness([{ id: 'a', v: 1 }], 'supabase');
+    const h = harness([{ id: 'a', v: 1 }], 'server');
     h.set([{ id: 'a', v: 9 }]);
     await flush(); await flush();
     expect(onSaveError).toHaveBeenCalledOnce();
@@ -61,7 +61,7 @@ describe('createSliceSetter', () => {
       refetch: vi.fn().mockRejectedValue(new Error('offline')),
       onSaveError,
     });
-    const h = harness([{ id: 'a', v: 1 }], 'supabase');
+    const h = harness([{ id: 'a', v: 1 }], 'server');
     h.set([{ id: 'a', v: 9 }]);
     await flush(); await flush(); await flush();
     expect(onSaveError).toHaveBeenCalledOnce();
@@ -82,7 +82,7 @@ describe('createSliceSetter', () => {
       return Promise.resolve();
     });
     setSlicePersistence({ push: push as any, refetch: vi.fn(), onSaveError: vi.fn() });
-    const h = harness([{ id: 'a', v: 1 }], 'supabase');
+    const h = harness([{ id: 'a', v: 1 }], 'server');
     h.set([{ id: 'a', v: 2 }]);
     h.set([{ id: 'a', v: 3 }]);
     await flush();

@@ -90,7 +90,7 @@ begin
     raise exception 'Hanya dosen atau admin yang dapat membuat kelas' using errcode = '42501';
   end if;
   if v_template is null then
-    raise exception 'Templat kelas belum di-seed (jalankan supabase/seed.sql)' using errcode = '55000';
+    raise exception 'Templat kelas belum di-seed (jalankan db/seed.sql)' using errcode = '55000';
   end if;
   insert into public.classes (name, created_by) values (trim(p_name), auth.uid()) returning id into v_id;
   if v_type = 'dosen' then
@@ -123,4 +123,4 @@ end $$;
 
 revoke execute on function public.start_practice_session(uuid, text), public.end_practice_session(),
   public.my_practice_session(), public.my_classes(), public.clear_must_change_password(),
-  public.create_class(text), public.reset_class(uuid) from anon;
+  public.create_class(text), public.reset_class(uuid) from public;

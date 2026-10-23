@@ -5,6 +5,9 @@ import {
   INITIAL_MEDICAL_RECORDS, INITIAL_CPPT, INITIAL_INFORMED_CONSENTS, INITIAL_CODING, INITIAL_CLAIMS,
   INITIAL_BILLING, INITIAL_BEDS, INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS,
 } from '../src/data/mockData';
+import {
+  INITIAL_MASTER_RUANGAN, INITIAL_MASTER_BEDS, INITIAL_MASTER_DOKTER, INITIAL_MASTER_POLI, INITIAL_DOCTOR_POLI_MAPPINGS,
+} from '../src/data/masterDataInit';
 import { sanitizeMedicalRecords, sanitizePatientList } from '../src/data/seedNormalizers';
 
 export const TEMPLATE_CLASS_ID = '00000000-0000-0000-0000-000000000001';
@@ -34,7 +37,7 @@ function insertRows(table: string, rows: { id: string }[]): string {
 }
 
 export function buildSeedSql(): string {
-  const staff = INITIAL_USERS.map(({ password: _pw, ...u }) => u);
+  const staff = INITIAL_USERS.map(({ password: _pw, tempPassword: _tmp, ...u }) => u);
   const tables: [string, { id: string }[]][] = [
     ['staff_directory', staff],
     ['patients', sanitizePatientList(INITIAL_PATIENTS)],
@@ -50,6 +53,11 @@ export function buildSeedSql(): string {
     ['dokumen_berkas', INITIAL_DOKUMEN_BERKAS],
     ['resume_medis', INITIAL_RESUME_MEDIS],
     ['asuhan_keperawatan', []],
+    ['master_ruangan', INITIAL_MASTER_RUANGAN],
+    ['master_bed', INITIAL_MASTER_BEDS],
+    ['master_dokter', INITIAL_MASTER_DOKTER],
+    ['master_poli', INITIAL_MASTER_POLI],
+    ['doctor_poli_mappings', INITIAL_DOCTOR_POLI_MAPPINGS],
   ];
 
   const roleValues = rolesForSeed()
@@ -70,6 +78,6 @@ export function buildSeedSql(): string {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  writeFileSync('supabase/seed.sql', buildSeedSql());
-  console.log('wrote supabase/seed.sql');
+  writeFileSync('db/seed.sql', buildSeedSql());
+  console.log('wrote db/seed.sql');
 }

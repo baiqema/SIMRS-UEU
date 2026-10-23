@@ -74,16 +74,15 @@ create or replace function public.log_event(p_action text, p_entity text, p_enti
 returns void language plpgsql security definer set search_path = public as $$
 declare v_class uuid;
 begin
-  if auth.uid() is null then raise exception 'not authenticated' using errcode = '42501'; end if;
+  if auth.uid() is null then raise exception 'not simrs_user' using errcode = '42501'; end if;
   if p_action <> 'NAVIGATE' then raise exception 'event % not allowed from client', p_action using errcode = '42501'; end if;
   select class_id into v_class from public.practice_sessions where user_id = auth.uid() and ended_at is null;
   perform private.write_event(v_class, p_action, p_entity, p_entity_id, p_details);
 end $$;
 
 alter table public.audit_log enable row level security;
-revoke insert, update, delete, truncate on public.audit_log from anon, authenticated;
-create policy audit_select on public.audit_log for select to authenticated using (
+revoke insert, update, delete, truncate on public.audit_log from public, simrs_user;
+create policy audit_select on public.audit_log for select to simrs_user using (
   coalesce(public.account_type() = 'admin', false) or (class_id is not null and public.can_read_class(class_id))
 );
-alter publication supabase_realtime add table public.audit_log;
-revoke execute on function public.log_event(text, text, text, jsonb) from anon;
+revoke execute on function public.log_event(text, text, text, jsonb) from public;

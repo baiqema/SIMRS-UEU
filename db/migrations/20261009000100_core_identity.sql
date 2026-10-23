@@ -1,6 +1,6 @@
 create extension if not exists pgcrypto;
 create schema if not exists private;
-revoke all on schema private from public, anon, authenticated;
+revoke all on schema private from public, simrs_user;
 
 create table public.classes (
   id uuid primary key default gen_random_uuid(),
@@ -114,26 +114,26 @@ alter table public.practice_roles enable row level security;
 alter table public.table_modules enable row level security;
 alter table public.practice_sessions enable row level security;
 
-create policy classes_select on public.classes for select to authenticated using (public.can_read_class(id));
+create policy classes_select on public.classes for select to simrs_user using (public.can_read_class(id));
 
-create policy profiles_select on public.profiles for select to authenticated using (
+create policy profiles_select on public.profiles for select to simrs_user using (
   id = auth.uid()
   or coalesce(public.account_type() = 'admin', false)
   or exists (select 1 from public.class_members m where m.user_id = profiles.id and public.is_class_member(m.class_id))
 );
 
-create policy class_members_select on public.class_members for select to authenticated
+create policy class_members_select on public.class_members for select to simrs_user
   using (public.can_read_class(class_id));
 
-create policy practice_roles_select on public.practice_roles for select to authenticated using (true);
-create policy practice_roles_update on public.practice_roles for update to authenticated
+create policy practice_roles_select on public.practice_roles for select to simrs_user using (true);
+create policy practice_roles_update on public.practice_roles for update to simrs_user
   using (coalesce(public.account_type() = 'admin', false))
   with check (coalesce(public.account_type() = 'admin', false));
 
-create policy table_modules_select on public.table_modules for select to authenticated using (true);
+create policy table_modules_select on public.table_modules for select to simrs_user using (true);
 
-create policy practice_sessions_select on public.practice_sessions for select to authenticated using (
+create policy practice_sessions_select on public.practice_sessions for select to simrs_user using (
   user_id = auth.uid() or coalesce(public.account_type() = 'admin', false) or public.is_class_dosen(class_id)
 );
 
-revoke all on all tables in schema public from anon;
+revoke all on all tables in schema public from public;

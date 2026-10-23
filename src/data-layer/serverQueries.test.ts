@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { loadMembers, mapAuditRow, mergeStaffAndMembers } from './supabaseQueries';
+import { mapAuditRow, mapMembers, mergeStaffAndMembers } from './serverQueries';
 import type { User } from '../types';
 
 describe('mapAuditRow', () => {
@@ -36,14 +35,15 @@ describe('mergeStaffAndMembers', () => {
   });
 });
 
-describe('loadMembers', () => {
-  it('skips memberships whose profile is hidden', async () => {
-    const rows = [
-      { member_role: 'mahasiswa', active: true, profiles: null },
-      { member_role: 'dosen', active: true, profiles: { id: 'p1', username: 'd', full_name: 'Dosen' } },
-    ];
-    const client = { from: () => ({ select: () => ({ eq: () => Promise.resolve({ data: rows, error: null }) }) }) } as unknown as SupabaseClient;
-    const out = await loadMembers(client, 'c');
-    expect(out).toEqual([{ id: 'p1', username: 'd', name: 'Dosen', roleId: 'R03', active: true }]);
+describe('mapMembers', () => {
+  it('maps memberships to app users, dosen as R03', () => {
+    const out = mapMembers([
+      { id: 'p1', username: 'd', full_name: 'Dosen', member_role: 'dosen', active: true },
+      { id: 'p2', username: 'm', full_name: 'Mhs', member_role: 'mahasiswa', active: false },
+    ]);
+    expect(out).toEqual([
+      { id: 'p1', username: 'd', name: 'Dosen', roleId: 'R03', active: true },
+      { id: 'p2', username: 'm', name: 'Mhs', roleId: 'R04', active: false },
+    ]);
   });
 });
