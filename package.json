@@ -1,5 +1,5 @@
 {
-  "name": "react-example",
+  "name": "simrs-ueu",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,19 +7,26 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "clean": "rm -rf dist server/dist",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "seed:build": "tsx scripts/build-seed.ts",
+    "server:dev": "tsx watch server/src/index.ts",
+    "server:build": "esbuild server/src/index.ts server/src/cli.ts --bundle --platform=node --format=esm --target=node20 --external:pg-native --outdir=server/dist --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "start": "node server/dist/index.js",
+    "db:migrate": "tsx server/src/cli.ts migrate",
+    "db:bootstrap": "tsx server/src/cli.ts bootstrap"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
-    "@supabase/supabase-js": "^2.118.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "chart.js": "^4.5.1",
-    "dotenv": "^17.2.3",
-    "express": "^4.21.2",
+    "express": "^4.22.3",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "pg": "^8.23.1",
     "react": "^19.0.1",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.0.1",
@@ -27,13 +34,16 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@types/express": "^4.17.25",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.14.0",
+    "@types/pg": "^8.23.1",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.15",
     "typescript": "~5.8.2",
     "vite": "^6.2.3",
-    "@types/express": "^4.17.21"
+    "vitest": "^3.2.7"
   }
 }

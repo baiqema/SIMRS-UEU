@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    env:
+      PGPASSWORD: postgres
+      # A non-superuser owner, as on the campus server.
+      TEST_DATABASE_URL: postgres://simrs_owner:ownerpw@localhost:5432/simrs_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: Prepare test database
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+          create role simrs_owner login password 'ownerpw';
+          create database simrs_test owner simrs_owner;
+          create role simrs_user nologin;
+          grant simrs_user to simrs_owner;
+          SQL
+          psql -h localhost -U postgres -d simrs_test -c 'create extension if not exists pgcrypto'
+      - run: npm run test:integration
+      - run: VITE_API_URL=/api npm run build && npm run server:build

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Modal } from '../components/Modal';
+import { KelasRosterPanel } from '../components/kelas/KelasRosterPanel';
 import Swal from 'sweetalert2';
 import {
   Users, Plus, ShieldCheck, UserCheck, Key, ShieldAlert,
@@ -62,7 +63,6 @@ export const ALL_SYSTEM_MODULES = [
   {
     group: 'ADMINISTRASI & PEMBELAJARAN',
     modules: [
-      { id: 'praktikum', name: 'Modul Praktikum RMIK', desc: 'Skenario pembelajaran, evaluasi & logbook mahasiswa' },
       { id: 'audit', name: 'Audit Trail (Superadmin)', desc: 'Pelacakan integritas per field data, IP address & user log' },
       { id: 'logaktivitas', name: 'Log Aktivitas Sistem', desc: 'Catatan log sesi login, logout dan transaksi aplikasi' },
       { id: 'manajemenuser', name: 'Manajemen Pengguna & Hak Akses', desc: 'Kelola akun user, reset password, dan konfigurasi RBAC' }
@@ -75,8 +75,12 @@ export const ManajemenUserView: React.FC = () => {
     users, roles, user: currentUser, addUser, updateUser, deleteUser,
     updateRolePermissions, getRole, canEditPage,
     classes, activeClassId, setActiveClassId, addClass,
-    importRoster, toggleUserActive, batchSetUsersActive, resetClassSimulation, createDosenUser
+    importRoster, toggleUserActive, batchSetUsersActive, resetClassSimulation, createDosenUser,
+    backendMode, accountType
   } = useApp();
+  // In database mode, classes and rosters live on the server: the roster tab shows KelasRosterPanel instead.
+  const isDbMode = backendMode === 'server';
+  const showRosterTab = !isDbMode || accountType === 'dosen' || accountType === 'admin';
 
   const isEditable = canEditPage('user');
   const isSuperAdmin = currentUser?.roleId === 'R01';
@@ -84,7 +88,7 @@ export const ManajemenUserView: React.FC = () => {
   const canManageRoster = isSuperAdmin || isDosen;
 
   // Active View Tab: 'users' (Daftar Pengguna) | 'rbac' (Matriks Hak Akses) | 'roster' (Kelas & Roster Mahasiswa)
-  const [activeTab, setActiveTab] = useState<'users' | 'rbac' | 'roster'>('roster');
+  const [activeTab, setActiveTab] = useState<'users' | 'rbac' | 'roster'>(showRosterTab ? 'roster' : 'users');
 
   // Search & Filter Users (Tab 1)
   const [searchTerm, setSearchTerm] = useState('');
@@ -724,6 +728,7 @@ export const ManajemenUserView: React.FC = () => {
 
         {/* Tab Switcher */}
         <div className="flex items-center gap-1.5 bg-slate-200/80 p-1.5 rounded-2xl shrink-0 overflow-x-auto">
+          {showRosterTab && (
           <button
             onClick={() => setActiveTab('roster')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
@@ -733,8 +738,9 @@ export const ManajemenUserView: React.FC = () => {
             }`}
           >
             <GraduationCap className="w-4 h-4 text-emerald-300" />
-            <span>Kelas & Roster ({classStudents.length})</span>
+            <span>{isDbMode ? 'Kelas & Roster' : `Kelas & Roster (${classStudents.length})`}</span>
           </button>
+          )}
           <button
             onClick={() => setActiveTab('users')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
@@ -784,6 +790,8 @@ export const ManajemenUserView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeTab === 'roster' && isDbMode && showRosterTab && <KelasRosterPanel />}
 
       {/* TAB 1: DAFTAR PENGGUNA (USERS TABLE) */}
       {activeTab === 'users' && (
@@ -1064,8 +1072,8 @@ export const ManajemenUserView: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 3: KELAS & ROSTER MAHASISWA */}
-      {activeTab === 'roster' && (
+      {/* TAB 3: KELAS & ROSTER MAHASISWA (local mode) */}
+      {activeTab === 'roster' && !isDbMode && (
         <div className="space-y-4">
           {/* Class Selector & Header Info Banner */}
           <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-3xl p-5 text-white shadow-sm border border-blue-800/40 space-y-4">
@@ -1121,7 +1129,7 @@ export const ManajemenUserView: React.FC = () => {
                 <button
                   onClick={() => setIsSqlSchemaModalOpen(true)}
                   className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all border border-white/20"
-                  title="Lihat Skema Database PostgreSQL & Aturan RLS Supabase"
+                  title="Lihat Skema Database PostgreSQL & Aturan RLS"
                 >
                   <Database className="w-3.5 h-3.5 text-emerald-300" />
                   <span>Skema SQL & RLS</span>
@@ -1963,12 +1971,12 @@ export const ManajemenUserView: React.FC = () => {
         </Modal>
       )}
 
-      {/* MODAL 4: SKEMA POSTGRESQL & ATURAN RLS SUPABASE */}
+      {/* MODAL 4: SKEMA POSTGRESQL & ATURAN RLS */}
       {isSqlSchemaModalOpen && (
         <Modal
           isOpen={isSqlSchemaModalOpen}
           onClose={() => setIsSqlSchemaModalOpen(false)}
-          title="Skema Database PostgreSQL & Aturan Row Level Security (RLS) Supabase"
+          title="Skema Database PostgreSQL & Aturan Row Level Security (RLS)"
         >
           <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-950 space-y-1">
@@ -1978,28 +1986,29 @@ export const ManajemenUserView: React.FC = () => {
               </div>
               <ul className="list-disc ml-5 space-y-0.5 text-slate-600">
                 <li><strong>Tenant Isolation:</strong> Setiap tabel transaksi klinis (pasien, registrasi, CPPT, coding, billing) memiliki kolom <code>class_id</code> terisolasi per kelas.</li>
-                <li><strong>Append-Only Audit Trail:</strong> Trigger <code>prevent_audit_tampering()</code> menolak semua perintah <code>UPDATE</code> dan <code>DELETE</code> pada <code>audit_trail</code> demi integritas forensik ISO 27001 & KMK 1423.</li>
+                <li><strong>Append-Only Audit Trail:</strong> Trigger <code>audit_log_immutable()</code> menolak semua perintah <code>UPDATE</code> dan <code>DELETE</code> pada <code>audit_log</code> demi integritas forensik ISO 27001 & KMK 1423.</li>
                 <li><strong>Role Rules:</strong> Peran <code>R04 Mahasiswa (Umum)</code> memiliki hak akses penuh <em>all modules</em>, sementara peran praktikum spesifik (R05 Dokter, R07 Pendaftaran, R09 Coding) dibatasi RLS.</li>
                 <li><strong>Proteksi Akun:</strong> Mahasiswa dilarang mengubah role menjadi Admin (R01) atau Dosen (R03).</li>
-                <li><strong>Reset Kelas:</strong> Stored procedure <code>reset_class_simulation(class_id)</code> mereset data klinis kelas tanpa menghapus mahasiswa atau log audit.</li>
+                <li><strong>Reset Kelas:</strong> Fungsi <code>reset_class(class_id)</code> mereset data klinis kelas tanpa menghapus mahasiswa atau log audit.</li>
               </ul>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-bold text-slate-700">File: <code>supabase_multitenant_schema.sql</code></span>
+                <span className="text-xs font-bold text-slate-700">Folder: <code>db/migrations/</code></span>
                 <button
                   onClick={() => {
                     const sqlSnippet = `-- SIMRS RMIK MULTI-TENANT SCHEMA & RLS
--- Silakan periksa file lengkap di root repositori: /supabase_multitenant_schema.sql
--- Termasuk tabel: classes, roles, users, audit_trail, patients, registrations, cppt, coding, billing, claims
--- Trigger: prevent_audit_tampering() (IMMUTABLE AUDIT TRAIL)
--- Function: reset_class_simulation(p_class_id, p_reset_by_user)`;
+-- Skema lengkap: folder db/migrations/ pada repositori (dijalankan berurutan)
+-- Tabel inti: classes, profiles, class_members, practice_roles, practice_sessions, audit_log
+-- Tabel klinis & master data per kelas: patients, registrations, cppt, coding, billing, claims, master_poli, master_dokter, ...
+-- Trigger: audit_log_immutable() (IMMUTABLE AUDIT TRAIL)
+-- Function: reset_class(p_class)`;
                     navigator.clipboard.writeText(sqlSnippet);
                     Swal.fire({
                       icon: 'success',
                       title: 'Petunjuk Skema Disalin',
-                      text: 'File skema lengkap tersedia di /supabase_multitenant_schema.sql pada workspace root.',
+                      text: 'Skema lengkap tersedia di folder db/migrations/ pada repositori.',
                       timer: 1600,
                       showConfirmButton: false
                     });
@@ -2012,35 +2021,22 @@ export const ManajemenUserView: React.FC = () => {
               </div>
 
               <div className="bg-slate-900 text-slate-200 p-3.5 rounded-xl text-[11px] font-mono leading-relaxed overflow-x-auto max-h-60 border border-slate-800">
-                <pre>{`-- 1. APPEND-ONLY IMMUTABLE AUDIT TRAIL TRIGGER
-CREATE OR REPLACE FUNCTION prevent_audit_tampering()
-RETURNS TRIGGER AS $$
-BEGIN
-    RAISE EXCEPTION 'AUDIT_TRAIL_IMMUTABLE: Audit trail entries cannot be updated or deleted!';
-END;
-$$ LANGUAGE plpgsql;
+                <pre>{`-- 1. APPEND-ONLY IMMUTABLE AUDIT LOG (db/migrations/..._audit.sql)
+create function private.audit_log_immutable() returns trigger as $$
+begin
+  raise exception 'audit_log is append-only' using errcode = '42501';
+end $$ language plpgsql;
 
-CREATE TRIGGER trg_audit_trail_immutable
-BEFORE UPDATE OR DELETE ON audit_trail
-FOR EACH ROW EXECUTE FUNCTION prevent_audit_tampering();
+-- 2. RLS: write allowed for the active practice role's modules ('all' for R04)
+create policy patients_insert on public.patients for insert to authenticated
+  with check (public.can_write(class_id, 'patients'));
 
--- 2. RLS POLICY FOR R04 MAHASISWA (ALL MODULES)
-CREATE POLICY "RLS: R04 All Modules Full Write Access" ON patients
-FOR ALL TO authenticated
-USING (
-    class_id = current_user_class() AND
-    current_user_role() IN ('R01', 'R03', 'R04')
-);
-
--- 3. RESET SIMULATION DATA BACK TO BENCHMARK WITHOUT DELETING USERS
-CREATE OR REPLACE FUNCTION reset_class_simulation(p_class_id TEXT, p_reset_by_user TEXT)
-RETURNS JSONB AS $$
-BEGIN
-    -- Resets clinical data for tenant p_class_id
-    -- Preserves users and audit_trail
-    ...
-END;
-$$ LANGUAGE plpgsql;`}</pre>
+-- 3. RESET CLASS DATA BACK TO THE TEMPLATE WITHOUT DELETING MEMBERS OR AUDIT LOG
+create function public.reset_class(p_class uuid) returns void as $$
+begin
+  -- dosen of the class or admin only; deletes class rows, copies the template again
+  ...
+end $$ language plpgsql security definer;`}</pre>
               </div>
             </div>
 
