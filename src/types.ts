@@ -14,6 +14,18 @@ export type RoleId =
   | 'R13' // Petugas Pelaporan
   | 'R14'; // Mahasiswa Keperawatan
 
+export interface SimClass {
+  id: string; // e.g. 'RMIK-2024-A'
+  name: string; // 'RMIK 2024 - Kelas A (Reguler Pagi)'
+  dosenId?: string;
+  dosenName?: string;
+  semester?: string;
+  academicYear?: string;
+  createdAt: string;
+  active: boolean;
+  description?: string;
+}
+
 export interface User {
   id: string;
   username: string;
@@ -21,6 +33,10 @@ export interface User {
   name: string;
   roleId: RoleId;
   active: boolean;
+  classId?: string;
+  nim?: string;
+  tempPassword?: string;
+  isFirstLogin?: boolean;
 }
 
 export interface Role {
@@ -318,6 +334,7 @@ export interface AuditEntry {
   ip: string;
   device: string;
   module?: string;
+  classId?: string;
 }
 
 export interface Bed {

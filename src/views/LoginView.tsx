@@ -4,9 +4,10 @@ import { RoleId } from '../types';
 import { Building2, Eye, EyeOff, LogIn, ShieldAlert, FileText, Activity, GraduationCap, HelpCircle, CheckCircle2, UserCheck, Lock } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
-  const { login } = useApp();
+  const { login, classes, activeClassId } = useApp();
   const [username, setUsername] = useState('20240306044');
   const [selectedRole, setSelectedRole] = useState<RoleId>('R09'); // Default: Mahasiswa Coding
+  const [selectedClassId, setSelectedClassId] = useState<string>(activeClassId || 'RMIK-2024-A');
   const [password, setPassword] = useState('mhs123');
   const [rememberMe, setRememberMe] = useState(true);
   const [showPass, setShowPass] = useState(false);
@@ -19,7 +20,7 @@ export const LoginView: React.FC = () => {
       setErrorMsg('Username/NIM dan password wajib diisi');
       return;
     }
-    const res = login(username.trim(), password.trim(), selectedRole);
+    const res = login(username.trim(), password.trim(), selectedRole, selectedClassId);
     if (!res.success) {
       setErrorMsg(res.error || 'Login gagal. Periksa kembali Username/NIM & password');
     }
@@ -30,7 +31,7 @@ export const LoginView: React.FC = () => {
     setPassword(p);
     setSelectedRole(r);
     setErrorMsg('');
-    login(u, p, r);
+    login(u, p, r, selectedClassId);
   };
 
   const roleOptions: { id: RoleId; label: string; desc: string }[] = [
@@ -155,6 +156,25 @@ export const LoginView: React.FC = () => {
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-600 focus:bg-white font-semibold text-slate-800 transition-all"
                   required
                 />
+              </div>
+
+              {/* Field: Kelas Simulasi RS (Multi-Tenant) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Kelas Simulasi RS <span className="text-rose-500">*</span></span>
+                  <span className="text-[10px] text-blue-600 font-semibold">1 Kelas = 1 SIMRS Terisolasi</span>
+                </label>
+                <select
+                  value={selectedClassId}
+                  onChange={e => setSelectedClassId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-600 focus:bg-white transition-all cursor-pointer"
+                >
+                  {classes.map(c => (
+                    <option key={c.id} value={c.id}>
+                      🏫 {c.name} {c.dosenName ? `(Dosen: ${c.dosenName})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Field 2: Pilihan Role (Dropdown) */}

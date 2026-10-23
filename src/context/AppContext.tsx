@@ -4,7 +4,7 @@ import {
   CPPT, InformedConsent, Coding, Claim, Billing, PharmacyRecord, LabRecord,
   RadiologyRecord, Bed, AuditEntry, PraktikumModule, DokumenBerkas, AsuhanKeperawatan,
   ExamScenario, ExamSubmission, ResumeMedis, ResumeMedisStatus,
-  MasterRuangan, MasterBed, MasterDokter, MasterPoli, DoctorPoliMapping
+  MasterRuangan, MasterBed, MasterDokter, MasterPoli, DoctorPoliMapping, SimClass
 } from '../types';
 import {
   INITIAL_USERS, INITIAL_ROLES, INITIAL_PATIENTS, INITIAL_REGISTRATIONS,
@@ -12,7 +12,7 @@ import {
   INITIAL_INFORMED_CONSENTS, INITIAL_CODING, INITIAL_CLAIMS, INITIAL_BILLING,
   INITIAL_PHARMACY, INITIAL_LAB, INITIAL_RADIOLOGY, INITIAL_BEDS,
   INITIAL_PRAKTIKUM, INITIAL_AUDIT_TRAIL, INITIAL_ICD10, INITIAL_ICD9CM,
-  INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS
+  INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS, INITIAL_CLASSES
 } from '../data/mockData';
 import {
   INITIAL_MASTER_RUANGAN, INITIAL_MASTER_POLI, INITIAL_MASTER_DOKTER,
@@ -53,10 +53,11 @@ interface AppContextType {
   sidebarCollapsed: boolean;
   
   toggleSidebar: () => void;
-  login: (u: string, p: string, selectedRoleId?: RoleId) => { success: boolean; error?: string };
+  login: (u: string, p: string, selectedRoleId?: RoleId, selectedClassId?: string) => { success: boolean; error?: string };
   logout: () => void;
   navigate: (page: string, params?: any) => void;
   audit: (action: AuditEntry['action'], entity: string, entityId: string, details?: { field_name?: string; old_value?: any; new_value?: any }) => void;
+  logAudit: (entry: { action: AuditEntry['action']; entity: string; entityId: string; field_name?: string; old_value?: any; new_value?: any }) => void;
   
   generateNoRM: () => string;
   addPatient: (patient: Omit<Patient, 'id'>) => Patient;
@@ -173,6 +174,17 @@ interface AppContextType {
   toggleDoctorPoliMappingStatus: (id: string) => void;
 
   getDoctorsForPoli: (poliIdOrName: string) => MasterDokter[];
+
+  // Multi-Tenant Classes & Roster (SIMRS Edukasi)
+  classes: SimClass[];
+  activeClassId: string;
+  setActiveClassId: (id: string) => void;
+  addClass: (cls: Omit<SimClass, 'createdAt'>) => { success: boolean; message?: string };
+  importRoster: (classId: string, students: Array<{ nim: string; name: string; roleId?: RoleId; tempPassword?: string }>) => { success: boolean; count: number; duplicates?: number };
+  toggleUserActive: (userId: string) => void;
+  batchSetUsersActive: (userIds: string[], active: boolean) => void;
+  resetClassSimulation: (classId: string) => void;
+  createDosenUser: (dosenData: { name: string; username: string; password?: string; classId?: string; nidn?: string }) => { success: boolean; message?: string };
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -199,6 +211,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return INITIAL_USERS;
   });
+
+  const [classes, setClasses] = useState<SimClass[]>(() => {
+    const saved = localStorage.getItem('simrs_classes');
+    if (saved) {
+      try {
+        const parsed: SimClass[] = JSON.parse(saved);
+        if (parsed && parsed.length > 0) return parsed;
+      } catch (e) {
+        return INITIAL_CLASSES;
+      }
+    }
+    return INITIAL_CLASSES;
+  });
+
+  const [activeClassId, setActiveClassIdState] = useState<string>(() => {
+    return localStorage.getItem('simrs_active_class_id') || 'RMIK-2024-A';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('simrs_classes', JSON.stringify(classes));
+  }, [classes]);
+
+  useEffect(() => {
+    localStorage.setItem('simrs_users', JSON.stringify(users));
+  }, [users]);
 
   const [roles, setRoles] = useState<Role[]>(() => {
     const saved = localStorage.getItem('simrs_roles');
@@ -298,9 +335,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_BILLING;
   });
 
-  const [pharmacy] = useState<PharmacyRecord[]>(INITIAL_PHARMACY);
-  const [lab] = useState<LabRecord[]>(INITIAL_LAB);
-  const [radiology] = useState<RadiologyRecord[]>(INITIAL_RADIOLOGY);
+  const [pharmacy, setPharmacy] = useState<PharmacyRecord[]>(INITIAL_PHARMACY);
+  const [lab, setLab] = useState<LabRecord[]>(INITIAL_LAB);
+  const [radiology, setRadiology] = useState<RadiologyRecord[]>(INITIAL_RADIOLOGY);
   const [beds, setBeds] = useState<Bed[]>(() => {
     const saved = localStorage.getItem('simrs_beds');
     return saved ? JSON.parse(saved) : INITIAL_BEDS;
@@ -462,39 +499,212 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       entity,
       entityId,
       field_name: details?.field_name || null,
-      old_value: details?.old_value ? String(details.old_value) : null,
-      new_value: details?.new_value ? String(details.new_value) : null,
+      old_value: details?.old_value !== undefined ? String(details.old_value) : null,
+      new_value: details?.new_value !== undefined ? String(details.new_value) : null,
       ip: '192.168.1.' + Math.floor(Math.random() * 255),
       device: navigator.userAgent.substring(0, 80),
-      module: activePage
+      module: activePage,
+      classId: activeClassId
     };
-    setAuditTrail(prev => [newEntry, ...prev.slice(0, 499)]);
+    // Strictly append-only: prepends to immutable audit trail
+    setAuditTrail(prev => {
+      const updated = [newEntry, ...prev.slice(0, 999)];
+      localStorage.setItem('simrs_audit_trail', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const logAudit = (entry: { action: AuditEntry['action']; entity: string; entityId: string; field_name?: string; old_value?: any; new_value?: any }) => {
+    audit(entry.action, entry.entity, entry.entityId, { field_name: entry.field_name, old_value: entry.old_value, new_value: entry.new_value });
+  };
+
+  const setActiveClassId = (id: string) => {
+    setActiveClassIdState(id);
+    localStorage.setItem('simrs_active_class_id', id);
+    audit('NAVIGATE', 'SimClass', id, { field_name: 'activeClassId', new_value: id });
+  };
+
+  const addClass = (cls: Omit<SimClass, 'createdAt'>) => {
+    const cleanId = cls.id.trim().toUpperCase();
+    if (classes.some(c => c.id.toUpperCase() === cleanId)) {
+      return { success: false, message: `Kode Kelas "${cleanId}" sudah digunakan.` };
+    }
+    const newCls: SimClass = {
+      ...cls,
+      id: cleanId,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    setClasses(prev => [...prev, newCls]);
+    audit('CREATE', 'SimClass', newCls.id, { field_name: 'name', new_value: newCls.name });
+    return { success: true };
+  };
+
+  const importRoster = (classId: string, students: Array<{ nim: string; name: string; roleId?: RoleId; tempPassword?: string }>) => {
+    let count = 0;
+    let duplicates = 0;
+    setUsers(prev => {
+      const existingUsernames = new Set(prev.map(u => u.username.toLowerCase()));
+      const newUsers: User[] = [];
+
+      students.forEach(st => {
+        const cleanNim = st.nim.trim();
+        const cleanName = st.name.trim();
+        if (!cleanNim || !cleanName) return;
+
+        if (existingUsernames.has(cleanNim.toLowerCase())) {
+          duplicates++;
+          return;
+        }
+
+        const tempPass = st.tempPassword || ('ueu' + cleanNim.slice(-4));
+        const newUser: User = {
+          id: 'U_' + cleanNim,
+          username: cleanNim,
+          password: tempPass,
+          tempPassword: tempPass,
+          name: cleanName,
+          roleId: st.roleId || 'R04', // default R04 Mahasiswa (All Modul)
+          classId: classId,
+          nim: cleanNim,
+          active: true,
+          isFirstLogin: true
+        };
+        newUsers.push(newUser);
+        existingUsernames.add(cleanNim.toLowerCase());
+        count++;
+      });
+
+      return [...prev, ...newUsers];
+    });
+
+    audit('CREATE', 'RosterImport', classId, {
+      field_name: 'roster_import',
+      new_value: `${count} mahasiswa diimpor ke kelas ${classId}`
+    });
+
+    return { success: true, count, duplicates };
+  };
+
+  const toggleUserActive = (userId: string) => {
+    setUsers(prev => prev.map(u => {
+      if (u.id === userId) {
+        const newActive = !u.active;
+        audit('UPDATE', 'User', userId, {
+          field_name: 'active',
+          old_value: String(u.active),
+          new_value: String(newActive)
+        });
+        return { ...u, active: newActive };
+      }
+      return u;
+    }));
+  };
+
+  const batchSetUsersActive = (userIds: string[], active: boolean) => {
+    const idSet = new Set(userIds);
+    setUsers(prev => prev.map(u => {
+      if (idSet.has(u.id)) {
+        return { ...u, active };
+      }
+      return u;
+    }));
+    audit('UPDATE', 'UserBatch', activeClassId, {
+      field_name: 'batch_active',
+      new_value: `${userIds.length} mahasiswa diset active=${active}`
+    });
+  };
+
+  const resetClassSimulation = (classId: string) => {
+    setPatients(INITIAL_PATIENTS);
+    setRegistrations(INITIAL_REGISTRATIONS);
+    setGeneralConsents(INITIAL_GENERAL_CONSENTS);
+    setMedicalRecords(INITIAL_MEDICAL_RECORDS);
+    setCppt(INITIAL_CPPT);
+    setInformedConsents(INITIAL_INFORMED_CONSENTS);
+    setCoding(INITIAL_CODING);
+    setClaims(INITIAL_CLAIMS);
+    setBilling(INITIAL_BILLING);
+    setPharmacy(INITIAL_PHARMACY);
+    setLab(INITIAL_LAB);
+    setRadiology(INITIAL_RADIOLOGY);
+    setBeds(INITIAL_BEDS);
+    setResumeMedisList(INITIAL_RESUME_MEDIS);
+
+    localStorage.setItem('simrs_patients', JSON.stringify(INITIAL_PATIENTS));
+    localStorage.setItem('simrs_registrations', JSON.stringify(INITIAL_REGISTRATIONS));
+    localStorage.setItem('simrs_generalConsents', JSON.stringify(INITIAL_GENERAL_CONSENTS));
+    localStorage.setItem('simrs_medicalRecords', JSON.stringify(INITIAL_MEDICAL_RECORDS));
+    localStorage.setItem('simrs_cppt', JSON.stringify(INITIAL_CPPT));
+    localStorage.setItem('simrs_informedConsents', JSON.stringify(INITIAL_INFORMED_CONSENTS));
+    localStorage.setItem('simrs_coding', JSON.stringify(INITIAL_CODING));
+    localStorage.setItem('simrs_claims', JSON.stringify(INITIAL_CLAIMS));
+    localStorage.setItem('simrs_billing', JSON.stringify(INITIAL_BILLING));
+    localStorage.setItem('simrs_pharmacy', JSON.stringify(INITIAL_PHARMACY));
+    localStorage.setItem('simrs_lab', JSON.stringify(INITIAL_LAB));
+    localStorage.setItem('simrs_radiology', JSON.stringify(INITIAL_RADIOLOGY));
+    localStorage.setItem('simrs_beds', JSON.stringify(INITIAL_BEDS));
+    localStorage.setItem('simrs_resumeMedisList', JSON.stringify(INITIAL_RESUME_MEDIS));
+
+    audit('UPDATE', 'SimClass', classId, {
+      field_name: 'reset_simulation',
+      new_value: `Simulasi data kelas ${classId} telah di-reset ke benchmark awal oleh ${user?.name || 'Dosen'}`
+    });
+  };
+
+  const createDosenUser = (dosenData: { name: string; username: string; password?: string; classId?: string; nidn?: string }) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang berwenang membuat akun Dosen.' };
+    }
+    const cleanU = dosenData.username.trim().toLowerCase();
+    if (users.some(u => u.username.toLowerCase() === cleanU)) {
+      return { success: false, message: 'Username sudah digunakan oleh akun lain.' };
+    }
+    const newDosen: User = {
+      id: genId('U_DSN'),
+      username: cleanU,
+      password: dosenData.password || 'dosen123',
+      tempPassword: dosenData.password || 'dosen123',
+      name: dosenData.name.trim(),
+      roleId: 'R03', // Dosen
+      classId: dosenData.classId || activeClassId,
+      active: true
+    };
+    setUsers(prev => [...prev, newDosen]);
+    audit('CREATE', 'User', newDosen.id, {
+      field_name: 'create_dosen',
+      new_value: `Akun Dosen ${newDosen.name} (${newDosen.username}) dibuat untuk kelas ${newDosen.classId}`
+    });
+    return { success: true };
   };
 
   const toggleSidebar = () => setSidebarCollapsed(prev => !prev);
 
-  const login = (u: string, p: string, selectedRoleId?: RoleId) => {
+  const login = (u: string, p: string, selectedRoleId?: RoleId, selectedClassId?: string) => {
     const cleanU = u.trim();
     const cleanP = p.trim();
 
     // 1. Search exact user match
-    let found = users.find(x => x.username.toLowerCase() === cleanU.toLowerCase() && x.password === cleanP && x.active);
+    let found = users.find(x => x.username.toLowerCase() === cleanU.toLowerCase() && x.password === cleanP);
 
     // 2. Fallback search by username
     if (!found) {
-      found = users.find(x => x.username.toLowerCase() === cleanU.toLowerCase() && x.active);
+      found = users.find(x => x.username.toLowerCase() === cleanU.toLowerCase());
     }
 
     // 3. Fallback auto-provision for student NIM (e.g. 20240306044) or custom username
     if (!found && cleanU.length > 0) {
       const isNim = /^\d+$/.test(cleanU);
       const assignedRole = selectedRoleId || 'R04';
+      const targetClass = selectedClassId || activeClassId;
       const newStudentUser: User = {
         id: 'U_' + cleanU,
         username: cleanU,
         password: cleanP || 'mhs123',
+        tempPassword: cleanP || 'mhs123',
         name: isNim ? `Mahasiswa RMIK (${cleanU})` : cleanU,
         roleId: assignedRole,
+        classId: targetClass,
+        nim: isNim ? cleanU : undefined,
         active: true
       };
       setUsers(prev => [...prev, newStudentUser]);
@@ -502,17 +712,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (!found) {
-      return { success: false, error: 'Username/NIM atau password salah atau akun non-aktif' };
+      return { success: false, error: 'Username/NIM atau password salah.' };
     }
 
-    // Assign selected role for active session if specified in login form
+    // Protection: Inactive user cannot log in
+    if (!found.active) {
+      return {
+        success: false,
+        error: 'Akun Anda berstatus NON-AKTIF. Silakan hubungi Dosen Pengampu atau Administrator untuk aktivasi.'
+      };
+    }
+
+    // Protection: Students cannot self-promote to Admin (R01) or Dosen (R03)
+    const isBaseStudent = found.roleId !== 'R01' && found.roleId !== 'R03';
+    if (isBaseStudent && (selectedRoleId === 'R01' || selectedRoleId === 'R03')) {
+      return {
+        success: false,
+        error: 'Akses Ditolak: Mahasiswa tidak memiliki wewenang untuk masuk sebagai Admin atau Dosen!'
+      };
+    }
+
+    const effectiveClass = selectedClassId || found.classId || activeClassId;
+    setActiveClassIdState(effectiveClass);
+    localStorage.setItem('simrs_active_class_id', effectiveClass);
+
+    // Assign selected role for active session (R04 stays "all modules", or practice role)
     const sessionUser: User = {
       ...found,
-      roleId: selectedRoleId || found.roleId
+      roleId: selectedRoleId || found.roleId,
+      classId: effectiveClass
     };
 
     setUser(sessionUser);
-    audit('LOGIN', 'User', sessionUser.id, { field_name: 'roleId', new_value: sessionUser.roleId });
+    localStorage.setItem('simrs_current_user', JSON.stringify(sessionUser));
+    audit('LOGIN', 'User', sessionUser.id, {
+      field_name: 'roleId',
+      new_value: `${sessionUser.roleId} (Kelas: ${effectiveClass})`
+    });
     return { success: true };
   };
 
@@ -2117,7 +2353,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateDoctorPoliMapping,
         deleteDoctorPoliMapping,
         toggleDoctorPoliMappingStatus,
-        getDoctorsForPoli
+        getDoctorsForPoli,
+        logAudit,
+        classes,
+        activeClassId,
+        setActiveClassId,
+        addClass,
+        importRoster,
+        toggleUserActive,
+        batchSetUsersActive,
+        resetClassSimulation,
+        createDosenUser
       }}
     >
       {children}

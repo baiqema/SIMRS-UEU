@@ -2,24 +2,61 @@ import {
   User, Role, Patient, Registration, GeneralConsent, MedicalRecord,
   CPPT, InformedConsent, Coding, Claim, Billing, PharmacyRecord, LabRecord,
   RadiologyRecord, ICD10, ICD9CM, Bed, AuditEntry, PraktikumModule, DokumenBerkas, AsuhanKeperawatan,
-  ResumeMedis
+  ResumeMedis, SimClass
 } from '../types';
 
+export const INITIAL_CLASSES: SimClass[] = [
+  {
+    id: 'RMIK-2024-A',
+    name: 'RMIK 2024 - Kelas A (Reguler Pagi)',
+    dosenId: 'U008',
+    dosenName: 'Dr. Wati Susanti, M.Kes',
+    semester: 'Ganjil 2026/2027',
+    academicYear: '2026/2027',
+    createdAt: '2026-08-01',
+    active: true,
+    description: 'Sistem SIMRS Simulasi Kelas RMIK Angkatan 2024 Pagi'
+  },
+  {
+    id: 'RMIK-2024-B',
+    name: 'RMIK 2024 - Kelas B (Reguler Sore)',
+    dosenId: 'U008',
+    dosenName: 'Dr. Wati Susanti, M.Kes',
+    semester: 'Ganjil 2026/2027',
+    academicYear: '2026/2027',
+    createdAt: '2026-08-01',
+    active: true,
+    description: 'Sistem SIMRS Simulasi Kelas RMIK Angkatan 2024 Sore'
+  },
+  {
+    id: 'SIMULASI-UTAMA',
+    name: 'Simulasi RS RMIK Utama (Benchmark)',
+    dosenId: 'U001',
+    dosenName: 'Super Administrator',
+    semester: 'All Period',
+    academicYear: '2026',
+    createdAt: '2026-01-01',
+    active: true,
+    description: 'Lingkungan Induk Praktikum Simulasi Rumah Sakit RMIK'
+  }
+];
+
 export const INITIAL_USERS: User[] = [
-  { id: 'U001', username: 'admin', password: 'admin123', name: 'Super Administrator', roleId: 'R01', active: true },
-  { id: 'U008', username: 'dosen', password: 'dosen123', name: 'Dr. Wati Susanti, M.Kes (Dosen RMIK)', roleId: 'R03', active: true },
-  { id: 'U008B', username: 'dsn.dr.wati', password: 'dosen123', name: 'Dr. Wati Susanti, M.Kes (Dosen RMIK)', roleId: 'R03', active: true },
+  { id: 'U001', username: 'admin', password: 'admin123', name: 'Super Administrator', roleId: 'R01', active: true, classId: 'SIMULASI-UTAMA' },
+  { id: 'U008', username: 'dosen', password: 'dosen123', name: 'Dr. Wati Susanti, M.Kes (Dosen RMIK)', roleId: 'R03', active: true, classId: 'RMIK-2024-A' },
+  { id: 'U008B', username: 'dsn.dr.wati', password: 'dosen123', name: 'Dr. Wati Susanti, M.Kes (Dosen RMIK)', roleId: 'R03', active: true, classId: 'RMIK-2024-A' },
   
   // Mahasiswa RMIK Kategori
-  { id: 'U007_PENDAFTARAN', username: 'mhs.pendaftaran', password: 'pendaftaran123', name: 'Mahasiswa RMIK - Pendaftaran & VClaim', roleId: 'R07', active: true },
-  { id: 'U007_KEPERAWATAN', username: 'mhs.keperawatan', password: 'keperawatan123', name: 'Mahasiswa RMIK - Keperawatan & Asuhan', roleId: 'R14', active: true },
-  { id: 'U007_PERAWAT', username: 'mhs.perawat', password: 'perawat123', name: 'Mahasiswa RMIK - Perawat & Triase', roleId: 'R06', active: true },
-  { id: 'U007_KODING', username: 'mhs.koding', password: 'koding123', name: 'Mahasiswa RMIK - Koding & Casemix', roleId: 'R09', active: true },
-  { id: 'U007_PELAPORAN', username: 'mhs.pelaporan', password: 'pelaporan123', name: 'Mahasiswa RMIK - Pelaporan & Statistik', roleId: 'R13', active: true },
-  { id: 'U007_RME', username: 'mhs.rme', password: 'rme123', name: 'Mahasiswa RMIK - Rekam Medis & CPPT', roleId: 'R08', active: true },
-  { id: 'U007_UMUM', username: 'mhs.umum', password: 'mhs123', name: 'Mahasiswa RMIK - Umum (All Modul)', roleId: 'R04', active: true },
-  { id: 'U007', username: 'mahasiswa', password: 'mhs123', name: 'Mahasiswa SIMRS (All Modul)', roleId: 'R04', active: true },
-  { id: 'U007B', username: 'mhs.john', password: 'mhs123', name: 'Mahasiswa RMIK Esa Unggul', roleId: 'R04', active: true },
+  { id: 'U007_PENDAFTARAN', username: 'mhs.pendaftaran', password: 'pendaftaran123', name: 'Mahasiswa RMIK - Pendaftaran & VClaim', roleId: 'R07', active: true, classId: 'RMIK-2024-A', nim: '20240306001', tempPassword: 'pendaftaran123' },
+  { id: 'U007_KEPERAWATAN', username: 'mhs.keperawatan', password: 'keperawatan123', name: 'Mahasiswa RMIK - Keperawatan & Asuhan', roleId: 'R14', active: true, classId: 'RMIK-2024-A', nim: '20240306002', tempPassword: 'keperawatan123' },
+  { id: 'U007_PERAWAT', username: 'mhs.perawat', password: 'perawat123', name: 'Mahasiswa RMIK - Perawat & Triase', roleId: 'R06', active: true, classId: 'RMIK-2024-A', nim: '20240306003', tempPassword: 'perawat123' },
+  { id: 'U007_KODING', username: 'mhs.koding', password: 'koding123', name: 'Mahasiswa RMIK - Koding & Casemix', roleId: 'R09', active: true, classId: 'RMIK-2024-A', nim: '20240306044', tempPassword: 'koding123' },
+  { id: 'U007_PELAPORAN', username: 'mhs.pelaporan', password: 'pelaporan123', name: 'Mahasiswa RMIK - Pelaporan & Statistik', roleId: 'R13', active: true, classId: 'RMIK-2024-A', nim: '20240306005', tempPassword: 'pelaporan123' },
+  { id: 'U007_RME', username: 'mhs.rme', password: 'rme123', name: 'Mahasiswa RMIK - Rekam Medis & CPPT', roleId: 'R08', active: true, classId: 'RMIK-2024-A', nim: '20240306006', tempPassword: 'rme123' },
+  { id: 'U007_UMUM', username: 'mhs.umum', password: 'mhs123', name: 'Mahasiswa RMIK - Umum (All Modul)', roleId: 'R04', active: true, classId: 'RMIK-2024-A', nim: '20240306007', tempPassword: 'mhs123' },
+  { id: 'U007', username: 'mahasiswa', password: 'mhs123', name: 'Mahasiswa SIMRS (All Modul)', roleId: 'R04', active: true, classId: 'RMIK-2024-A', nim: '20240306008', tempPassword: 'mhs123' },
+  { id: 'U007B', username: 'mhs.john', password: 'mhs123', name: 'Mahasiswa RMIK Esa Unggul', roleId: 'R04', active: true, classId: 'RMIK-2024-A', nim: '20240306009', tempPassword: 'mhs123' },
+  { id: 'U_20240306044', username: '20240306044', password: 'mhs123', name: 'Anwar Baskoro (20240306044)', roleId: 'R04', active: true, classId: 'RMIK-2024-A', nim: '20240306044', tempPassword: 'mhs123' },
 
   { id: 'U002', username: 'dr.sari', password: 'dokter123', name: 'dr. Sari Dewi, Sp.PD', roleId: 'R05', active: true },
   { id: 'U002_BEDAH', username: 'dr.ahmad', password: 'dokter123', name: 'dr. Ahmad Fauzi, Sp.B', roleId: 'R05', active: true },
