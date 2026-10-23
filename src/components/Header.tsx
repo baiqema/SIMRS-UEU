@@ -36,8 +36,9 @@ export const Header: React.FC = () => {
       farmasi: 'Penunjang / Farmasi',
       laboratorium: 'Penunjang / Laboratorium',
       radiologi: 'Penunjang / Radiologi',
-      manajemenuser: 'Administrasi / Manajemen Pengguna',
+      manajemenuser: 'Administrasi / Hak Akses & Pengguna',
       audit: 'Administrasi / Audit Trail',
+      masterdata: 'Administrasi / Master Data SIMRS (Superadmin)',
       logaktivitas: 'Administrasi / Log Aktivitas',
       pelaporan: 'Pelaporan / Indikator & Laporan RS',
       metadata: 'Standar & Regulasi / Kamus Metadata KMK 1423'
@@ -50,6 +51,7 @@ export const Header: React.FC = () => {
     if (!searchTerm.trim()) return;
     const term = searchTerm.toLowerCase();
     const modules = [
+      { key: 'masterdata', keywords: ['master data', 'master', 'ruangan', 'tempat tidur', 'mapping dokter', 'master dokter', 'master poli'] },
       { key: 'kunjungan', keywords: ['kunjungan', 'kunjungan pasien', 'riwayat kunjungan', 'laporan kunjungan', 'history kunjungan'] },
       { key: 'indekspasien', keywords: ['kiup', 'indeks pasien', 'indeks utama', 'master pasien'] },
       { key: 'bedmanagement', keywords: ['bed', 'tempat tidur', 'kamar ranap', 'bangsal', 'bed management'] },

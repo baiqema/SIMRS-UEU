@@ -25,6 +25,7 @@ import { AuditTrailView } from './views/AuditTrailView';
 import { LogAktivitasView } from './views/LogAktivitasView';
 import { PelaporanView } from './views/PelaporanView';
 import { MetadataRmeView } from './views/MetadataRmeView';
+import { MasterDataView } from './views/MasterDataView';
 import { ShieldAlert } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -53,6 +54,7 @@ const AppContent: React.FC = () => {
     if (pageId === 'kunjungan' || pageId === 'indekspasien') return access.includes('all') || access.includes('pendaftaran') || access.includes('kunjungan');
     if (pageId === 'bedmanagement') return access.includes('all') || access.includes('pendaftaran') || access.includes('bedmanagement');
     if (pageId === 'audit') return user.roleId === 'R01' || user.roleId === 'R03';
+    if (pageId === 'masterdata') return user.roleId === 'R01';
     return access.includes('all') || access.includes(pageId);
   };
 
@@ -110,6 +112,8 @@ const AppContent: React.FC = () => {
         return <ManajemenUserView />;
       case 'audit':
         return <AuditTrailView />;
+      case 'masterdata':
+        return <MasterDataView />;
       case 'logaktivitas':
         return <LogAktivitasView />;
       case 'pelaporan':

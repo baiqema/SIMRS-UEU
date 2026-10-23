@@ -14,6 +14,18 @@ export type RoleId =
   | 'R13' // Petugas Pelaporan
   | 'R14'; // Mahasiswa Keperawatan
 
+export interface SimClass {
+  id: string; // e.g. 'RMIK-2024-A'
+  name: string; // 'RMIK 2024 - Kelas A (Reguler Pagi)'
+  dosenId?: string;
+  dosenName?: string;
+  semester?: string;
+  academicYear?: string;
+  createdAt: string;
+  active: boolean;
+  description?: string;
+}
+
 export interface User {
   id: string;
   username: string;
@@ -21,6 +33,10 @@ export interface User {
   name: string;
   roleId: RoleId;
   active: boolean;
+  classId?: string;
+  nim?: string;
+  tempPassword?: string;
+  isFirstLogin?: boolean;
 }
 
 export interface Role {
@@ -318,6 +334,7 @@ export interface AuditEntry {
   ip: string;
   device: string;
   module?: string;
+  classId?: string;
 }
 
 export interface Bed {
@@ -483,4 +500,110 @@ export interface ResumeMedis {
   createdAt?: string;
   updatedAt?: string;
 }
+
+// ==========================================
+// MASTER DATA MANAGEMENT (SUPERADMIN ROLE R01)
+// ==========================================
+
+export type JenisRuangan = 
+  | 'Rawat Inap' 
+  | 'ICU' 
+  | 'NICU' 
+  | 'PICU' 
+  | 'HCU' 
+  | 'Isolasi' 
+  | 'VK / Bersalin' 
+  | 'Bedah / OK' 
+  | 'Perawatan Khusus'
+  | string;
+
+export interface MasterRuangan {
+  id: string; // Unique ID (e.g. RNG-MWR-01)
+  kode: string; // Unique Room Code
+  nama: string; // Room Name (e.g. Bangsal Mawar)
+  jenis: JenisRuangan;
+  lokasi: string; // Building, Floor (e.g. Gedung A Lantai 2)
+  kapasitas: number; // Bed capacity (non-negative)
+  status: 'Aktif' | 'Nonaktif';
+  deskripsi?: string;
+  fasilitas?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type StatusBedOperasional = 
+  | 'Tersedia' 
+  | 'Terisi' 
+  | 'Dibersihkan' 
+  | 'Dalam Perbaikan' 
+  | 'Tidak Aktif';
+
+export interface MasterBed {
+  id: string; // Unique Bed ID / Code (e.g. MWR-101-A)
+  kode: string; // Unique Bed Code
+  nama: string; // Bed Name/Number (e.g. Bed A, Kamar 101 - Bed 01)
+  ruanganId: string; // Relasi ke ID Ruangan
+  ruanganNama: string; // Denormalized Room Name
+  kelas: 'VVIP' | 'VIP' | 'Kelas 1' | 'Kelas 2' | 'Kelas 3' | 'ICU' | 'Isolasi' | string;
+  statusOperasional: StatusBedOperasional;
+  patientId?: string | null;
+  pasienNama?: string | null;
+  status: 'Aktif' | 'Nonaktif';
+  catatan?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface MasterDokter {
+  id: string; // Unique Doctor ID (e.g. DOC-001)
+  nama: string; // Full Name with titles (e.g. dr. Andika Pratama, Sp.PD)
+  nik: string; // 16-digit NIK
+  strSip: string; // STR / SIP number
+  spesialisasi: string; // Specialty (e.g. Penyakit Dalam)
+  telepon: string; // Phone number
+  email?: string;
+  status: 'Aktif' | 'Nonaktif';
+  gender?: 'L' | 'P';
+  jadwalUmum?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type KelompokLayananPoli = 
+  | 'Spesialis Dasar' 
+  | 'Spesialis Lain' 
+  | 'Gigi Spesialis' 
+  | 'Penunjang Medik' 
+  | 'Layanan Umum'
+  | string;
+
+export interface MasterPoli {
+  id: string; // Unique Poli ID / Code (e.g. POL-PD)
+  kode: string; // Unique Poli Code
+  nama: string; // Poli Name (e.g. Poliklinik Penyakit Dalam)
+  kelompokLayanan: KelompokLayananPoli;
+  lokasi: string; // Building & Floor location
+  jamPelayanan: string; // Service hours (e.g. 08:00 - 15:00 WIB)
+  status: 'Aktif' | 'Nonaktif';
+  deskripsi?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface DoctorPoliMapping {
+  id: string; // Unique Mapping ID
+  doctorId: string; // Doctor ID from MasterDokter
+  doctorName: string;
+  poliId: string; // Poli ID from MasterPoli
+  poliName: string;
+  jadwalPraktik?: string; // Formatted schedule string
+  hariPraktik: string[]; // e.g. ['Senin', 'Rabu', 'Jumat']
+  jamMulai: string; // e.g. "08:00"
+  jamSelesai: string; // e.g. "12:00"
+  status: 'Aktif' | 'Nonaktif';
+  catatan?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 

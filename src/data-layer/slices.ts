@@ -13,6 +13,11 @@ export const SLICES = {
   asuhanKeperawatan: { table: 'asuhan_keperawatan', localKey: 'simrs_asuhanKeperawatan' },
   resumeMedisList: { table: 'resume_medis', localKey: 'simrs_resume_medis' },
   staff: { table: 'staff_directory', localKey: 'simrs_users' },
+  masterRuangan: { table: 'master_ruangan', localKey: 'simrs_master_ruangan' },
+  masterBed: { table: 'master_bed', localKey: 'simrs_master_bed' },
+  masterDokter: { table: 'master_dokter', localKey: 'simrs_master_dokter' },
+  masterPoli: { table: 'master_poli', localKey: 'simrs_master_poli' },
+  doctorPoliMappings: { table: 'doctor_poli_mappings', localKey: 'simrs_doctor_poli_mappings' },
 } as const satisfies Record<string, { table: string; localKey: string }>;
 
 export type SliceName = keyof typeof SLICES;

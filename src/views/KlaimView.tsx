@@ -72,7 +72,7 @@ export const KlaimView: React.FC = () => {
         hakKelas: 'Kelas 1',
         faskes1: 'Puskesmas Gambir (0114001)',
         sepNo: '0012R0010826V000128',
-        responseCode: '200 OK',
+        responseCode: 'Aktif',
         dbSynced: true
       },
       {
@@ -87,7 +87,7 @@ export const KlaimView: React.FC = () => {
         hakKelas: 'Kelas 3',
         faskes1: 'Klinik Pratama Sehat (0114005)',
         sepNo: '0012R0010826V000129',
-        responseCode: '200 OK',
+        responseCode: 'Aktif',
         dbSynced: true
       },
       {
@@ -102,7 +102,7 @@ export const KlaimView: React.FC = () => {
         hakKelas: 'Kelas 2',
         faskes1: 'Puskesmas Kebon Jeruk (0112001)',
         sepNo: '-',
-        responseCode: '201 Not Active',
+        responseCode: 'Tidak Aktif',
         dbSynced: true
       }
     ];
@@ -217,7 +217,7 @@ export const KlaimView: React.FC = () => {
         ? 'Peserta Mandiri / PBI Aktif (Iuran Terbayar Lunas)'
         : 'Tunggakan Iuran 2 Bulan (Non-Aktif sejak 01/08/2026)';
       const sepNo = isAktif ? `0012R0010826V${Math.floor(100000 + Math.random() * 900000)}` : '-';
-      const respCode = isAktif ? '200 OK' : '201 Not Active';
+      const respCode = isAktif ? 'Aktif' : 'Tidak Aktif';
 
       const newLog: VClaimSyncLogItem = {
         id: `VC-${Date.now().toString().slice(-4)}`,
@@ -239,12 +239,12 @@ export const KlaimView: React.FC = () => {
 
       Swal.fire({
         icon: isAktif ? 'success' : 'error',
-        title: isAktif ? 'Status BPJS: AKTIF (200 OK)' : 'Status BPJS: TIDAK AKTIF (201)',
+        title: isAktif ? 'Status BPJS: AKTIF' : 'Status BPJS: TIDAK AKTIF',
         html: `
           <div class="text-left text-xs space-y-2">
             <p><strong>Nama:</strong> ${patientName} (${noRM})</p>
             <p><strong>No. BPJS:</strong> ${rawDigits} | <strong>NIK:</strong> ${nik}</p>
-            <p><strong>Status:</strong> <span class="font-bold ${isAktif ? 'text-emerald-600' : 'text-rose-600'}">${newLog.status} (${respCode})</span></p>
+            <p><strong>Status:</strong> <span class="font-bold ${isAktif ? 'text-emerald-600' : 'text-rose-600'}">${newLog.status}</span></p>
             <p><strong>Keterangan:</strong> ${statusDesc}</p>
             ${isAktif ? `<p><strong>Nomor SEP:</strong> <span class="font-mono text-blue-600 font-bold">${sepNo}</span></p>` : ''}
           </div>
@@ -367,13 +367,13 @@ export const KlaimView: React.FC = () => {
             </div>
 
             <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 shadow-xs">
-              <div className="text-[10px] font-bold text-emerald-600 uppercase">Peserta Aktif (200 OK)</div>
+              <div className="text-[10px] font-bold text-emerald-600 uppercase">Peserta Aktif</div>
               <div className="text-xl font-black text-emerald-900 mt-1">{countAktif}</div>
               <span className="text-[10px] text-emerald-600 mt-0.5 block">Eligible Pelayanan</span>
             </div>
 
             <div className="bg-white p-3.5 rounded-2xl border border-rose-200 shadow-xs">
-              <div className="text-[10px] font-bold text-rose-600 uppercase">Tidak Aktif (201)</div>
+              <div className="text-[10px] font-bold text-rose-600 uppercase">Tidak Aktif</div>
               <div className="text-xl font-black text-rose-900 mt-1">{countTidakAktif}</div>
               <span className="text-[10px] text-rose-600 mt-0.5 block">Tunggakan / Mutasi</span>
             </div>
@@ -430,7 +430,7 @@ export const KlaimView: React.FC = () => {
                   onClick={() => handleRunQuickCheck('Aktif')}
                   disabled={quickChecking}
                   className="flex-1 sm:flex-none px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-                  title="Cek ke Server VClaim (Simulasi Respon AKTIF 200)"
+                  title="Cek ke Server VClaim (Simulasi Respon AKTIF)"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${quickChecking ? 'animate-spin' : ''}`} />
                   <span>{quickChecking ? 'Validasi...' : '+ Cek BPJS (Aktif)'}</span>
@@ -441,7 +441,7 @@ export const KlaimView: React.FC = () => {
                   onClick={() => handleRunQuickCheck('Tidak Aktif')}
                   disabled={quickChecking}
                   className="px-3 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer flex items-center gap-1.5 active:scale-95 transition-all"
-                  title="Cek ke Server VClaim (Simulasi Respon TIDAK AKTIF 201)"
+                  title="Cek ke Server VClaim (Simulasi Respon TIDAK AKTIF)"
                 >
                   <span>▲ Cek (Tidak Aktif)</span>
                 </button>
@@ -536,7 +536,6 @@ export const KlaimView: React.FC = () => {
                       <th className="py-2.5 px-3.5">No. BPJS (13 Digit)</th>
                       <th className="py-2.5 px-3.5">Nama Pasien & RM</th>
                       <th className="py-2.5 px-3.5 text-center">Status VClaim</th>
-                      <th className="py-2.5 px-3.5">Respon Bridging</th>
                       <th className="py-2.5 px-3.5">Keterangan / Alasan</th>
                       <th className="py-2.5 px-3.5 text-center">Database Lokal</th>
                       <th className="py-2.5 px-3.5 text-center">Aksi</th>
@@ -571,11 +570,6 @@ export const KlaimView: React.FC = () => {
                                 TIDAK AKTIF
                               </span>
                             )}
-                          </td>
-                          <td className="py-2.5 px-3.5 font-mono text-[11px] font-semibold whitespace-nowrap">
-                            <span className={item.status === 'Aktif' ? 'text-emerald-700' : 'text-rose-700'}>
-                              {item.responseCode}
-                            </span>
                           </td>
                           <td className="py-2.5 px-3.5 text-slate-700 max-w-xs text-[11px]">
                             {item.statusDesc}

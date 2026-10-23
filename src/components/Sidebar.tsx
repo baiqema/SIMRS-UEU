@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ClipboardList, FileSignature, FileText,
   FilePenLine, Handshake, Barcode, ShieldAlert, Receipt,
   Banknote, Pill, FlaskConical, Radio, Users,
-  ShieldCheck, History, BarChart3, BookOpen, Bed, Stethoscope, Contact
+  ShieldCheck, History, BarChart3, BookOpen, Bed, Stethoscope, Contact, Database
 } from 'lucide-react';
 import esaUnggulEmblem from '../assets/logo-esa-unggul-emblem.png';
 import { RmikLogo } from './Logos';
@@ -68,8 +68,9 @@ export const Sidebar: React.FC = () => {
       ]
     },
     {
-      group: 'PRAKTIKUM & ADMIN',
+      group: 'ADMINISTRASI & SISTEM',
       items: [
+        { id: 'masterdata', label: 'Master Data SIMRS', icon: Database, superadminOnly: true },
         { id: 'audit', label: 'Audit Trail (Superadmin)', icon: ShieldCheck, superadminOnly: true },
         { id: 'logaktivitas', label: 'Log Aktivitas', icon: History },
         { id: 'manajemenuser', label: 'Hak Akses & Pengguna', icon: Users }
@@ -95,8 +96,11 @@ export const Sidebar: React.FC = () => {
     }
   };
 
-  const hasAccess = (_pageId: string) => {
-    return true; // Everyone can view all modules/displays
+  const hasAccess = (pageId: string) => {
+    if (pageId === 'masterdata' || pageId === 'audit') {
+      return isSuperAdmin;
+    }
+    return true;
   };
 
   return (

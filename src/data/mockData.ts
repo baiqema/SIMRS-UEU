@@ -2,24 +2,61 @@ import {
   User, Role, Patient, Registration, GeneralConsent, MedicalRecord,
   CPPT, InformedConsent, Coding, Claim, Billing, PharmacyRecord, LabRecord,
   RadiologyRecord, ICD10, ICD9CM, Bed, AuditEntry, DokumenBerkas, AsuhanKeperawatan,
-  ResumeMedis
+  ResumeMedis, SimClass
 } from '../types';
 
+export const INITIAL_CLASSES: SimClass[] = [
+  {
+    id: 'RMIK-2024-A',
+    name: 'RMIK 2024 - Kelas A (Reguler Pagi)',
+    dosenId: 'U008',
+    dosenName: 'Dr. Wati Susanti, M.Kes',
+    semester: 'Ganjil 2026/2027',
+    academicYear: '2026/2027',
+    createdAt: '2026-08-01',
+    active: true,
+    description: 'Sistem SIMRS Simulasi Kelas RMIK Angkatan 2024 Pagi'
+  },
+  {
+    id: 'RMIK-2024-B',
+    name: 'RMIK 2024 - Kelas B (Reguler Sore)',
+    dosenId: 'U008',
+    dosenName: 'Dr. Wati Susanti, M.Kes',
+    semester: 'Ganjil 2026/2027',
+    academicYear: '2026/2027',
+    createdAt: '2026-08-01',
+    active: true,
+    description: 'Sistem SIMRS Simulasi Kelas RMIK Angkatan 2024 Sore'
+  },
+  {
+    id: 'SIMULASI-UTAMA',
+    name: 'Simulasi RS RMIK Utama (Benchmark)',
+    dosenId: 'U001',
+    dosenName: 'Super Administrator',
+    semester: 'All Period',
+    academicYear: '2026',
+    createdAt: '2026-01-01',
+    active: true,
+    description: 'Lingkungan Induk Praktikum Simulasi Rumah Sakit RMIK'
+  }
+];
+
 export const INITIAL_USERS: User[] = [
-  { id: 'U001', username: 'admin', password: 'admin123', name: 'Super Administrator', roleId: 'R01', active: true },
-  { id: 'U008', username: 'dosen', password: 'dosen123', name: 'Dr. Wati Susanti, M.Kes (Dosen RMIK)', roleId: 'R03', active: true },
-  { id: 'U008B', username: 'dsn.dr.wati', password: 'dosen123', name: 'Dr. Wati Susanti, M.Kes (Dosen RMIK)', roleId: 'R03', active: true },
+  { id: 'U001', username: 'admin', password: 'admin123', name: 'Super Administrator', roleId: 'R01', active: true, classId: 'SIMULASI-UTAMA' },
+  { id: 'U008', username: 'dosen', password: 'dosen123', name: 'Dr. Wati Susanti, M.Kes (Dosen RMIK)', roleId: 'R03', active: true, classId: 'RMIK-2024-A' },
+  { id: 'U008B', username: 'dsn.dr.wati', password: 'dosen123', name: 'Dr. Wati Susanti, M.Kes (Dosen RMIK)', roleId: 'R03', active: true, classId: 'RMIK-2024-A' },
   
   // Mahasiswa RMIK Kategori
-  { id: 'U007_PENDAFTARAN', username: 'mhs.pendaftaran', password: 'pendaftaran123', name: 'Mahasiswa RMIK - Pendaftaran & VClaim', roleId: 'R07', active: true },
-  { id: 'U007_KEPERAWATAN', username: 'mhs.keperawatan', password: 'keperawatan123', name: 'Mahasiswa RMIK - Keperawatan & Asuhan', roleId: 'R14', active: true },
-  { id: 'U007_PERAWAT', username: 'mhs.perawat', password: 'perawat123', name: 'Mahasiswa RMIK - Perawat & Triase', roleId: 'R06', active: true },
-  { id: 'U007_KODING', username: 'mhs.koding', password: 'koding123', name: 'Mahasiswa RMIK - Koding & Casemix', roleId: 'R09', active: true },
-  { id: 'U007_PELAPORAN', username: 'mhs.pelaporan', password: 'pelaporan123', name: 'Mahasiswa RMIK - Pelaporan & Statistik', roleId: 'R13', active: true },
-  { id: 'U007_RME', username: 'mhs.rme', password: 'rme123', name: 'Mahasiswa RMIK - Rekam Medis & CPPT', roleId: 'R08', active: true },
-  { id: 'U007_UMUM', username: 'mhs.umum', password: 'mhs123', name: 'Mahasiswa RMIK - Umum (All Modul)', roleId: 'R04', active: true },
-  { id: 'U007', username: 'mahasiswa', password: 'mhs123', name: 'Mahasiswa SIMRS (All Modul)', roleId: 'R04', active: true },
-  { id: 'U007B', username: 'mhs.john', password: 'mhs123', name: 'Mahasiswa RMIK Esa Unggul', roleId: 'R04', active: true },
+  { id: 'U007_PENDAFTARAN', username: 'mhs.pendaftaran', password: 'pendaftaran123', name: 'Mahasiswa RMIK - Pendaftaran & VClaim', roleId: 'R07', active: true, classId: 'RMIK-2024-A', nim: '20240306001', tempPassword: 'pendaftaran123' },
+  { id: 'U007_KEPERAWATAN', username: 'mhs.keperawatan', password: 'keperawatan123', name: 'Mahasiswa RMIK - Keperawatan & Asuhan', roleId: 'R14', active: true, classId: 'RMIK-2024-A', nim: '20240306002', tempPassword: 'keperawatan123' },
+  { id: 'U007_PERAWAT', username: 'mhs.perawat', password: 'perawat123', name: 'Mahasiswa RMIK - Perawat & Triase', roleId: 'R06', active: true, classId: 'RMIK-2024-A', nim: '20240306003', tempPassword: 'perawat123' },
+  { id: 'U007_KODING', username: 'mhs.koding', password: 'koding123', name: 'Mahasiswa RMIK - Koding & Casemix', roleId: 'R09', active: true, classId: 'RMIK-2024-A', nim: '20240306044', tempPassword: 'koding123' },
+  { id: 'U007_PELAPORAN', username: 'mhs.pelaporan', password: 'pelaporan123', name: 'Mahasiswa RMIK - Pelaporan & Statistik', roleId: 'R13', active: true, classId: 'RMIK-2024-A', nim: '20240306005', tempPassword: 'pelaporan123' },
+  { id: 'U007_RME', username: 'mhs.rme', password: 'rme123', name: 'Mahasiswa RMIK - Rekam Medis & CPPT', roleId: 'R08', active: true, classId: 'RMIK-2024-A', nim: '20240306006', tempPassword: 'rme123' },
+  { id: 'U007_UMUM', username: 'mhs.umum', password: 'mhs123', name: 'Mahasiswa RMIK - Umum (All Modul)', roleId: 'R04', active: true, classId: 'RMIK-2024-A', nim: '20240306007', tempPassword: 'mhs123' },
+  { id: 'U007', username: 'mahasiswa', password: 'mhs123', name: 'Mahasiswa SIMRS (All Modul)', roleId: 'R04', active: true, classId: 'RMIK-2024-A', nim: '20240306008', tempPassword: 'mhs123' },
+  { id: 'U007B', username: 'mhs.john', password: 'mhs123', name: 'Mahasiswa RMIK Esa Unggul', roleId: 'R04', active: true, classId: 'RMIK-2024-A', nim: '20240306009', tempPassword: 'mhs123' },
+  { id: 'U_20240306044', username: '20240306044', password: 'mhs123', name: 'Anwar Baskoro (20240306044)', roleId: 'R04', active: true, classId: 'RMIK-2024-A', nim: '20240306044', tempPassword: 'mhs123' },
 
   { id: 'U002', username: 'dr.sari', password: 'dokter123', name: 'dr. Sari Dewi, Sp.PD', roleId: 'R05', active: true },
   { id: 'U002_BEDAH', username: 'dr.ahmad', password: 'dokter123', name: 'dr. Ahmad Fauzi, Sp.B', roleId: 'R05', active: true },
@@ -621,43 +658,43 @@ export const INITIAL_ICD9CM: ICD9CM[] = [
 ];
 
 export const INITIAL_BEDS: Bed[] = [
-  // Bangsal Mawar (Penyakit Dalam)
+  // Bangsal Mawar (Penyakit Dalam) - 8 Beds
   { id: 'MWR-101-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000001', roomName: 'Kamar 101', bedNumber: 'Bed A', occupiedSince: '2026-08-20' },
-  { id: 'MWR-101-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 101', bedNumber: 'Bed B' },
+  { id: 'MWR-101-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000007', roomName: 'Kamar 101', bedNumber: 'Bed B', occupiedSince: '2026-09-20' },
   { id: 'MWR-102-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 102', bedNumber: 'Bed A' },
   { id: 'MWR-102-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 1', status: 'Maintenance', patientId: null, roomName: 'Kamar 102', bedNumber: 'Bed B', maintenanceReason: 'Sterilisasi kamar & pembersihan menyeluruh pasca discharge' },
   { id: 'MWR-201-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Occupied', patientId: '000002', roomName: 'Kamar 201', bedNumber: 'Bed A', occupiedSince: '2026-09-21' },
-  { id: 'MWR-201-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 201', bedNumber: 'Bed B' },
-  { id: 'MWR-202-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 202', bedNumber: 'Bed A' },
-  { id: 'MWR-202-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 202', bedNumber: 'Bed B' },
+  { id: 'MWR-201-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Occupied', patientId: '000008', roomName: 'Kamar 201', bedNumber: 'Bed B', occupiedSince: '2026-09-22' },
+  { id: 'MWR-202-A', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Occupied', patientId: '000009', roomName: 'Kamar 202', bedNumber: 'Bed A', occupiedSince: '2026-09-23' },
+  { id: 'MWR-202-B', room: 'Bangsal Mawar - Penyakit Dalam', floor: '2', class: 'Kelas 2', status: 'Occupied', patientId: '000010', roomName: 'Kamar 202', bedNumber: 'Bed B', occupiedSince: '2026-09-24' },
 
-  // Bangsal Melati (Bedah Umum)
+  // Bangsal Melati (Bedah Umum) - 5 Beds
   { id: 'MLT-201-A', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 2', status: 'Occupied', patientId: '000003', roomName: 'Kamar 201', bedNumber: 'Bed A', occupiedSince: '2026-09-22' },
-  { id: 'MLT-201-B', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 201', bedNumber: 'Bed B' },
-  { id: 'MLT-301-A', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 3', status: 'Available', patientId: null, roomName: 'Kamar 301', bedNumber: 'Bed A' },
+  { id: 'MLT-201-B', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 2', status: 'Occupied', patientId: '000011', roomName: 'Kamar 201', bedNumber: 'Bed B', occupiedSince: '2026-09-23' },
+  { id: 'MLT-301-A', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 3', status: 'Occupied', patientId: '000012', roomName: 'Kamar 301', bedNumber: 'Bed A', occupiedSince: '2026-09-24' },
   { id: 'MLT-301-B', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 3', status: 'Available', patientId: null, roomName: 'Kamar 301', bedNumber: 'Bed B' },
   { id: 'MLT-301-C', room: 'Bangsal Melati - Bedah Umum', floor: '3', class: 'Kelas 3', status: 'Maintenance', patientId: null, roomName: 'Kamar 301', bedNumber: 'Bed C', maintenanceReason: 'Perbaikan panel oksigen sentral & tuas hidrolik tempat tidur' },
 
-  // Bangsal Anggrek (Kebidanan & Obgyn)
+  // Bangsal Anggrek (Kebidanan & Obgyn) - 3 Beds
   { id: 'AGR-101-A', room: 'Bangsal Anggrek - Kebidanan & Kandungan', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000004', roomName: 'Kamar 101', bedNumber: 'Bed A', occupiedSince: '2026-09-22' },
-  { id: 'AGR-101-B', room: 'Bangsal Anggrek - Kebidanan & Kandungan', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 101', bedNumber: 'Bed B' },
+  { id: 'AGR-101-B', room: 'Bangsal Anggrek - Kebidanan & Kandungan', floor: '2', class: 'Kelas 1', status: 'Occupied', patientId: '000013', roomName: 'Kamar 101', bedNumber: 'Bed B', occupiedSince: '2026-09-23' },
   { id: 'AGR-201-A', room: 'Bangsal Anggrek - Kebidanan & Kandungan', floor: '2', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 201', bedNumber: 'Bed A' },
 
-  // Bangsal Dahlia (Anak)
+  // Bangsal Dahlia (Anak) - 2 Beds
   { id: 'DHL-201-A', room: 'Bangsal Dahlia - Anak (Pediatrik)', floor: '3', class: 'Kelas 2', status: 'Occupied', patientId: '000005', roomName: 'Kamar 201', bedNumber: 'Bed A', occupiedSince: '2026-09-23' },
-  { id: 'DHL-201-B', room: 'Bangsal Dahlia - Anak (Pediatrik)', floor: '3', class: 'Kelas 2', status: 'Available', patientId: null, roomName: 'Kamar 201', bedNumber: 'Bed B' },
+  { id: 'DHL-201-B', room: 'Bangsal Dahlia - Anak (Pediatrik)', floor: '3', class: 'Kelas 2', status: 'Occupied', patientId: '000014', roomName: 'Kamar 201', bedNumber: 'Bed B', occupiedSince: '2026-09-24' },
 
-  // Bangsal Cempaka (Saraf & Jantung)
-  { id: 'CMP-101-A', room: 'Bangsal Cempaka - Saraf & Jantung', floor: '4', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Kamar 101', bedNumber: 'Bed A' },
-  { id: 'CMP-201-A', room: 'Bangsal Cempaka - Saraf & Jantung', floor: '4', class: 'Kelas 2', status: 'Maintenance', patientId: null, roomName: 'Kamar 201', bedNumber: 'Bed A', maintenanceReason: 'Dalam proses sterilisasi UV ruangan' },
+  // Bangsal Cempaka (Saraf & Jantung) - 2 Beds
+  { id: 'CMP-101-A', room: 'Bangsal Cempaka - Saraf & Jantung', floor: '4', class: 'Kelas 1', status: 'Occupied', patientId: '000015', roomName: 'Kamar 101', bedNumber: 'Bed A', occupiedSince: '2026-09-23' },
+  { id: 'CMP-201-A', room: 'Bangsal Cempaka - Saraf & Jantung', floor: '4', class: 'Kelas 2', status: 'Occupied', patientId: '000016', roomName: 'Kamar 201', bedNumber: 'Bed A', occupiedSince: '2026-09-24' },
 
-  // VIP & VVIP
+  // VIP & VVIP - 3 Beds
   { id: 'VIP-EDL-01', room: 'Ruang VIP Edelweiss', floor: '5', class: 'VIP', status: 'Occupied', patientId: '000006', roomName: 'Kamar VIP 501', bedNumber: 'Bed Tunggal', occupiedSince: '2026-09-21' },
-  { id: 'VIP-EDL-02', room: 'Ruang VIP Edelweiss', floor: '5', class: 'VIP', status: 'Available', patientId: null, roomName: 'Kamar VIP 502', bedNumber: 'Bed Tunggal' },
+  { id: 'VIP-EDL-02', room: 'Ruang VIP Edelweiss', floor: '5', class: 'VIP', status: 'Occupied', patientId: '000017', roomName: 'Kamar VIP 502', bedNumber: 'Bed Tunggal', occupiedSince: '2026-09-22' },
   { id: 'VVIP-WJK-01', room: 'Ruang VVIP Wijayakusuma', floor: '5', class: 'VVIP', status: 'Available', patientId: null, roomName: 'Suite VVIP 508', bedNumber: 'Bed Elektrik' },
 
-  // ICU & Isolasi
-  { id: 'ICU-01', room: 'Ruang Perawatan Intensif (ICU)', floor: '2', class: 'ICU', status: 'Available', patientId: null, roomName: 'ICU Unit', bedNumber: 'Bed 01' },
+  // ICU & Isolasi - 2 Beds
+  { id: 'ICU-01', room: 'Ruang Perawatan Intensif (ICU)', floor: '2', class: 'ICU', status: 'Occupied', patientId: '000018', roomName: 'ICU Unit', bedNumber: 'Bed 01', occupiedSince: '2026-09-24' },
   { id: 'ICU-02', room: 'Ruang Perawatan Intensif (ICU)', floor: '2', class: 'ICU', status: 'Available', patientId: null, roomName: 'ICU Unit', bedNumber: 'Bed 02' },
   { id: 'ISO-01', room: 'Ruang Isolasi Tekanan Negatif', floor: '2', class: 'Kelas 1', status: 'Available', patientId: null, roomName: 'Isolasi 01', bedNumber: 'Bed Isolasi' },
 ];

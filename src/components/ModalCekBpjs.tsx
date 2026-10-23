@@ -87,21 +87,26 @@ export const ModalCekBpjs: React.FC<ModalCekBpjsProps> = ({
   const handleBpjsChange = (val: string) => {
     const digitsOnly = val.replace(/\D/g, '').slice(0, 13);
     setInputNoBpjs(digitsOnly);
+    setCheckResult(null);
   };
 
   // Handle NIK change: only digits, max 16
   const handleNikChange = (val: string) => {
     const digitsOnly = val.replace(/\D/g, '').slice(0, 16);
     setInputNik(digitsOnly);
+    setCheckResult(null);
   };
 
   // Quick Select Patient
   const handleSelectPatient = (pId: string) => {
     setSelectedPatientId(pId);
+    setCheckResult(null);
     const p = patients.find(item => item.id === pId);
     if (p) {
       if (p.noBPJS && p.noBPJS !== '-') {
         setInputNoBpjs(p.noBPJS.replace(/\D/g, '').slice(0, 13));
+      } else {
+        setInputNoBpjs('');
       }
       if (p.nik) {
         setInputNik(p.nik.replace(/\D/g, '').slice(0, 16));
@@ -114,24 +119,48 @@ export const ModalCekBpjs: React.FC<ModalCekBpjsProps> = ({
     }
   };
 
-  // Run Check BPJS
+  // Run Check BPJS & SEP
   const handlePerformCheck = () => {
     if (searchMethod === 'noBpjs') {
-      if (!inputNoBpjs || inputNoBpjs.length !== 13) {
+      const cleanBpjs = (inputNoBpjs || '').trim();
+      if (!cleanBpjs) {
+        setCheckResult(null);
+        Swal.fire({
+          icon: 'warning',
+          title: 'Nomor Kartu BPJS Belum Diisi',
+          text: 'Silakan masukkan nomor kartu BPJS Kesehatan (13 digit angka) terlebih dahulu sebelum melihat hasil SEP.',
+          confirmButtonColor: '#2563eb'
+        });
+        return;
+      }
+      if (cleanBpjs.length !== 13) {
+        setCheckResult(null);
         Swal.fire({
           icon: 'warning',
           title: 'Validasi No. Kartu BPJS',
-          text: `Nomor Kartu BPJS Kesehatan harus tepat 13 digit angka (saat ini ${inputNoBpjs.length} digit).`,
+          text: `Nomor Kartu BPJS Kesehatan harus tepat 13 digit angka (saat ini ${cleanBpjs.length} digit). Harap lengkapi nomor kartu terlebih dahulu.`,
           confirmButtonColor: '#2563eb'
         });
         return;
       }
     } else if (searchMethod === 'nik') {
       if (!inputNik || inputNik.length !== 16) {
+        setCheckResult(null);
         Swal.fire({
           icon: 'warning',
           title: 'Validasi NIK KTP',
-          text: `Nomor Induk Kependudukan (NIK) harus tepat 16 digit angka (saat ini ${inputNik.length} digit).`,
+          text: `Nomor Induk Kependudukan (NIK) harus tepat 16 digit angka (saat ini ${inputNik ? inputNik.length : 0} digit).`,
+          confirmButtonColor: '#2563eb'
+        });
+        return;
+      }
+    } else if (searchMethod === 'patientList') {
+      if (!selectedPatientId) {
+        setCheckResult(null);
+        Swal.fire({
+          icon: 'warning',
+          title: 'Pilih Pasien Terlebih Dahulu',
+          text: 'Silakan pilih pasien dari daftar untuk memeriksa kepesertaan dan SEP BPJS.',
           confirmButtonColor: '#2563eb'
         });
         return;
@@ -161,7 +190,7 @@ export const ModalCekBpjs: React.FC<ModalCekBpjsProps> = ({
       const hakKelas = matched?.bpjsClass || 'Kelas 1';
       const sepNo = isAktif ? `0012R0010826V${Math.floor(100000 + Math.random() * 900000)}` : '-';
       const faskes1 = 'Puskesmas Kebon Jeruk (0112001)';
-      const respCode = isAktif ? '200 OK' : '201 Not Active';
+      const respCode = isAktif ? 'Aktif' : 'Tidak Aktif';
 
       const result = {
         noBPJS: resolvedBpjs,
@@ -401,7 +430,7 @@ export const ModalCekBpjs: React.FC<ModalCekBpjsProps> = ({
                     : 'bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50'
                 }`}
               >
-                ● Status AKTIF (200 OK)
+                ● Status AKTIF
               </button>
               <button
                 type="button"
@@ -412,7 +441,7 @@ export const ModalCekBpjs: React.FC<ModalCekBpjsProps> = ({
                     : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
                 }`}
               >
-                ▲ Status TIDAK AKTIF (201)
+                ▲ Status TIDAK AKTIF
               </button>
             </div>
 
@@ -460,7 +489,7 @@ export const ModalCekBpjs: React.FC<ModalCekBpjsProps> = ({
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-rose-600 text-white shadow-xs'
                 }`}>
-                  {checkResult.status === 'Aktif' ? '✓ STATUS: AKTIF (200)' : '⚠ STATUS: TIDAK AKTIF (201)'}
+                  {checkResult.status === 'Aktif' ? '✓ STATUS: AKTIF' : '⚠ STATUS: TIDAK AKTIF'}
                 </span>
               </div>
             </div>

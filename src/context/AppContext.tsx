@@ -3,7 +3,8 @@ import {
   User, Role, RoleId, Patient, Registration, GeneralConsent, MedicalRecord,
   CPPT, InformedConsent, Coding, Claim, Billing, PharmacyRecord, LabRecord,
   RadiologyRecord, Bed, AuditEntry, DokumenBerkas, AsuhanKeperawatan,
-  ResumeMedis, ResumeMedisStatus
+  ResumeMedis, ResumeMedisStatus,
+  MasterRuangan, MasterBed, MasterDokter, MasterPoli, DoctorPoliMapping, SimClass
 } from '../types';
 import {
   INITIAL_USERS, INITIAL_ROLES, INITIAL_PATIENTS, INITIAL_REGISTRATIONS,
@@ -11,8 +12,12 @@ import {
   INITIAL_INFORMED_CONSENTS, INITIAL_CODING, INITIAL_CLAIMS, INITIAL_BILLING,
   INITIAL_PHARMACY, INITIAL_LAB, INITIAL_RADIOLOGY, INITIAL_BEDS,
   INITIAL_AUDIT_TRAIL, INITIAL_ICD10, INITIAL_ICD9CM,
-  INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS
+  INITIAL_DOKUMEN_BERKAS, INITIAL_RESUME_MEDIS, INITIAL_CLASSES
 } from '../data/mockData';
+import {
+  INITIAL_MASTER_RUANGAN, INITIAL_MASTER_POLI, INITIAL_MASTER_DOKTER,
+  INITIAL_DOCTOR_POLI_MAPPINGS, INITIAL_MASTER_BEDS
+} from '../data/masterDataInit';
 import { sanitizePatientList, sanitizeMedicalRecords } from '../data/seedNormalizers';
 import { useSlice } from '../data-layer/useSlice';
 import { getBackendMode } from '../data-layer/config';
@@ -52,7 +57,7 @@ interface AppContextType {
   sidebarCollapsed: boolean;
   
   toggleSidebar: () => void;
-  login: (u: string, p: string, selectedRoleId?: RoleId) => Promise<{ success: boolean; error?: string; needsClassChoice?: boolean }>;
+  login: (u: string, p: string, selectedRoleId?: RoleId, selectedClassId?: string) => Promise<{ success: boolean; error?: string; needsClassChoice?: boolean }>;
   backendMode: BackendMode;
   booting: boolean;
   accountType: AccountType | null;
@@ -66,6 +71,7 @@ interface AppContextType {
   logout: () => void;
   navigate: (page: string, params?: any) => void;
   audit: (action: AuditEntry['action'], entity: string, entityId: string, details?: { field_name?: string; old_value?: any; new_value?: any }) => void;
+  logAudit: (entry: { action: AuditEntry['action']; entity: string; entityId: string; field_name?: string; old_value?: any; new_value?: any }) => void;
   
   generateNoRM: () => string;
   addPatient: (patient: Omit<Patient, 'id'>) => Patient;
@@ -143,6 +149,51 @@ interface AppContextType {
   getUser: (id: string) => User | undefined;
   getRole: (id: string) => Role | undefined;
   canEditPage: (pageId?: string) => boolean;
+
+  // Master Data SIMRS (Superadmin R01)
+  masterRuangan: MasterRuangan[];
+  masterBed: MasterBed[];
+  masterDokter: MasterDokter[];
+  masterPoli: MasterPoli[];
+  doctorPoliMappings: DoctorPoliMapping[];
+
+  addMasterRuangan: (data: Omit<MasterRuangan, 'id' | 'createdAt' | 'updatedAt'>) => { success: boolean; message: string; data?: MasterRuangan };
+  updateMasterRuangan: (id: string, updates: Partial<MasterRuangan>) => { success: boolean; message: string };
+  deleteMasterRuangan: (id: string) => { success: boolean; message: string };
+  toggleMasterRuanganStatus: (id: string) => void;
+
+  addMasterBed: (data: Omit<MasterBed, 'id' | 'createdAt' | 'updatedAt'>) => { success: boolean; message: string; data?: MasterBed };
+  updateMasterBed: (id: string, updates: Partial<MasterBed>) => { success: boolean; message: string };
+  deleteMasterBed: (id: string) => { success: boolean; message: string };
+  toggleMasterBedStatus: (id: string) => { success: boolean; message: string };
+
+  addMasterDokter: (data: Omit<MasterDokter, 'id' | 'createdAt' | 'updatedAt'>) => { success: boolean; message: string; data?: MasterDokter };
+  updateMasterDokter: (id: string, updates: Partial<MasterDokter>) => { success: boolean; message: string };
+  deleteMasterDokter: (id: string) => { success: boolean; message: string };
+  toggleMasterDokterStatus: (id: string) => void;
+
+  addMasterPoli: (data: Omit<MasterPoli, 'id' | 'createdAt' | 'updatedAt'>) => { success: boolean; message: string; data?: MasterPoli };
+  updateMasterPoli: (id: string, updates: Partial<MasterPoli>) => { success: boolean; message: string };
+  deleteMasterPoli: (id: string) => { success: boolean; message: string };
+  toggleMasterPoliStatus: (id: string) => { success: boolean; message: string };
+
+  addDoctorPoliMapping: (data: Omit<DoctorPoliMapping, 'id' | 'createdAt' | 'updatedAt'>) => { success: boolean; message: string; data?: DoctorPoliMapping };
+  updateDoctorPoliMapping: (id: string, updates: Partial<DoctorPoliMapping>) => { success: boolean; message: string };
+  deleteDoctorPoliMapping: (id: string) => { success: boolean; message: string };
+  toggleDoctorPoliMappingStatus: (id: string) => void;
+
+  getDoctorsForPoli: (poliIdOrName: string) => MasterDokter[];
+
+  // Multi-Tenant Classes & Roster (SIMRS Edukasi)
+  classes: SimClass[];
+  activeClassId: string;
+  setActiveClassId: (id: string) => void;
+  addClass: (cls: Omit<SimClass, 'createdAt'>) => { success: boolean; message?: string };
+  importRoster: (classId: string, students: Array<{ nim: string; name: string; roleId?: RoleId; tempPassword?: string }>) => { success: boolean; count: number; duplicates?: number };
+  toggleUserActive: (userId: string) => void;
+  batchSetUsersActive: (userIds: string[], active: boolean) => void;
+  resetClassSimulation: (classId: string) => void;
+  createDosenUser: (dosenData: { name: string; username: string; password?: string; classId?: string; nidn?: string }) => { success: boolean; message?: string };
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -170,6 +221,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     return INITIAL_USERS;
   });
+
+  const [classes, setClasses] = useState<SimClass[]>(() => {
+    const saved = localStorage.getItem('simrs_classes');
+    if (saved) {
+      try {
+        const parsed: SimClass[] = JSON.parse(saved);
+        if (parsed && parsed.length > 0) return parsed;
+      } catch (e) {
+        return INITIAL_CLASSES;
+      }
+    }
+    return INITIAL_CLASSES;
+  });
+
+  const [activeClassId, setActiveClassIdState] = useState<string>(() => {
+    return localStorage.getItem('simrs_active_class_id') || 'RMIK-2024-A';
+  });
+
+  useEffect(() => {
+    if (getBackendMode() === 'local') localStorage.setItem('simrs_classes', JSON.stringify(classes));
+  }, [classes]);
 
   const [roles, setRoles] = useState<Role[]>(() => {
     const saved = localStorage.getItem('simrs_roles');
@@ -238,9 +310,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_BILLING;
   });
 
-  const [pharmacy] = useState<PharmacyRecord[]>(INITIAL_PHARMACY);
-  const [lab] = useState<LabRecord[]>(INITIAL_LAB);
-  const [radiology] = useState<RadiologyRecord[]>(INITIAL_RADIOLOGY);
+  const [pharmacy, setPharmacy] = useState<PharmacyRecord[]>(INITIAL_PHARMACY);
+  const [lab, setLab] = useState<LabRecord[]>(INITIAL_LAB);
+  const [radiology, setRadiology] = useState<RadiologyRecord[]>(INITIAL_RADIOLOGY);
   const [beds, setBeds] = useSlice<Bed>('beds', () => {
     const saved = localStorage.getItem('simrs_beds');
     return saved ? JSON.parse(saved) : INITIAL_BEDS;
@@ -264,6 +336,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [resumeMedisList, setResumeMedisList] = useSlice<ResumeMedis>('resumeMedisList', () => {
     const saved = localStorage.getItem('simrs_resume_medis');
     return saved ? JSON.parse(saved) : INITIAL_RESUME_MEDIS;
+  });
+
+  // MASTER DATA SIMRS (SUPERADMIN R01)
+  const [masterRuangan, setMasterRuangan] = useSlice<MasterRuangan>('masterRuangan', () => {
+    const saved = localStorage.getItem('simrs_master_ruangan');
+    return saved ? JSON.parse(saved) : INITIAL_MASTER_RUANGAN;
+  });
+
+  const [masterBed, setMasterBed] = useSlice<MasterBed>('masterBed', () => {
+    const saved = localStorage.getItem('simrs_master_bed');
+    return saved ? JSON.parse(saved) : INITIAL_MASTER_BEDS;
+  });
+
+  const [masterDokter, setMasterDokter] = useSlice<MasterDokter>('masterDokter', () => {
+    const saved = localStorage.getItem('simrs_master_dokter');
+    return saved ? JSON.parse(saved) : INITIAL_MASTER_DOKTER;
+  });
+
+  const [masterPoli, setMasterPoli] = useSlice<MasterPoli>('masterPoli', () => {
+    const saved = localStorage.getItem('simrs_master_poli');
+    return saved ? JSON.parse(saved) : INITIAL_MASTER_POLI;
+  });
+
+  const [doctorPoliMappings, setDoctorPoliMappings] = useSlice<DoctorPoliMapping>('doctorPoliMappings', () => {
+    const saved = localStorage.getItem('simrs_doctor_poli_mappings');
+    return saved ? JSON.parse(saved) : INITIAL_DOCTOR_POLI_MAPPINGS;
   });
 
   const [activePage, setActivePage] = useState<string>('dashboard');
@@ -308,39 +406,221 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       entity,
       entityId,
       field_name: details?.field_name || null,
-      old_value: details?.old_value ? String(details.old_value) : null,
-      new_value: details?.new_value ? String(details.new_value) : null,
+      old_value: details?.old_value !== undefined ? String(details.old_value) : null,
+      new_value: details?.new_value !== undefined ? String(details.new_value) : null,
       ip: '192.168.1.' + Math.floor(Math.random() * 255),
       device: navigator.userAgent.substring(0, 80),
-      module: activePage
+      module: activePage,
+      classId: activeClassId
     };
-    setAuditTrail(prev => [newEntry, ...prev.slice(0, 499)]);
+    // Strictly append-only: prepends to immutable audit trail
+    setAuditTrail(prev => {
+      const updated = [newEntry, ...prev.slice(0, 999)];
+      localStorage.setItem('simrs_audit_trail', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const logAudit = (entry: { action: AuditEntry['action']; entity: string; entityId: string; field_name?: string; old_value?: any; new_value?: any }) => {
+    audit(entry.action, entry.entity, entry.entityId, { field_name: entry.field_name, old_value: entry.old_value, new_value: entry.new_value });
+  };
+
+  const setActiveClassId = (id: string) => {
+    setActiveClassIdState(id);
+    localStorage.setItem('simrs_active_class_id', id);
+    audit('NAVIGATE', 'SimClass', id, { field_name: 'activeClassId', new_value: id });
+  };
+
+  const addClass = (cls: Omit<SimClass, 'createdAt'>) => {
+    if (backendMode === 'supabase') return { success: false, message: 'Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.' };
+    const cleanId = cls.id.trim().toUpperCase();
+    if (classes.some(c => c.id.toUpperCase() === cleanId)) {
+      return { success: false, message: `Kode Kelas "${cleanId}" sudah digunakan.` };
+    }
+    const newCls: SimClass = {
+      ...cls,
+      id: cleanId,
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    setClasses(prev => [...prev, newCls]);
+    audit('CREATE', 'SimClass', newCls.id, { field_name: 'name', new_value: newCls.name });
+    return { success: true };
+  };
+
+  const importRoster = (classId: string, students: Array<{ nim: string; name: string; roleId?: RoleId; tempPassword?: string }>) => {
+    if (backendMode === 'supabase') { notifyInfo('Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.'); return { success: false, count: 0 }; }
+    let count = 0;
+    let duplicates = 0;
+    setUsers(prev => {
+      const existingUsernames = new Set(prev.map(u => u.username.toLowerCase()));
+      const newUsers: User[] = [];
+
+      students.forEach(st => {
+        const cleanNim = st.nim.trim();
+        const cleanName = st.name.trim();
+        if (!cleanNim || !cleanName) return;
+
+        if (existingUsernames.has(cleanNim.toLowerCase())) {
+          duplicates++;
+          return;
+        }
+
+        const tempPass = st.tempPassword || ('ueu' + cleanNim.slice(-4));
+        const newUser: User = {
+          id: 'U_' + cleanNim,
+          username: cleanNim,
+          password: tempPass,
+          tempPassword: tempPass,
+          name: cleanName,
+          roleId: st.roleId || 'R04', // default R04 Mahasiswa (All Modul)
+          classId: classId,
+          nim: cleanNim,
+          active: true,
+          isFirstLogin: true
+        };
+        newUsers.push(newUser);
+        existingUsernames.add(cleanNim.toLowerCase());
+        count++;
+      });
+
+      return [...prev, ...newUsers];
+    });
+
+    audit('CREATE', 'RosterImport', classId, {
+      field_name: 'roster_import',
+      new_value: `${count} mahasiswa diimpor ke kelas ${classId}`
+    });
+
+    return { success: true, count, duplicates };
+  };
+
+  const toggleUserActive = (userId: string) => {
+    if (backendMode === 'supabase') { notifyInfo('Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.'); return; }
+    setUsers(prev => prev.map(u => {
+      if (u.id === userId) {
+        const newActive = !u.active;
+        audit('UPDATE', 'User', userId, {
+          field_name: 'active',
+          old_value: String(u.active),
+          new_value: String(newActive)
+        });
+        return { ...u, active: newActive };
+      }
+      return u;
+    }));
+  };
+
+  const batchSetUsersActive = (userIds: string[], active: boolean) => {
+    if (backendMode === 'supabase') { notifyInfo('Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.'); return; }
+    const idSet = new Set(userIds);
+    setUsers(prev => prev.map(u => {
+      if (idSet.has(u.id)) {
+        return { ...u, active };
+      }
+      return u;
+    }));
+    audit('UPDATE', 'UserBatch', activeClassId, {
+      field_name: 'batch_active',
+      new_value: `${userIds.length} mahasiswa diset active=${active}`
+    });
+  };
+
+  const resetClassSimulation = (classId: string) => {
+    if (backendMode === 'supabase') {
+      sb.resetActiveClass().then(r => { if (!r.success) notifyInfo(r.error || 'Reset kelas gagal.'); }).catch(notifySaveError);
+      return;
+    }
+    setPatients(INITIAL_PATIENTS);
+    setRegistrations(INITIAL_REGISTRATIONS);
+    setGeneralConsents(INITIAL_GENERAL_CONSENTS);
+    setMedicalRecords(INITIAL_MEDICAL_RECORDS);
+    setCppt(INITIAL_CPPT);
+    setInformedConsents(INITIAL_INFORMED_CONSENTS);
+    setCoding(INITIAL_CODING);
+    setClaims(INITIAL_CLAIMS);
+    setBilling(INITIAL_BILLING);
+    setPharmacy(INITIAL_PHARMACY);
+    setLab(INITIAL_LAB);
+    setRadiology(INITIAL_RADIOLOGY);
+    setBeds(INITIAL_BEDS);
+    setResumeMedisList(INITIAL_RESUME_MEDIS);
+
+    localStorage.setItem('simrs_patients', JSON.stringify(INITIAL_PATIENTS));
+    localStorage.setItem('simrs_registrations', JSON.stringify(INITIAL_REGISTRATIONS));
+    localStorage.setItem('simrs_generalConsents', JSON.stringify(INITIAL_GENERAL_CONSENTS));
+    localStorage.setItem('simrs_medicalRecords', JSON.stringify(INITIAL_MEDICAL_RECORDS));
+    localStorage.setItem('simrs_cppt', JSON.stringify(INITIAL_CPPT));
+    localStorage.setItem('simrs_informedConsents', JSON.stringify(INITIAL_INFORMED_CONSENTS));
+    localStorage.setItem('simrs_coding', JSON.stringify(INITIAL_CODING));
+    localStorage.setItem('simrs_claims', JSON.stringify(INITIAL_CLAIMS));
+    localStorage.setItem('simrs_billing', JSON.stringify(INITIAL_BILLING));
+    localStorage.setItem('simrs_pharmacy', JSON.stringify(INITIAL_PHARMACY));
+    localStorage.setItem('simrs_lab', JSON.stringify(INITIAL_LAB));
+    localStorage.setItem('simrs_radiology', JSON.stringify(INITIAL_RADIOLOGY));
+    localStorage.setItem('simrs_beds', JSON.stringify(INITIAL_BEDS));
+    localStorage.setItem('simrs_resumeMedisList', JSON.stringify(INITIAL_RESUME_MEDIS));
+
+    audit('UPDATE', 'SimClass', classId, {
+      field_name: 'reset_simulation',
+      new_value: `Simulasi data kelas ${classId} telah di-reset ke benchmark awal oleh ${user?.name || 'Dosen'}`
+    });
+  };
+
+  const createDosenUser = (dosenData: { name: string; username: string; password?: string; classId?: string; nidn?: string }) => {
+    if (backendMode === 'supabase') return { success: false, message: 'Dalam mode database, kelola kelas dan roster melalui tab Kelas & Roster.' };
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang berwenang membuat akun Dosen.' };
+    }
+    const cleanU = dosenData.username.trim().toLowerCase();
+    if (users.some(u => u.username.toLowerCase() === cleanU)) {
+      return { success: false, message: 'Username sudah digunakan oleh akun lain.' };
+    }
+    const newDosen: User = {
+      id: genId('U_DSN'),
+      username: cleanU,
+      password: dosenData.password || 'dosen123',
+      tempPassword: dosenData.password || 'dosen123',
+      name: dosenData.name.trim(),
+      roleId: 'R03', // Dosen
+      classId: dosenData.classId || activeClassId,
+      active: true
+    };
+    setUsers(prev => [...prev, newDosen]);
+    audit('CREATE', 'User', newDosen.id, {
+      field_name: 'create_dosen',
+      new_value: `Akun Dosen ${newDosen.name} (${newDosen.username}) dibuat untuk kelas ${newDosen.classId}`
+    });
+    return { success: true };
   };
 
   const toggleSidebar = () => setSidebarCollapsed(prev => !prev);
 
-  const loginLocal = (u: string, p: string, selectedRoleId?: RoleId) => {
+  const loginLocal = (u: string, p: string, selectedRoleId?: RoleId, selectedClassId?: string) => {
     const cleanU = u.trim();
     const cleanP = p.trim();
 
     // 1. Search exact user match
-    let found = users.find(x => x.username.toLowerCase() === cleanU.toLowerCase() && x.password === cleanP && x.active);
+    let found = users.find(x => x.username.toLowerCase() === cleanU.toLowerCase() && x.password === cleanP);
 
     // 2. Fallback search by username
     if (!found) {
-      found = users.find(x => x.username.toLowerCase() === cleanU.toLowerCase() && x.active);
+      found = users.find(x => x.username.toLowerCase() === cleanU.toLowerCase());
     }
 
     // 3. Fallback auto-provision for student NIM (e.g. 20240306044) or custom username
     if (!found && cleanU.length > 0) {
       const isNim = /^\d+$/.test(cleanU);
       const assignedRole = selectedRoleId || 'R04';
+      const targetClass = selectedClassId || activeClassId;
       const newStudentUser: User = {
         id: 'U_' + cleanU,
         username: cleanU,
         password: cleanP || 'mhs123',
+        tempPassword: cleanP || 'mhs123',
         name: isNim ? `Mahasiswa RMIK (${cleanU})` : cleanU,
         roleId: assignedRole,
+        classId: targetClass,
+        nim: isNim ? cleanU : undefined,
         active: true
       };
       setUsers(prev => [...prev, newStudentUser]);
@@ -348,23 +628,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (!found) {
-      return { success: false, error: 'Username/NIM atau password salah atau akun non-aktif' };
+      return { success: false, error: 'Username/NIM atau password salah.' };
     }
 
-    // Assign selected role for active session if specified in login form
+    // Protection: Inactive user cannot log in
+    if (!found.active) {
+      return {
+        success: false,
+        error: 'Akun Anda berstatus NON-AKTIF. Silakan hubungi Dosen Pengampu atau Administrator untuk aktivasi.'
+      };
+    }
+
+    // Protection: Students cannot self-promote to Admin (R01) or Dosen (R03)
+    const isBaseStudent = found.roleId !== 'R01' && found.roleId !== 'R03';
+    if (isBaseStudent && (selectedRoleId === 'R01' || selectedRoleId === 'R03')) {
+      return {
+        success: false,
+        error: 'Akses Ditolak: Mahasiswa tidak memiliki wewenang untuk masuk sebagai Admin atau Dosen!'
+      };
+    }
+
+    const effectiveClass = selectedClassId || found.classId || activeClassId;
+    setActiveClassIdState(effectiveClass);
+    localStorage.setItem('simrs_active_class_id', effectiveClass);
+
+    // Assign selected role for active session (R04 stays "all modules", or practice role)
     const sessionUser: User = {
       ...found,
-      roleId: selectedRoleId || found.roleId
+      roleId: selectedRoleId || found.roleId,
+      classId: effectiveClass
     };
 
     setUser(sessionUser);
-    audit('LOGIN', 'User', sessionUser.id, { field_name: 'roleId', new_value: sessionUser.roleId });
+    localStorage.setItem('simrs_current_user', JSON.stringify(sessionUser));
+    audit('LOGIN', 'User', sessionUser.id, {
+      field_name: 'roleId',
+      new_value: `${sessionUser.roleId} (Kelas: ${effectiveClass})`
+    });
     return { success: true };
   };
 
-  const login = async (u: string, p: string, selectedRoleId?: RoleId) => {
+  const login = async (u: string, p: string, selectedRoleId?: RoleId, selectedClassId?: string) => {
     if (backendMode === 'supabase') return sb.login(u, p, selectedRoleId ?? 'R04');
-    return loginLocal(u, p, selectedRoleId);
+    return loginLocal(u, p, selectedRoleId, selectedClassId);
   };
 
   const logoutLocal = () => {
@@ -434,8 +740,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       cleanNoRM = cleanNoRM.padStart(6, '0');
     }
+    let rawName = (patientData.name || '').trim();
+    rawName = rawName.replace(/^(tn\.|ny\.|nn\.|sdr\.|sdri\.|an\.|bpk\.|ibu\.|dr\.|dra\.|drs\.|h\.|hj\.|tuan|nyonya|nona|saudara|saudari|anak|bapak|ibu)\s+/i, '');
+    const cleanName = rawName.toUpperCase().trim();
     const newPatient: Patient = {
       ...patientData,
+      name: cleanName,
       noRM: cleanNoRM,
       id: genId('P')
     };
@@ -453,24 +763,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updatePatient = (patientId: string, updates: Partial<Patient>) => {
     let oldName = '';
+    const normalizedUpdates = updates.name 
+      ? { 
+          ...updates, 
+          name: updates.name.replace(/^(tn\.|ny\.|nn\.|sdr\.|sdri\.|an\.|bpk\.|ibu\.|dr\.|dra\.|drs\.|h\.|hj\.|tuan|nyonya|nona|saudara|saudari|anak|bapak|ibu)\s+/i, '').toUpperCase().trim() 
+        } 
+      : updates;
+
     setPatients(prev => prev.map(p => {
       if (p.id === patientId) {
         oldName = p.name;
         audit('UPDATE', 'Pasien', patientId, { 
-          field_name: updates.name && updates.name !== p.name ? 'name' : 'patient_identity_update', 
+          field_name: normalizedUpdates.name && normalizedUpdates.name !== p.name ? 'name' : 'patient_identity_update', 
           old_value: p.name,
-          new_value: JSON.stringify(updates) 
+          new_value: JSON.stringify(normalizedUpdates) 
         });
-        return { ...p, ...updates };
+        return { ...p, ...normalizedUpdates };
       }
       return p;
     }));
 
-    if (updates.name && oldName && updates.name !== oldName) {
+    if (normalizedUpdates.name && oldName && normalizedUpdates.name !== oldName) {
       setGeneralConsents(prev => prev.map(gc => {
         const reg = registrations.find(r => r.id === gc.regId);
         if (reg?.patientId === patientId && (gc.patientSign === oldName || gc.patientSign === 'Pasien / Wali')) {
-          return { ...gc, patientSign: updates.name };
+          return { ...gc, patientSign: normalizedUpdates.name };
         }
         return gc;
       }));
@@ -1186,7 +1503,602 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (targetPage === 'bedmanagement') {
       return role.access.includes('all') || role.access.includes('pendaftaran') || role.access.includes('bedmanagement');
     }
+    if (targetPage === 'masterdata') {
+      return user?.roleId === 'R01';
+    }
     return role.access.includes(targetPage);
+  };
+
+  // ========================================================
+  // MASTER DATA MANAGEMENT METHODS (ROLE SUPERADMIN R01)
+  // ========================================================
+
+  // --- 1. RUANGAN ---
+  const addMasterRuangan = (data: Omit<MasterRuangan, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const cleanKode = data.kode.trim().toUpperCase();
+    if (!cleanKode || !data.nama.trim()) {
+      return { success: false, message: 'Kode dan Nama Ruangan wajib diisi!' };
+    }
+    if (masterRuangan.some(r => r.kode.toUpperCase() === cleanKode)) {
+      return { success: false, message: `Kode ruangan "${cleanKode}" sudah digunakan! Harap gunakan kode unik lain.` };
+    }
+    if (Number(data.kapasitas) < 0) {
+      return { success: false, message: 'Kapasitas ruangan tidak boleh bernilai negatif!' };
+    }
+
+    const newRuangan: MasterRuangan = {
+      ...data,
+      id: genId('RNG'),
+      kode: cleanKode,
+      nama: data.nama.trim(),
+      kapasitas: Number(data.kapasitas) || 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setMasterRuangan(prev => [...prev, newRuangan]);
+    audit('CREATE', 'MasterRuangan', newRuangan.id, { field_name: 'nama', new_value: newRuangan.nama });
+    return { success: true, message: `Ruangan "${newRuangan.nama}" berhasil ditambahkan.`, data: newRuangan };
+  };
+
+  const updateMasterRuangan = (id: string, updates: Partial<MasterRuangan>) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    if (updates.kode) {
+      const cleanKode = updates.kode.trim().toUpperCase();
+      if (masterRuangan.some(r => r.id !== id && r.kode.toUpperCase() === cleanKode)) {
+        return { success: false, message: `Kode ruangan "${cleanKode}" sudah digunakan ruangan lain!` };
+      }
+    }
+    if (updates.kapasitas !== undefined && Number(updates.kapasitas) < 0) {
+      return { success: false, message: 'Kapasitas ruangan tidak boleh bernilai negatif!' };
+    }
+
+    setMasterRuangan(prev => prev.map(r => {
+      if (r.id === id) {
+        const updated = {
+          ...r,
+          ...updates,
+          kode: updates.kode ? updates.kode.trim().toUpperCase() : r.kode,
+          nama: updates.nama ? updates.nama.trim() : r.nama,
+          updatedAt: new Date().toISOString()
+        };
+        audit('UPDATE', 'MasterRuangan', id, { field_name: 'ruangan_update', new_value: updated.nama });
+        return updated;
+      }
+      return r;
+    }));
+    return { success: true, message: 'Informasi ruangan berhasil diperbarui.' };
+  };
+
+  const deleteMasterRuangan = (id: string) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const targetRoom = masterRuangan.find(r => r.id === id);
+    if (!targetRoom) return { success: false, message: 'Ruangan tidak ditemukan.' };
+
+    const occupiedBed = masterBed.find(b => 
+      (b.ruanganId === id || b.ruanganNama === targetRoom.nama) && 
+      (b.statusOperasional === 'Terisi' || b.patientId)
+    );
+    if (occupiedBed) {
+      return { 
+        success: false, 
+        message: `Ruangan "${targetRoom.nama}" tidak dapat dihapus karena bed "${occupiedBed.nama}" sedang ditempati oleh pasien aktif!` 
+      };
+    }
+
+    setMasterRuangan(prev => prev.filter(r => r.id !== id));
+    setMasterBed(prev => prev.filter(b => b.ruanganId !== id && b.ruanganNama !== targetRoom.nama));
+    setBeds(prev => prev.filter(b => !b.room.includes(targetRoom.nama)));
+    audit('DELETE', 'MasterRuangan', id, { field_name: 'nama', old_value: targetRoom.nama });
+    return { success: true, message: `Ruangan "${targetRoom.nama}" berhasil dihapus.` };
+  };
+
+  const toggleMasterRuanganStatus = (id: string) => {
+    if (user?.roleId !== 'R01') return;
+    setMasterRuangan(prev => prev.map(r => {
+      if (r.id === id) {
+        const nextStatus = r.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+        audit('UPDATE', 'MasterRuangan', id, { field_name: 'status', old_value: r.status, new_value: nextStatus });
+        return { ...r, status: nextStatus, updatedAt: new Date().toISOString() };
+      }
+      return r;
+    }));
+  };
+
+  // --- 2. BED / TEMPAT TIDUR ---
+  const addMasterBed = (data: Omit<MasterBed, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const cleanKode = data.kode.trim().toUpperCase();
+    if (!cleanKode || !data.nama.trim() || !data.ruanganId) {
+      return { success: false, message: 'Kode bed, nama bed, dan ruangan penempatan wajib diisi!' };
+    }
+    if (masterBed.some(b => b.kode.toUpperCase() === cleanKode || b.id.toUpperCase() === cleanKode)) {
+      return { success: false, message: `Kode bed "${cleanKode}" sudah terdaftar!` };
+    }
+
+    const room = masterRuangan.find(r => r.id === data.ruanganId);
+    if (!room) {
+      return { success: false, message: 'Ruangan yang dipilih tidak valid.' };
+    }
+
+    const currentBedsInRoom = masterBed.filter(b => b.ruanganId === data.ruanganId && b.status !== 'Nonaktif').length;
+    if (room.kapasitas > 0 && currentBedsInRoom >= room.kapasitas) {
+      return { 
+        success: false, 
+        message: `Peringatan Kapasitas: Ruangan "${room.nama}" sudah mencapai kapasitas maksimal (${room.kapasitas} bed). Perbesar kapasitas ruangan terlebih dahulu.` 
+      };
+    }
+
+    const newBed: MasterBed = {
+      ...data,
+      id: cleanKode,
+      kode: cleanKode,
+      nama: data.nama.trim(),
+      ruanganNama: room.nama,
+      statusOperasional: data.statusOperasional || 'Tersedia',
+      patientId: null,
+      pasienNama: null,
+      status: 'Aktif',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setMasterBed(prev => [...prev, newBed]);
+
+    const mappedBedStatus: Bed['status'] = newBed.statusOperasional === 'Terisi' ? 'Occupied' 
+      : newBed.statusOperasional === 'Dalam Perbaikan' ? 'Maintenance' 
+      : newBed.statusOperasional === 'Dibersihkan' ? 'Cleaning' 
+      : 'Available';
+
+    const simrsBed: Bed = {
+      id: newBed.id,
+      room: room.nama,
+      floor: room.lokasi.includes('Lantai') ? room.lokasi.replace(/.*Lantai\s*/i, '').trim().charAt(0) : '2',
+      class: (newBed.kelas as any) || 'Kelas 1',
+      status: mappedBedStatus,
+      patientId: null,
+      roomName: newBed.nama.split('-')[0]?.trim() || room.nama,
+      bedNumber: newBed.nama.split('-')[1]?.trim() || newBed.nama,
+      note: newBed.catatan
+    };
+    setBeds(prev => [...prev.filter(b => b.id !== newBed.id), simrsBed]);
+
+    audit('CREATE', 'MasterBed', newBed.id, { field_name: 'kode', new_value: newBed.kode });
+    return { success: true, message: `Bed "${newBed.nama}" berhasil ditambahkan ke ruangan ${room.nama}.`, data: newBed };
+  };
+
+  const updateMasterBed = (id: string, updates: Partial<MasterBed>) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const current = masterBed.find(b => b.id === id);
+    if (!current) return { success: false, message: 'Data bed tidak ditemukan.' };
+
+    if (current.statusOperasional === 'Terisi' && updates.statusOperasional && updates.statusOperasional !== 'Terisi') {
+      if (current.patientId) {
+        return { 
+          success: false, 
+          message: 'Validasi SIMRS: Bed sedang ditempati oleh pasien aktif. Status "Terisi" tidak boleh diubah manual tanpa melalui alur discharge atau mutasi pasien di Bed Management!' 
+        };
+      }
+    }
+
+    if ((current.statusOperasional === 'Terisi' || current.patientId) && updates.status === 'Nonaktif') {
+      return {
+        success: false,
+        message: 'Bed yang sedang ditempati pasien tidak boleh dinonaktifkan! Selesaikan admisi atau pindahkan pasien terlebih dahulu.'
+      };
+    }
+
+    let targetRoomName = current.ruanganNama;
+    if (updates.ruanganId && updates.ruanganId !== current.ruanganId) {
+      const room = masterRuangan.find(r => r.id === updates.ruanganId);
+      if (room) targetRoomName = room.nama;
+    }
+
+    setMasterBed(prev => prev.map(b => {
+      if (b.id === id) {
+        return {
+          ...b,
+          ...updates,
+          ruanganNama: targetRoomName,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return b;
+    }));
+
+    if (updates.statusOperasional || updates.nama || updates.kelas || updates.ruanganId) {
+      setBeds(prev => prev.map(b => {
+        if (b.id === id) {
+          const mappedStatus: Bed['status'] = updates.statusOperasional === 'Terisi' ? 'Occupied'
+            : updates.statusOperasional === 'Dalam Perbaikan' ? 'Maintenance'
+            : updates.statusOperasional === 'Dibersihkan' ? 'Cleaning'
+            : 'Available';
+          return {
+            ...b,
+            room: targetRoomName,
+            class: (updates.kelas as any) || b.class,
+            status: updates.statusOperasional ? mappedStatus : b.status,
+            roomName: updates.nama ? updates.nama.split('-')[0]?.trim() : b.roomName,
+            bedNumber: updates.nama ? updates.nama.split('-')[1]?.trim() || updates.nama : b.bedNumber,
+            note: updates.catatan !== undefined ? updates.catatan : b.note
+          };
+        }
+        return b;
+      }));
+    }
+
+    audit('UPDATE', 'MasterBed', id, { field_name: 'bed_update', new_value: updates.statusOperasional || updates.nama });
+    return { success: true, message: 'Data bed berhasil diperbarui.' };
+  };
+
+  const deleteMasterBed = (id: string) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const target = masterBed.find(b => b.id === id);
+    if (!target) return { success: false, message: 'Bed tidak ditemukan.' };
+
+    if (target.statusOperasional === 'Terisi' || target.patientId) {
+      return {
+        success: false,
+        message: 'DILARANG MENGHAPUS: Bed ini sedang ditempati oleh pasien aktif! Lakukan discharge atau mutasi pasien terlebih dahulu.'
+      };
+    }
+
+    setMasterBed(prev => prev.filter(b => b.id !== id));
+    setBeds(prev => prev.filter(b => b.id !== id));
+    audit('DELETE', 'MasterBed', id, { field_name: 'kode', old_value: target.kode });
+    return { success: true, message: `Bed "${target.nama}" berhasil dihapus.` };
+  };
+
+  const toggleMasterBedStatus = (id: string) => {
+    if (user?.roleId !== 'R01') return { success: false, message: 'Akses terbatas untuk Superadmin.' };
+    const target = masterBed.find(b => b.id === id);
+    if (!target) return { success: false, message: 'Bed tidak ditemukan.' };
+
+    if (target.status === 'Aktif' && (target.statusOperasional === 'Terisi' || target.patientId)) {
+      return {
+        success: false,
+        message: 'Bed yang sedang ditempati pasien tidak boleh dinonaktifkan sebelum pemindahan pasien dilakukan!'
+      };
+    }
+
+    const nextStatus = target.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+    setMasterBed(prev => prev.map(b => b.id === id ? { ...b, status: nextStatus, updatedAt: new Date().toISOString() } : b));
+    audit('UPDATE', 'MasterBed', id, { field_name: 'status', old_value: target.status, new_value: nextStatus });
+    return { success: true, message: `Status bed "${target.nama}" berhasil diubah menjadi ${nextStatus}.` };
+  };
+
+  // --- 3. DOKTER ---
+  const addMasterDokter = (data: Omit<MasterDokter, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const cleanName = data.nama.trim();
+    const cleanNik = data.nik.trim();
+    if (!cleanName || !data.spesialisasi) {
+      return { success: false, message: 'Nama dokter dan spesialisasi wajib diisi!' };
+    }
+
+    if (cleanNik && masterDokter.some(d => d.nik === cleanNik)) {
+      return { success: false, message: `Dokter dengan NIK "${cleanNik}" sudah terdaftar!` };
+    }
+    if (masterDokter.some(d => d.nama.toLowerCase() === cleanName.toLowerCase())) {
+      return { success: false, message: `Dokter dengan nama "${cleanName}" sudah ada dalam master data!` };
+    }
+
+    const newId = `DOC_${Date.now().toString(36).toUpperCase()}`;
+    const newDokter: MasterDokter = {
+      ...data,
+      id: newId,
+      nama: cleanName,
+      nik: cleanNik || `317405${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+      strSip: data.strSip || `STR-${Math.floor(1000000000 + Math.random() * 9000000000)}/2026`,
+      telepon: data.telepon || '0812' + Math.floor(10000000 + Math.random() * 90000000),
+      status: 'Aktif',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setMasterDokter(prev => [newDokter, ...prev]);
+    audit('CREATE', 'MasterDokter', newDokter.id, { field_name: 'nama', new_value: newDokter.nama });
+    return { success: true, message: `Dokter ${newDokter.nama} berhasil ditambahkan ke Master Data.`, data: newDokter };
+  };
+
+  const updateMasterDokter = (id: string, updates: Partial<MasterDokter>) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    setMasterDokter(prev => prev.map(d => {
+      if (d.id === id) {
+        const updated = { ...d, ...updates, updatedAt: new Date().toISOString() };
+        audit('UPDATE', 'MasterDokter', id, { field_name: 'nama', new_value: updated.nama });
+        return updated;
+      }
+      return d;
+    }));
+
+    if (updates.nama) {
+      setDoctorPoliMappings(prev => prev.map(m => m.doctorId === id ? { ...m, doctorName: updates.nama! } : m));
+    }
+    return { success: true, message: 'Data dokter berhasil diperbarui.' };
+  };
+
+  const deleteMasterDokter = (id: string) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const target = masterDokter.find(d => d.id === id);
+    if (!target) return { success: false, message: 'Dokter tidak ditemukan.' };
+
+    setDoctorPoliMappings(prev => prev.filter(m => m.doctorId !== id));
+    setMasterDokter(prev => prev.filter(d => d.id !== id));
+    audit('DELETE', 'MasterDokter', id, { field_name: 'nama', old_value: target.nama });
+    return { success: true, message: `Dokter "${target.nama}" berhasil dihapus beserta seluruh penugasannya.` };
+  };
+
+  const toggleMasterDokterStatus = (id: string) => {
+    if (user?.roleId !== 'R01') return;
+    setMasterDokter(prev => prev.map(d => {
+      if (d.id === id) {
+        const nextStatus = d.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+        audit('UPDATE', 'MasterDokter', id, { field_name: 'status', old_value: d.status, new_value: nextStatus });
+        return { ...d, status: nextStatus, updatedAt: new Date().toISOString() };
+      }
+      return d;
+    }));
+  };
+
+  // --- 4. POLI / KLINIK ---
+  const addMasterPoli = (data: Omit<MasterPoli, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const cleanKode = data.kode.trim().toUpperCase();
+    if (!cleanKode || !data.nama.trim()) {
+      return { success: false, message: 'Kode poli dan Nama Poli wajib diisi!' };
+    }
+    if (masterPoli.some(p => p.kode.toUpperCase() === cleanKode || p.id.toUpperCase() === cleanKode)) {
+      return { success: false, message: `Kode poli "${cleanKode}" sudah terdaftar!` };
+    }
+
+    const newPoli: MasterPoli = {
+      ...data,
+      id: cleanKode,
+      kode: cleanKode,
+      nama: data.nama.trim(),
+      status: 'Aktif',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setMasterPoli(prev => [...prev, newPoli]);
+    audit('CREATE', 'MasterPoli', newPoli.id, { field_name: 'nama', new_value: newPoli.nama });
+    return { success: true, message: `Poli "${newPoli.nama}" berhasil ditambahkan.`, data: newPoli };
+  };
+
+  const updateMasterPoli = (id: string, updates: Partial<MasterPoli>) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    setMasterPoli(prev => prev.map(p => {
+      if (p.id === id) {
+        const updated = { ...p, ...updates, updatedAt: new Date().toISOString() };
+        audit('UPDATE', 'MasterPoli', id, { field_name: 'nama', new_value: updated.nama });
+        return updated;
+      }
+      return p;
+    }));
+
+    if (updates.nama) {
+      setDoctorPoliMappings(prev => prev.map(m => m.poliId === id ? { ...m, poliName: updates.nama! } : m));
+    }
+    return { success: true, message: 'Data poli berhasil diperbarui.' };
+  };
+
+  const deleteMasterPoli = (id: string) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const target = masterPoli.find(p => p.id === id);
+    if (!target) return { success: false, message: 'Poli tidak ditemukan.' };
+
+    const hasActiveVisits = registrations.some(r => r.poli.toLowerCase() === target.nama.toLowerCase() || r.poli.toLowerCase().includes(target.nama.toLowerCase()));
+    const hasActiveMappings = doctorPoliMappings.some(m => m.poliId === id && m.status === 'Aktif');
+
+    if (hasActiveVisits || hasActiveMappings) {
+      return {
+        success: false,
+        message: `Poli "${target.nama}" memiliki riwayat kunjungan pasien atau jadwal aktif. Sesuai standar tata kelola SIMRS, gunakan fitur "Nonaktifkan Poli" untuk melindungi integritas transaksi!`
+      };
+    }
+
+    setMasterPoli(prev => prev.filter(p => p.id !== id));
+    setDoctorPoliMappings(prev => prev.filter(m => m.poliId !== id));
+    audit('DELETE', 'MasterPoli', id, { field_name: 'nama', old_value: target.nama });
+    return { success: true, message: `Poli "${target.nama}" berhasil dihapus.` };
+  };
+
+  const toggleMasterPoliStatus = (id: string) => {
+    if (user?.roleId !== 'R01') return { success: false, message: 'Akses terbatas untuk Superadmin.' };
+    const target = masterPoli.find(p => p.id === id);
+    if (!target) return { success: false, message: 'Poli tidak ditemukan.' };
+
+    const nextStatus = target.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+    setMasterPoli(prev => prev.map(p => p.id === id ? { ...p, status: nextStatus, updatedAt: new Date().toISOString() } : b => b));
+    audit('UPDATE', 'MasterPoli', id, { field_name: 'status', old_value: target.status, new_value: nextStatus });
+    return { success: true, message: `Status poli "${target.nama}" berhasil diubah menjadi ${nextStatus}.` };
+  };
+
+  // --- 5. PENEMPATAN DOKTER KE POLI (MAPPING MANY-TO-MANY) ---
+  const addDoctorPoliMapping = (data: Omit<DoctorPoliMapping, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    if (!data.doctorId || !data.poliId) {
+      return { success: false, message: 'Dokter dan Poli wajib dipilih!' };
+    }
+
+    const doc = masterDokter.find(d => d.id === data.doctorId);
+    const poli = masterPoli.find(p => p.id === data.poliId);
+    if (!doc || !poli) {
+      return { success: false, message: 'Dokter atau Poli tidak valid!' };
+    }
+
+    const requestedDays = data.hariPraktik || [];
+    const requestedStart = data.jamMulai || '08:00';
+    const requestedEnd = data.jamSelesai || '12:00';
+
+    const conflict = doctorPoliMappings.find(m => {
+      if (m.doctorId !== data.doctorId || m.status !== 'Aktif') return false;
+      const commonDay = m.hariPraktik.find(d => requestedDays.includes(d));
+      if (!commonDay) return false;
+      const isOverlap = !(requestedEnd <= m.jamMulai || requestedStart >= m.jamSelesai);
+      return isOverlap;
+    });
+
+    if (conflict) {
+      return {
+        success: false,
+        message: `VALIDASI BENTROK JADWAL: Dokter ${doc.nama} sudah memiliki jadwal di ${conflict.poliName} (${conflict.jadwalPraktik}) pada waktu yang sama. Dokter tidak dapat melayani 2 poli secara bersamaan!`
+      };
+    }
+
+    const newMapping: DoctorPoliMapping = {
+      ...data,
+      id: `MAP-${Date.now().toString(36).toUpperCase()}`,
+      doctorName: doc.nama,
+      poliName: poli.nama,
+      jadwalPraktik: data.jadwalPraktik || `${requestedDays.join(', ')} (${requestedStart} - ${requestedEnd} WIB)`,
+      hariPraktik: requestedDays,
+      jamMulai: requestedStart,
+      jamSelesai: requestedEnd,
+      status: 'Aktif',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setDoctorPoliMappings(prev => [...prev, newMapping]);
+    audit('CREATE', 'DoctorPoliMapping', newMapping.id, { field_name: 'mapping', new_value: `${doc.nama} -> ${poli.nama}` });
+    return { success: true, message: `Penugasan dokter ${doc.nama} pada ${poli.nama} berhasil disimpan.`, data: newMapping };
+  };
+
+  const updateDoctorPoliMapping = (id: string, updates: Partial<DoctorPoliMapping>) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const current = doctorPoliMappings.find(m => m.id === id);
+    if (!current) return { success: false, message: 'Data penempatan tidak ditemukan.' };
+
+    const targetDoctorId = updates.doctorId || current.doctorId;
+    const requestedDays = updates.hariPraktik || current.hariPraktik;
+    const requestedStart = updates.jamMulai || current.jamMulai;
+    const requestedEnd = updates.jamSelesai || current.jamSelesai;
+
+    if (updates.hariPraktik || updates.jamMulai || updates.jamSelesai) {
+      const conflict = doctorPoliMappings.find(m => {
+        if (m.id === id || m.doctorId !== targetDoctorId || m.status !== 'Aktif') return false;
+        const commonDay = m.hariPraktik.find(d => requestedDays.includes(d));
+        if (!commonDay) return false;
+        const isOverlap = !(requestedEnd <= m.jamMulai || requestedStart >= m.jamSelesai);
+        return isOverlap;
+      });
+
+      if (conflict) {
+        return {
+          success: false,
+          message: `VALIDASI BENTROK JADWAL: Jadwal bertabrakan dengan penugasan di ${conflict.poliName} (${conflict.jadwalPraktik})!`
+        };
+      }
+    }
+
+    setDoctorPoliMappings(prev => prev.map(m => {
+      if (m.id === id) {
+        const updated = {
+          ...m,
+          ...updates,
+          jadwalPraktik: updates.jadwalPraktik || `${requestedDays.join(', ')} (${requestedStart} - ${requestedEnd} WIB)`,
+          updatedAt: new Date().toISOString()
+        };
+        audit('UPDATE', 'DoctorPoliMapping', id, { field_name: 'jadwal', new_value: updated.jadwalPraktik });
+        return updated;
+      }
+      return m;
+    }));
+    return { success: true, message: 'Pengaturan penempatan dokter berhasil diperbarui.' };
+  };
+
+  const deleteDoctorPoliMapping = (id: string) => {
+    if (user?.roleId !== 'R01') {
+      return { success: false, message: 'Hanya Super Administrator (R01) yang memiliki wewenang mengelola Master Data!' };
+    }
+    const target = doctorPoliMappings.find(m => m.id === id);
+    if (!target) return { success: false, message: 'Data penempatan tidak ditemukan.' };
+
+    setDoctorPoliMappings(prev => prev.filter(m => m.id !== id));
+    audit('DELETE', 'DoctorPoliMapping', id, { field_name: 'mapping', old_value: `${target.doctorName} - ${target.poliName}` });
+    return { success: true, message: `Penugasan dokter ${target.doctorName} pada ${target.poliName} berhasil dihapus.` };
+  };
+
+  const toggleDoctorPoliMappingStatus = (id: string) => {
+    if (user?.roleId !== 'R01') return;
+    setDoctorPoliMappings(prev => prev.map(m => {
+      if (m.id === id) {
+        const nextStatus = m.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+        audit('UPDATE', 'DoctorPoliMapping', id, { field_name: 'status', old_value: m.status, new_value: nextStatus });
+        return { ...m, status: nextStatus, updatedAt: new Date().toISOString() };
+      }
+      return m;
+    }));
+  };
+
+  const getDoctorsForPoli = (poliIdOrName: string): MasterDokter[] => {
+    if (!poliIdOrName) return [];
+    const activeMappings = doctorPoliMappings.filter(m => 
+      m.status === 'Aktif' && 
+      (m.poliId.toLowerCase() === poliIdOrName.toLowerCase() || 
+       m.poliName.toLowerCase() === poliIdOrName.toLowerCase() ||
+       poliIdOrName.toLowerCase().includes(m.poliName.toLowerCase()) ||
+       m.poliName.toLowerCase().includes(poliIdOrName.toLowerCase()))
+    );
+
+    if (activeMappings.length > 0) {
+      const docIds = new Set(activeMappings.map(m => m.doctorId));
+      return masterDokter.filter(d => docIds.has(d.id) && d.status === 'Aktif');
+    }
+
+    const fallbackPoli = MASTER_POLIKLINIK.find(p => 
+      p.name.toLowerCase() === poliIdOrName.toLowerCase() || 
+      poliIdOrName.toLowerCase().includes(p.name.toLowerCase()) ||
+      p.name.toLowerCase().includes(poliIdOrName.toLowerCase())
+    );
+    if (fallbackPoli) {
+      const fallbackIds = new Set(fallbackPoli.doctors.map(d => d.id));
+      const foundInMaster = masterDokter.filter(d => fallbackIds.has(d.id) && d.status === 'Aktif');
+      if (foundInMaster.length > 0) return foundInMaster;
+      return fallbackPoli.doctors.map(d => ({
+        id: d.id,
+        nama: d.name,
+        nik: '3174051000000000',
+        strSip: 'STR-KONSIL-2026',
+        spesialisasi: d.specialty,
+        telepon: '081280001000',
+        status: 'Aktif'
+      }));
+    }
+
+    return masterDokter.filter(d => d.status === 'Aktif').slice(0, 3);
   };
 
   return (
@@ -1268,7 +2180,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         chooseClass: sb.chooseClass,
         changePassword: sb.changePassword,
         resetActiveClass: sb.resetActiveClass,
-        setMemberActive: sb.setMemberActive
+        setMemberActive: sb.setMemberActive,
+        // Master Data SIMRS
+        masterRuangan,
+        masterBed,
+        masterDokter,
+        masterPoli,
+        doctorPoliMappings,
+        addMasterRuangan,
+        updateMasterRuangan,
+        deleteMasterRuangan,
+        toggleMasterRuanganStatus,
+        addMasterBed,
+        updateMasterBed,
+        deleteMasterBed,
+        toggleMasterBedStatus,
+        addMasterDokter,
+        updateMasterDokter,
+        deleteMasterDokter,
+        toggleMasterDokterStatus,
+        addMasterPoli,
+        updateMasterPoli,
+        deleteMasterPoli,
+        toggleMasterPoliStatus,
+        addDoctorPoliMapping,
+        updateDoctorPoliMapping,
+        deleteDoctorPoliMapping,
+        toggleDoctorPoliMappingStatus,
+        getDoctorsForPoli,
+        logAudit,
+        classes,
+        activeClassId,
+        setActiveClassId,
+        addClass,
+        importRoster,
+        toggleUserActive,
+        batchSetUsersActive,
+        resetClassSimulation,
+        createDosenUser
       }}
     >
       {children}

@@ -11,6 +11,8 @@ import Swal from 'sweetalert2';
 export const AuditTrailView: React.FC = () => {
   const { auditTrail, user, logAudit } = useApp();
   const isSuperAdmin = user?.roleId === 'R01';
+  const isDosen = user?.roleId === 'R03';
+  const canViewAudit = isSuperAdmin || isDosen;
 
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,8 +22,8 @@ export const AuditTrailView: React.FC = () => {
   // Modal Detail Inspection
   const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
 
-  // If user is not superadmin, render security restricted lock screen
-  if (!isSuperAdmin) {
+  // If user is neither superadmin nor dosen, render security restricted lock screen
+  if (!canViewAudit) {
     return (
       <div className="space-y-6">
         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-rose-200 shadow-xs p-8 text-center space-y-4">
@@ -29,9 +31,9 @@ export const AuditTrailView: React.FC = () => {
             <Lock className="w-8 h-8" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-slate-900">Akses Terbatas: Super Administrator Only</h2>
+            <h2 className="text-lg font-bold text-slate-900">Akses Terbatas: Super Administrator & Dosen Pengampu</h2>
             <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-              Modul <strong>Audit Trail (Log Diff Integrity)</strong> memuat catatan forensik keamanan, manipulasi basis data, dan riwayat IP Address. Berdasarkan KMK HK.01.07/MENKES/1423/2022 dan ISO 27001, modul ini hanya dapat diakses oleh pemegang peran <strong>Super Administrator (R01)</strong>.
+              Modul <strong>Audit Trail (Log Diff Integrity)</strong> memuat catatan forensik keamanan, manipulasi basis data, dan jejak aktivitas praktikum mahasiswa. Berdasarkan KMK HK.01.07/MENKES/1423/2022 dan ISO 27001, modul ini hanya dapat diakses oleh <strong>Super Administrator (R01)</strong> dan <strong>Dosen Pengampu (R03)</strong>.
             </p>
           </div>
 
