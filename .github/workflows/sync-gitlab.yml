@@ -1,0 +1,37 @@
+# Copies main (and tags) to the campus GitLab copy after every change on GitHub.
+# GitHub stays the place to edit; see docs/operations/gitlab-sync.md.
+name: Sync to GitLab
+
+on:
+  push:
+    branches: [main]
+    tags: ["*"]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-gitlab
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      GITLAB_REPO: gitlab.com/esaunggul/simrs-rmik.git
+    steps:
+      - name: Check the token is set
+        run: |
+          if [ -z "$GITLAB_TOKEN" ]; then
+            echo "::warning::GITLAB_TOKEN secret is not set; skipping the GitLab sync."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+      - uses: actions/checkout@v4
+        if: env.SKIP != '1'
+        with:
+          fetch-depth: 0
+      - name: Push to GitLab
+        if: env.SKIP != '1'
+        run: |
+          # A plain (non-force) push: if someone committed on GitLab directly, this fails instead of overwriting it.
+          git push "https://oauth2:${GITLAB_TOKEN}@${GITLAB_REPO}" refs/remotes/origin/main:refs/heads/main
+          git push "https://oauth2:${GITLAB_TOKEN}@${GITLAB_REPO}" --tags

@@ -12,6 +12,7 @@ Guides:
 - [Installing on the campus server](docs/operations/campus-deployment.md) (IT unit)
 - [Development](docs/operations/development.md)
 - [Demo walkthrough](docs/operations/demo-walkthrough.md)
+- [GitHub → GitLab sync](docs/operations/gitlab-sync.md)
 
 Quick trial with Docker: `cp .env.example .env`, set `POSTGRES_PASSWORD` and `JWT_SECRET`, then `docker compose up -d --build` and open http://localhost:8080 after the bootstrap step in the campus guide.
 
