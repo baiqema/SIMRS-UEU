@@ -23,6 +23,7 @@ The documents below were written from the code on `main` (commit `c768230`, Octo
 | [Development](operations/development.md) | Developers |
 | [Demo walkthrough](operations/demo-walkthrough.md) | Demo presenters |
 | [Setup checklist](operations/setup-checklist.md) | Ema, Daniel, IT unit |
+| [GitHub → GitLab sync](operations/gitlab-sync.md) | Daniel, IT unit |
 
 ## Historical
 

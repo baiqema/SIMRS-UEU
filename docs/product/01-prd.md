@@ -80,7 +80,7 @@ Full detail is in [Users, roles and access](02-users-and-roles.md).
 
 ## 8. Constraints
 
-- **Editing workflow.** Ema edits the screens in Google AI Studio, which syncs only with GitHub. GitHub (`baiqema/SIMRS-UEU`) is therefore the main copy and the campus GitLab is refreshed from it. Screens may only reach data through `useApp()`; `server/`, `db/`, `src/data-layer/` and `src/lib/` must not be edited from AI Studio.
+- **Editing workflow.** Ema edits the screens in Google AI Studio, which syncs only with GitHub. GitHub (`baiqema/SIMRS-UEU`) is therefore the main copy; the campus GitLab copy is updated from it automatically on every change to `main` (see [gitlab-sync.md](../operations/gitlab-sync.md)). Screens may only reach data through `useApp()`; `server/`, `db/`, `src/data-layer/` and `src/lib/` must not be edited from AI Studio.
 - **Infrastructure.** Production runs on the Esa Unggul PostgreSQL server (14 or newer) and one Node.js 20 process or Docker container. No cloud services.
 - **Language.** The interface is in Bahasa Indonesia.
 - **Data.** Simulated only; class data may be wiped at any time.
@@ -112,3 +112,4 @@ These come from reading the code and should be decided by the product owner.
 | --- | --- |
 | Up to Oct 2026 | Screens built by Ema in Google AI Studio, data in the browser only |
 | 2026-10-23 | Server mode merged (PR #2): own Node.js API on PostgreSQL, classes, rosters, audit trail, Docker. Supabase design dropped. Praktikum module removed. First copy pushed to the campus GitLab. |
+| 2026-10-23 | Automatic GitHub → GitLab sync (PR #3). |

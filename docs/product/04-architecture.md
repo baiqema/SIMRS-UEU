@@ -111,12 +111,12 @@ All data is simulated, so the system holds no personal data, but the same contro
 
 ```mermaid
 flowchart TB
-  GH["GitHub baiqema/SIMRS-UEU<br/>main copy, AI Studio sync, CI"] -->|refresh per version| GL["GitLab esaunggul/simrs-rmik<br/>campus copy"]
+  GH["GitHub baiqema/SIMRS-UEU<br/>main copy, AI Studio sync, CI"] -->|"sync-gitlab workflow on every push to main"| GL["GitLab esaunggul/simrs-rmik<br/>campus copy"]
   GL -->|git clone, docker build| SRV["Campus server<br/>Docker container or Node process, port 8080"]
   SRV --> DB[("Campus PostgreSQL")]
 ```
 
-- Install, configuration, backups and updates are in [campus-deployment.md](../operations/campus-deployment.md).
+- Install, configuration, backups and updates are in [campus-deployment.md](../operations/campus-deployment.md). How GitLab is kept in step is in [gitlab-sync.md](../operations/gitlab-sync.md).
 - Migrations run in name order, each in its own transaction, recorded in `simrs_meta.schema_migrations`; `MIGRATE_ON_START=true` applies them at startup. `db/seed.sql` only rewrites the template class, so it is safe to reload.
 - Sizing for a class of about 50 students: 1 vCPU and 1 GB RAM for the app.
 - Health check: `GET /api/health`.
