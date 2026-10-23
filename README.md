@@ -9,6 +9,7 @@ A teaching hospital information system (SIMRS) for RMIK students at Universitas 
 
 Guides:
 
+- [Product and system documentation](docs/README.md): PRD, roles and access, functional requirements, architecture, data model, API reference
 - [Installing on the campus server](docs/operations/campus-deployment.md) (IT unit)
 - [Development](docs/operations/development.md)
 - [Demo walkthrough](docs/operations/demo-walkthrough.md)
